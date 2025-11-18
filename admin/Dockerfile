@@ -10,14 +10,11 @@ ARG GIT_SHA
 
 WORKDIR /app
 
-# Copy package files and config
+# Copy package files
 COPY package.json ./
 COPY package-lock.json ./
 COPY tsconfig.json ./
-COPY tsconfig.app.json ./
-COPY tsconfig.node.json ./
 COPY vite.config.ts ./
-COPY postcss.config.js ./
 
 # Install dependencies
 RUN npm ci --legacy-peer-deps
@@ -25,7 +22,6 @@ RUN npm ci --legacy-peer-deps
 # Copy source code
 COPY src ./src
 COPY index.html ./
-COPY public ./public
 
 # Set environment variables for build
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
