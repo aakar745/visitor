@@ -27,8 +27,7 @@ import { PrintQueueController } from './print-queue.controller';
         connection: {
           host: configService.get<string>('REDIS_HOST', 'localhost'),
           port: configService.get<number>('REDIS_PORT', 6379),
-          // Optional: Add password if Redis has auth
-          // password: configService.get<string>('REDIS_PASSWORD'),
+          password: configService.get<string>('REDIS_PASSWORD'),
         },
         defaultJobOptions: {
           attempts: 3, // Retry failed jobs 3 times

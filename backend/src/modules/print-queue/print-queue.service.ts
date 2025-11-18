@@ -42,10 +42,12 @@ export class PrintQueueService implements OnModuleInit {
     // Create Redis client for distributed locking
     const redisHost = this.configService.get<string>('REDIS_HOST', 'localhost');
     const redisPort = this.configService.get<number>('REDIS_PORT', 6379);
+    const redisPassword = this.configService.get<string>('REDIS_PASSWORD');
     
     this.redisClient = new Redis({
       host: redisHost,
       port: redisPort,
+      password: redisPassword,
     });
 
     this.logger.log('✅ Print Queue Service initialized');
