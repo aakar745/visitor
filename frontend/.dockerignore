@@ -1,0 +1,61 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+.pnp
+.pnp.js
+
+# Testing
+coverage
+.nyc_output
+
+# Next.js
+.next
+out
+dist
+build
+
+# Production
+.vercel
+.env*.local
+
+# Environment files (use build args instead)
+.env
+.env.*
+!env.production.txt
+!env.example.txt
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+!README.md
+
+# Config files not needed in Docker
+.eslintrc.json
+.prettierrc
+components.json
+
+# Firebase
+.firebaserc
+firebase.json
+
