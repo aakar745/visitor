@@ -1,27 +1,38 @@
 import { useQuery } from '@tanstack/react-query';
-import { locationsApi, INDIAN_STATES } from '../api/locations';
+import { locationsApi } from '../api/locations';
 
 /**
- * Hook to fetch all Indian states
+ * Hook to fetch all countries
  */
-export function useStates() {
-  return useQuery<string[], Error>({
-    queryKey: ['locations', 'states'],
-    queryFn: () => locationsApi.getStates(),
-    staleTime: Infinity, // States don't change, cache forever
-    initialData: INDIAN_STATES, // Use fallback as initial data
+export function useCountries() {
+  return useQuery({
+    queryKey: ['locations', 'countries'],
+    queryFn: () => locationsApi.getCountries(),
+    staleTime: Infinity, // Countries don't change often, cache forever
   });
 }
 
 /**
- * Hook to fetch cities for a specific state
+ * Hook to lookup location by pincode
  */
-export function useCities(state: string | null) {
-  return useQuery<string[], Error>({
-    queryKey: ['locations', 'cities', state],
-    queryFn: () => locationsApi.getCitiesByState(state!),
-    enabled: !!state && state.length > 0,
+export function usePincodeLookup(pincode: string) {
+  return useQuery({
+    queryKey: ['locations', 'pincode', pincode],
+    queryFn: () => locationsApi.lookupByPincode(pincode),
+    enabled: !!pincode && pincode.length === 6,
     staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+}
+
+/**
+ * Hook for pincode autocomplete search
+ */
+export function usePincodeAutocomplete(query: string, limit: number = 10) {
+  return useQuery({
+    queryKey: ['locations', 'pincode-autocomplete', query, limit],
+    queryFn: () => locationsApi.autocompletePincodes(query, limit),
+    enabled: !!query && query.length >= 2,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
 
