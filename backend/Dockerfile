@@ -44,12 +44,12 @@ RUN npm ci --only=production && \
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 
-# Copy necessary runtime files
-COPY --chown=nestjs:nodejs ./templates ./templates
+# Copy necessary runtime files (optional - uncomment if you add templates folder)
+# COPY --chown=nestjs:nodejs ./templates ./templates
 
 # Create necessary directories
-RUN mkdir -p uploads backups && \
-    chown -R nestjs:nodejs uploads backups
+RUN mkdir -p uploads backups templates && \
+    chown -R nestjs:nodejs uploads backups templates
 
 # Switch to non-root user
 USER nestjs
