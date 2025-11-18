@@ -40,59 +40,11 @@ export default defineConfig({
     minify: 'terser',
     cssCodeSplit: true,
 
-    // Rollup options for code splitting
+    // Rollup options - let Vite handle automatic chunking
     rollupOptions: {
       output: {
-        // Manual chunk splitting for better caching
-        manualChunks: (id) => {
-          // React core
-          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
-            return 'react-vendor';
-          }
-          
-          // React Router
-          if (id.includes('node_modules/react-router')) {
-            return 'router-vendor';
-          }
-          
-          // State management
-          if (id.includes('node_modules/@reduxjs') || 
-              id.includes('node_modules/react-redux') ||
-              id.includes('node_modules/@tanstack/react-query')) {
-            return 'state-vendor';
-          }
-          
-          // Ant Design and Icons - keep together to avoid React context issues
-          if (id.includes('node_modules/antd') || id.includes('node_modules/@ant-design/icons')) {
-            return 'antd-vendor';
-          }
-          
-          // Date libraries
-          if (id.includes('node_modules/date-fns') || 
-              id.includes('node_modules/dayjs')) {
-            return 'date-vendor';
-          }
-          
-          // Form libraries
-          if (id.includes('node_modules/react-hook-form') ||
-              id.includes('node_modules/@hookform') ||
-              id.includes('node_modules/yup')) {
-            return 'form-vendor';
-          }
-          
-          // Utilities
-          if (id.includes('node_modules/axios') || 
-              id.includes('node_modules/js-cookie')) {
-            return 'utils-vendor';
-          }
-          
-          // All other node_modules
-          if (id.includes('node_modules')) {
-            return 'vendor';
-          }
-        },
-        
-        // Asset file naming
+        // Automatic chunking - Vite handles this optimally
+        // Manual chunking was causing React context issues
         chunkFileNames: 'js/[name]-[hash].js',
         entryFileNames: 'js/[name]-[hash].js',
         assetFileNames: (assetInfo) => {
