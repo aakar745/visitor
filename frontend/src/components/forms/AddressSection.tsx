@@ -3,17 +3,10 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { UseFormReturn } from 'react-hook-form';
 import { RegistrationFormData } from '@/types';
-import { useStates, useCities } from '@/lib/hooks/useLocations';
-import { Skeleton } from '@/components/ui/skeleton';
+import { usePincodeLookup } from '@/lib/hooks/useLocations';
+import { useEffect } from 'react';
 
 interface AddressSectionProps {
   form: UseFormReturn<RegistrationFormData>;
@@ -27,89 +20,28 @@ export function AddressSection({ form }: AddressSectionProps) {
     setValue,
   } = form;
 
-  const selectedState = watch('state');
-
-  // Fetch states and cities
-  const { data: states = [], isLoading: statesLoading } = useStates();
-  const { data: cities = [], isLoading: citiesLoading } = useCities(selectedState);
+  const pincode = watch('pincode');
+  
+  // Auto-fill state and city based on pincode
+  const { data: pincodeData } = usePincodeLookup(pincode || '');
+  
+  useEffect(() => {
+    if (pincodeData && pincodeData.found) {
+      if (pincodeData.state?.name) {
+        setValue('state', pincodeData.state.name, { shouldValidate: true });
+      }
+      if (pincodeData.city?.name) {
+        setValue('city', pincodeData.city.name, { shouldValidate: true });
+      }
+    }
+  }, [pincodeData, setValue]);
 
   return (
     <div className="space-y-6">
       <h3 className="text-lg font-semibold">Address Information</h3>
 
       <div className="grid gap-6 md:grid-cols-3">
-        {/* State */}
-        <div className="space-y-2">
-          <Label htmlFor="state" className="required">
-            State
-          </Label>
-          {statesLoading ? (
-            <Skeleton className="h-10 w-full" />
-          ) : (
-            <Select
-              value={selectedState || ''}
-              onValueChange={(value) => {
-                setValue('state', value, { shouldValidate: true });
-                setValue('city', '', { shouldValidate: false }); // Reset city when state changes
-              }}
-            >
-              <SelectTrigger className={errors.state ? 'border-red-500' : ''}>
-                <SelectValue placeholder="Select state" />
-              </SelectTrigger>
-              <SelectContent>
-                {states.map((state) => (
-                  <SelectItem key={state} value={state}>
-                    {state}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          {errors.state && (
-            <p className="text-sm text-red-500">{errors.state.message}</p>
-          )}
-        </div>
-
-        {/* City */}
-        <div className="space-y-2">
-          <Label htmlFor="city" className="required">
-            City
-          </Label>
-          {citiesLoading ? (
-            <Skeleton className="h-10 w-full" />
-          ) : cities.length > 0 ? (
-            <Select
-              value={watch('city') || ''}
-              onValueChange={(value) => setValue('city', value, { shouldValidate: true })}
-              disabled={!selectedState}
-            >
-              <SelectTrigger className={errors.city ? 'border-red-500' : ''}>
-                <SelectValue placeholder="Select city" />
-              </SelectTrigger>
-              <SelectContent>
-                {cities.map((city) => (
-                  <SelectItem key={city} value={city}>
-                    {city}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <Input
-              id="city"
-              type="text"
-              placeholder="Enter city name"
-              {...register('city')}
-              className={errors.city ? 'border-red-500' : ''}
-              disabled={!selectedState}
-            />
-          )}
-          {errors.city && (
-            <p className="text-sm text-red-500">{errors.city.message}</p>
-          )}
-        </div>
-
-        {/* Pincode */}
+        {/* Pincode - Enter first to auto-fill state & city */}
         <div className="space-y-2">
           <Label htmlFor="pincode" className="required">
             Pincode
@@ -125,6 +57,47 @@ export function AddressSection({ form }: AddressSectionProps) {
           />
           {errors.pincode && (
             <p className="text-sm text-red-500">{errors.pincode.message}</p>
+          )}
+          {pincodeData && pincodeData.found && (
+            <p className="text-xs text-green-600">
+              ✓ {pincodeData.area && `${pincodeData.area}, `}{pincodeData.city?.name}, {pincodeData.state?.name}
+            </p>
+          )}
+        </div>
+
+        {/* State - Auto-filled from pincode */}
+        <div className="space-y-2">
+          <Label htmlFor="state" className="required">
+            State
+          </Label>
+          <Input
+            id="state"
+            type="text"
+            placeholder="State"
+            {...register('state')}
+            className={errors.state ? 'border-red-500' : ''}
+            readOnly={pincodeData?.found}
+          />
+          {errors.state && (
+            <p className="text-sm text-red-500">{errors.state.message}</p>
+          )}
+        </div>
+
+        {/* City - Auto-filled from pincode */}
+        <div className="space-y-2">
+          <Label htmlFor="city" className="required">
+            City
+          </Label>
+          <Input
+            id="city"
+            type="text"
+            placeholder="City"
+            {...register('city')}
+            className={errors.city ? 'border-red-500' : ''}
+            readOnly={pincodeData?.found}
+          />
+          {errors.city && (
+            <p className="text-sm text-red-500">{errors.city.message}</p>
           )}
         </div>
 
