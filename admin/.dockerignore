@@ -43,7 +43,8 @@ docs
 .editorconfig
 .eslintrc.js
 .prettierrc
-tsconfig*.json
-vite.config.ts
+# Keep tsconfig*.json and vite.config.ts - Vite needs these for building!
+# tsconfig*.json
+# vite.config.ts
 postcss.config.js
 
