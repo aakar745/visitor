@@ -23,7 +23,6 @@ import {
   MenuOutlined,
   CalendarOutlined,
   SafetyOutlined,
-  ScanOutlined,
   EnvironmentOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';

@@ -43,9 +43,10 @@ export const useImportProgress = (importId: string | null, enabled = true) => {
     queryKey: importQueryKeys.progress(importId || ''),
     queryFn: () => importApi.getProgress(importId!),
     enabled: enabled && !!importId,
-    refetchInterval: (data) => {
+    refetchInterval: (query) => {
       // Stop polling if import is completed or failed
-      const status = data?.data?.status;
+      const data = query.state.data as any;
+      const status = data?.data?.status || data?.status;
       if (
         status === 'completed' ||
         status === 'failed' ||

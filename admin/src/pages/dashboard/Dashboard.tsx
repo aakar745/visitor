@@ -358,7 +358,7 @@ const Dashboard: React.FC = () => {
         <Table
           columns={columns}
           dataSource={recentVisitors}
-          rowKey={(record) => record._id || record.id || `visitor-${Math.random()}`}
+          rowKey={(record) => record.id || `visitor-${Math.random()}`}
           pagination={false}
           size="middle"
         />

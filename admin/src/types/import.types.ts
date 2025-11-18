@@ -1,16 +1,20 @@
-export enum ImportStatus {
-  PENDING = 'pending',
-  PROCESSING = 'processing',
-  COMPLETED = 'completed',
-  FAILED = 'failed',
-  PARTIALLY_COMPLETED = 'partially_completed',
-}
+export const ImportStatus = {
+  PENDING: 'pending',
+  PROCESSING: 'processing',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+  PARTIALLY_COMPLETED: 'partially_completed',
+} as const;
 
-export enum DuplicateStrategy {
-  SKIP = 'skip',
-  UPDATE = 'update',
-  CREATE_NEW = 'create_new',
-}
+export type ImportStatus = typeof ImportStatus[keyof typeof ImportStatus];
+
+export const DuplicateStrategy = {
+  SKIP: 'skip',
+  UPDATE: 'update',
+  CREATE_NEW: 'create_new',
+} as const;
+
+export type DuplicateStrategy = typeof DuplicateStrategy[keyof typeof DuplicateStrategy];
 
 export interface ImportProgress {
   importId: string;

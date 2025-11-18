@@ -47,14 +47,17 @@ export const useApiSelect = (field: Omit<CustomField, 'id'>, dependencyValue?: s
     enabled: shouldUseDropdown && (!field.apiConfig?.dependsOn || !!dependencyValue),
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     retry: 1, // Only retry once
-    onError: () => {
+  });
+
+  // Update API availability based on query result
+  useEffect(() => {
+    if (error) {
       console.warn(`API not available for ${field.name}, falling back to text input`);
       setIsApiAvailable(false);
-    },
-    onSuccess: () => {
+    } else if (options) {
       setIsApiAvailable(true);
-    },
-  });
+    }
+  }, [error, options, field.name]);
 
   // Fallback options from field configuration
   const fallbackOptions: ApiSelectOption[] = field.options?.map(opt => ({
