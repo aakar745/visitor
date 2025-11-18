@@ -1,23 +1,31 @@
 # ================================
 # Stage 1: Build Stage
 # ================================
-FROM node:22-alpine AS builder
+FROM node:22-alpine AS build
 
-# Set working directory
+# Declare build arguments
+ARG VITE_API_BASE_URL
+ARG VITE_ENV
+ARG GIT_SHA
+
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy package files and config
+COPY package.json ./
+COPY package-lock.json ./
+COPY tsconfig.json ./
+COPY tsconfig.app.json ./
+COPY tsconfig.node.json ./
+COPY vite.config.ts ./
+COPY postcss.config.js ./
 
 # Install dependencies
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Copy source code
-COPY . .
-
-# Build arguments for environment variables
-ARG VITE_API_BASE_URL
-ARG VITE_ENV=production
+COPY src ./src
+COPY index.html ./
+COPY public ./public
 
 # Set environment variables for build
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
@@ -27,23 +35,20 @@ ENV VITE_ENV=$VITE_ENV
 RUN npm run build
 
 # ================================
-# Stage 2: Production Stage (Nginx)
+# Stage 2: Production Stage
 # ================================
-FROM nginx:1.25-alpine
+FROM node:22-alpine
 
-# Copy built application from builder
-COPY --from=builder /app/dist /usr/share/nginx/html
+WORKDIR /app
 
-# Copy custom nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Install serve package for serving static files
+RUN npm install -g serve
+
+# Copy built application
+COPY --from=build /app/dist ./dist
 
 # Expose port
-EXPOSE 80
+EXPOSE 5000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
-
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
-
+# Serve the built React app with SPA routing support
+CMD ["serve", "-s", "dist", "-l", "5000"]
