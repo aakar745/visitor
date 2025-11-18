@@ -62,30 +62,9 @@ export default defineConfig({
             return 'state-vendor';
           }
           
-          // Ant Design - split into smaller chunks
-          if (id.includes('node_modules/antd')) {
-            // Split Ant Design components by category
-            if (id.includes('antd/es/form') || 
-                id.includes('antd/es/input') ||
-                id.includes('antd/es/select') ||
-                id.includes('antd/es/date-picker')) {
-              return 'antd-forms';
-            }
-            if (id.includes('antd/es/table') || 
-                id.includes('antd/es/pagination')) {
-              return 'antd-tables';
-            }
-            if (id.includes('antd/es/modal') || 
-                id.includes('antd/es/drawer') ||
-                id.includes('antd/es/notification')) {
-              return 'antd-overlays';
-            }
-            return 'antd-core';
-          }
-          
-          // Ant Design Icons
-          if (id.includes('node_modules/@ant-design/icons')) {
-            return 'antd-icons';
+          // Ant Design and Icons - keep together to avoid React context issues
+          if (id.includes('node_modules/antd') || id.includes('node_modules/@ant-design/icons')) {
+            return 'antd-vendor';
           }
           
           // Date libraries
