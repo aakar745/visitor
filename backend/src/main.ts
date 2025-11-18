@@ -1,0 +1,189 @@
+import { NestFactory } from '@nestjs/core';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import compression from 'compression';
+import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
+import { AppModule } from './app.module';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+
+async function bootstrap() {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+    // CORS is configured manually below with app.enableCors() - don't enable here
+  });
+
+  const configService = app.get(ConfigService);
+
+  // Security - Configure Helmet to allow images from uploads
+  if (configService.get('ENABLE_HELMET', true)) {
+    app.use(
+      helmet({
+        crossOriginResourcePolicy: { policy: 'cross-origin' },
+        contentSecurityPolicy: {
+          directives: {
+            defaultSrc: ["'self'"],
+            imgSrc: ["'self'", 'data:', 'blob:', '*'],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            scriptSrc: ["'self'"],
+          },
+        },
+      }),
+    );
+  }
+
+  // Compression
+  if (configService.get('ENABLE_COMPRESSION', true)) {
+    app.use(compression());
+  }
+
+  // Cookie parser
+  app.use(cookieParser());
+
+  // Static file serving for uploads with CORS support
+  const uploadDir = configService.get('UPLOAD_DIR', './uploads');
+  app.useStaticAssets(uploadDir, {
+    prefix: '/uploads/',
+    setHeaders: (res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.setHeader('Access-Control-Allow-Methods', 'GET');
+      res.setHeader('Cache-Control', 'public, max-age=31536000');
+    },
+  });
+  console.log(`📁 Static files served from: ${uploadDir} at /uploads/ (CORS enabled)`);
+
+  // CORS configuration
+  const corsOriginsString = configService.get<string>('CORS_ORIGINS') || 'http://localhost:5173';
+  const corsOrigins = corsOriginsString.split(',').map(origin => origin.trim());
+  
+  console.log('🔒 CORS Configuration:');
+  console.log('   Allowed Origins:', corsOrigins);
+  console.log('   Credentials: true');
+  
+  app.enableCors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, Postman, or server-to-server)
+      if (!origin) return callback(null, true);
+      
+      // Check if origin is in allowed list
+      if (corsOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        console.warn(`⚠️  Blocked by CORS: ${origin}`);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true, // Must be true for cookies/credentials
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type', 
+      'Authorization', 
+      'Accept',
+      'X-Requested-With',
+      'x-csrf-token', // Required for CSRF protection
+    ],
+    exposedHeaders: ['Set-Cookie'],
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+  });
+
+  // API prefix and versioning
+  app.setGlobalPrefix('api');
+  
+  app.enableVersioning({
+    type: VersioningType.URI,
+    defaultVersion: '1',
+  });
+
+  // Global validation pipe
+  if (configService.get('ENABLE_VALIDATION_PIPE', true)) {
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true, // Strip properties that don't have decorators
+        forbidNonWhitelisted: true, // Throw error if non-whitelisted properties exist
+        transform: true, // Transform payloads to DTO instances
+        transformOptions: {
+          enableImplicitConversion: true,
+        },
+      }),
+    );
+  }
+
+  // Global exception filter
+  app.useGlobalFilters(new AllExceptionsFilter());
+
+  // Global interceptors
+  app.useGlobalInterceptors(
+    new LoggingInterceptor(),
+    new TransformInterceptor(),
+  );
+
+  // Swagger API documentation
+  if (configService.get('ENABLE_SWAGGER', true)) {
+    const config = new DocumentBuilder()
+      .setTitle(configService.get('APP_NAME', 'Visitor Management System'))
+      .setDescription('Enterprise-grade API for visitor and exhibition management')
+      .setVersion('1.0')
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          name: 'JWT',
+          description: 'Enter JWT token',
+          in: 'header',
+        },
+        'JWT-auth',
+      )
+      .addTag('Auth', 'Authentication endpoints')
+      .addTag('Users', 'User management')
+      .addTag('Roles', 'Role and permissions management')
+      .addTag('Exhibitions', 'Exhibition management')
+      .addTag('Visitors', 'Visitor management')
+      .addTag('Exhibitors', 'Exhibitor management')
+      .addTag('Payments', 'Payment processing')
+      .addTag('Badges', 'Badge generation')
+      .addTag('Notifications', 'Email and SMS notifications')
+      .addTag('Settings', 'System settings')
+      .addTag('Analytics', 'Analytics and reporting')
+      .build();
+
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+        tagsSorter: 'alpha',
+        operationsSorter: 'alpha',
+      },
+    });
+  }
+
+  // Graceful shutdown
+  app.enableShutdownHooks();
+
+  const port = configService.get('PORT', 3000);
+  const host = configService.get('HOST', '0.0.0.0');
+  
+  await app.listen(port, host);
+
+  console.log(`
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                                                               ║
+    ║   🚀 Visitor Management System API                           ║
+    ║                                                               ║
+    ║   Environment: ${configService.get('NODE_ENV', 'development').padEnd(48)} ║
+    ║   Server:      http://${host}:${port.toString().padEnd(39)} ║
+    ║   API Docs:    http://${host}:${port}/api/docs${' '.repeat(26)} ║
+    ║   Health:      http://${host}:${port}/health${' '.repeat(29)} ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+  `);
+}
+
+bootstrap();
+

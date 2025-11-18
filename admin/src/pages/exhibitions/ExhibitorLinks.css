@@ -1,0 +1,120 @@
+/* Exhibitor Links Page Styles */
+
+.exhibitor-links-page {
+  padding: 24px;
+}
+
+.exhibitor-card {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+}
+
+.exhibitor-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.exhibitor-stats-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+}
+
+.exhibitor-stats-card .ant-statistic-title {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.exhibitor-stats-card .ant-statistic-content {
+  color: white;
+}
+
+.exhibitor-avatar-large {
+  border: 2px solid #f0f0f0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.exhibitor-link-cell {
+  background: #f5f7fa;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  display: inline-block;
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exhibitor-table .ant-table-thead > tr > th {
+  background: #fafafa;
+  font-weight: 600;
+  color: #262626;
+}
+
+.exhibitor-row-active {
+  background: #f6ffed !important;
+}
+
+.exhibitor-row-inactive {
+  background: #fafafa !important;
+  opacity: 0.7;
+}
+
+.qr-modal-content {
+  text-align: center;
+  padding: 24px;
+}
+
+.qr-code-container {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  display: inline-block;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #f0f0f0;
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.stat-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.top-performer-badge {
+  background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+  color: white;
+  border: none;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+}
+
+.search-filter-bar {
+  background: #fafafa;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+

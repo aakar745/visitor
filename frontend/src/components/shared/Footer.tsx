@@ -1,0 +1,159 @@
+import Link from 'next/link';
+import { Calendar, Mail, MapPin, Phone } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+
+export function Footer() {
+  const currentYear = new Date().getFullYear();
+
+  return (
+    <footer className="border-t bg-gradient-to-b from-background to-muted/30">
+      <div className="container mx-auto max-w-7xl px-4 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          {/* Brand */}
+          <div className="space-y-4">
+            <Link href="/" className="flex items-center space-x-2 group">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-primary to-purple-600 rounded-lg blur-lg opacity-50" />
+                <div className="relative bg-gradient-to-r from-primary to-purple-600 p-2 rounded-lg">
+                  <Calendar className="h-5 w-5 text-white" />
+                </div>
+              </div>
+              <span className="text-xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+                ExhibitHub
+              </span>
+            </Link>
+            <p className="text-sm text-muted-foreground max-w-xs">
+              Your premier platform for discovering and registering for exhibitions and events worldwide.
+            </p>
+          </div>
+
+          {/* Quick Links */}
+          <div>
+            <h3 className="font-semibold mb-4">Quick Links</h3>
+            <ul className="space-y-2 text-sm">
+              <li>
+                <Link
+                  href="/"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Browse Exhibitions
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/#about"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  About Us
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/#features"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Features
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/#contact"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Contact
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Resources */}
+          <div>
+            <h3 className="font-semibold mb-4">Resources</h3>
+            <ul className="space-y-2 text-sm">
+              <li>
+                <Link
+                  href="/help"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Help Center
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/privacy"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/terms"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Terms of Service
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/faq"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  FAQ
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Contact */}
+          <div>
+            <h3 className="font-semibold mb-4">Contact Us</h3>
+            <ul className="space-y-3 text-sm">
+              <li className="flex items-start gap-2 text-muted-foreground">
+                <Mail className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <a
+                  href="mailto:info@exhibithub.com"
+                  className="hover:text-foreground transition-colors"
+                >
+                  info@exhibithub.com
+                </a>
+              </li>
+              <li className="flex items-start gap-2 text-muted-foreground">
+                <Phone className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <a
+                  href="tel:+1234567890"
+                  className="hover:text-foreground transition-colors"
+                >
+                  +1 (234) 567-890
+                </a>
+              </li>
+              <li className="flex items-start gap-2 text-muted-foreground">
+                <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <span>123 Exhibition St, Event City, EC 12345</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <Separator className="my-8" />
+
+        {/* Bottom Bar */}
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
+          <p>&copy; {currentYear} ExhibitHub. All rights reserved.</p>
+          <div className="flex items-center gap-6">
+            <Link href="/privacy" className="hover:text-foreground transition-colors">
+              Privacy
+            </Link>
+            <Link href="/terms" className="hover:text-foreground transition-colors">
+              Terms
+            </Link>
+            <Link href="/cookies" className="hover:text-foreground transition-colors">
+              Cookies
+            </Link>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
+

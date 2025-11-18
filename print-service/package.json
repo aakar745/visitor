@@ -1,0 +1,92 @@
+{
+  "name": "visitor-badge-print-service",
+  "version": "1.0.0",
+  "description": "Local print service for Brother QL-800 thermal label printer",
+  "main": "electron-main.js",
+  "scripts": {
+    "start": "node server.js",
+    "worker": "node print-worker.js",
+    "dev": "nodemon server.js",
+    "test": "node test-print.js",
+    "gui": "electron .",
+    "gui-dev": "set NODE_ENV=development && electron .",
+    "build": "electron-builder",
+    "build-win": "electron-builder --win",
+    "dist": "electron-builder --win --x64"
+  },
+  "keywords": [
+    "brother",
+    "ql-800",
+    "thermal",
+    "printer",
+    "label",
+    "badge"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.13.2",
+    "bullmq": "^5.63.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "ioredis": "^5.8.2",
+    "node-windows": "^1.0.0-beta.8",
+    "pdf-lib": "^1.17.1",
+    "pdf-to-printer": "^5.6.1",
+    "puppeteer-core": "^24.30.0",
+    "qrcode": "^1.5.3",
+    "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "electron": "^39.2.0",
+    "electron-builder": "^26.0.12",
+    "nodemon": "^3.0.2"
+  },
+  "build": {
+    "appId": "com.visitor.print-service",
+    "productName": "Print Service Manager",
+    "copyright": "Copyright © 2025",
+    "npmRebuild": false,
+    "buildDependenciesFromSource": false,
+    "asar": false,
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron-main.js",
+      "electron-preload.js",
+      "server.js",
+      "print-worker.js",
+      "gui/**/*",
+      "labels/",
+      "redis/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "gui/icon.ico",
+      "forceCodeSigning": false,
+      "signAndEditExecutable": false,
+      "verifyUpdateCodeSignature": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Print Service Manager",
+      "runAfterFinish": true,
+      "installerIcon": "gui/icon.ico",
+      "uninstallerIcon": "gui/icon.ico",
+      "license": "LICENSE.txt"
+    }
+  }
+}

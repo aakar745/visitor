@@ -1,0 +1,34 @@
+===========================================
+REDIS CONFIGURATION FOR PRINT SERVICE
+===========================================
+
+Add these variables to your print-service/.env file:
+
+# Redis Configuration (Queue System)
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# Printer Configuration  
+PRINTER_NAME=Brother QL-800
+AUTO_PRINT=true
+
+# Server Configuration
+PORT=9100
+
+===========================================
+STARTING THE SERVICES
+===========================================
+
+1. Start Redis (Docker):
+   docker start visitor-redis
+
+2. Start Print Service (API - optional, for manual print endpoint):
+   npm start
+
+3. Start Print Worker (REQUIRED for queue processing):
+   npm run worker
+
+IMPORTANT: The print worker must be running to process queued jobs!
+
+===========================================
+

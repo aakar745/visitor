@@ -1,0 +1,144 @@
+'use client';
+
+import Link from 'next/link';
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Calendar, Menu, X, Sparkles } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { ThemeToggle } from './ThemeToggle';
+
+export function Header() {
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 10);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  return (
+    <header
+      className={cn(
+        'sticky top-0 z-50 w-full transition-all duration-300',
+        isScrolled
+          ? 'bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b shadow-sm'
+          : 'bg-transparent'
+      )}
+    >
+      <div className="container mx-auto max-w-7xl">
+        <div className="flex h-16 items-center justify-between px-4">
+          {/* Logo */}
+          <Link href="/" className="flex items-center space-x-2 group">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-primary to-purple-600 rounded-lg blur-lg opacity-50 group-hover:opacity-75 transition-opacity" />
+              <div className="relative bg-gradient-to-r from-primary to-purple-600 p-2 rounded-lg">
+                <Calendar className="h-5 w-5 text-white" />
+              </div>
+            </div>
+            <span className="text-xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+              ExhibitHub
+            </span>
+          </Link>
+
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center space-x-1">
+            <Link href="/">
+              <Button variant="ghost" className="text-sm font-medium">
+                Exhibitions
+              </Button>
+            </Link>
+            <Link href="/#about">
+              <Button variant="ghost" className="text-sm font-medium">
+                About
+              </Button>
+            </Link>
+            <Link href="/#features">
+              <Button variant="ghost" className="text-sm font-medium">
+                Features
+              </Button>
+            </Link>
+            <Link href="/#contact">
+              <Button variant="ghost" className="text-sm font-medium">
+                Contact
+              </Button>
+            </Link>
+          </nav>
+
+          {/* Theme Toggle & CTA Button */}
+          <div className="hidden md:flex items-center space-x-2">
+            <ThemeToggle />
+            <Button
+              asChild
+              className="bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+            >
+              <Link href="/#exhibitions" className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4" />
+                Browse Events
+              </Link>
+            </Button>
+          </div>
+
+          {/* Mobile Menu Button & Theme Toggle */}
+          <div className="flex md:hidden items-center space-x-2">
+            <ThemeToggle />
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-2 rounded-lg hover:bg-muted transition-colors"
+            >
+              {isMobileMenuOpen ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Menu */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden border-t bg-background/95 backdrop-blur">
+            <nav className="flex flex-col space-y-1 p-4">
+              <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
+                <Button variant="ghost" className="w-full justify-start text-sm font-medium">
+                  Exhibitions
+                </Button>
+              </Link>
+              <Link href="/#about" onClick={() => setIsMobileMenuOpen(false)}>
+                <Button variant="ghost" className="w-full justify-start text-sm font-medium">
+                  About
+                </Button>
+              </Link>
+              <Link href="/#features" onClick={() => setIsMobileMenuOpen(false)}>
+                <Button variant="ghost" className="w-full justify-start text-sm font-medium">
+                  Features
+                </Button>
+              </Link>
+              <Link href="/#contact" onClick={() => setIsMobileMenuOpen(false)}>
+                <Button variant="ghost" className="w-full justify-start text-sm font-medium">
+                  Contact
+                </Button>
+              </Link>
+              <Button
+                asChild
+                className="w-full mt-4 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white"
+              >
+                <Link
+                  href="/#exhibitions"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center justify-center gap-2"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Browse Events
+                </Link>
+              </Button>
+            </nav>
+          </div>
+        )}
+      </div>
+    </header>
+  );
+}
+

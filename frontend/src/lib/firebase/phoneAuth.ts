@@ -1,0 +1,175 @@
+import {
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+  ConfirmationResult,
+  PhoneAuthProvider,
+  signInWithCredential,
+} from 'firebase/auth';
+import { auth } from './config';
+
+// Declare global for reCAPTCHA
+declare global {
+  interface Window {
+    recaptchaVerifier: RecaptchaVerifier | undefined;
+    recaptchaWidgetId: number | undefined;
+  }
+}
+
+/**
+ * Initialize reCAPTCHA verifier for phone authentication
+ * @param containerId - ID of the HTML element where reCAPTCHA will be rendered
+ * @param onSuccess - Callback when reCAPTCHA is solved
+ * @param onError - Callback when reCAPTCHA encounters an error
+ */
+export const initializeRecaptcha = (
+  containerId: string = 'recaptcha-container',
+  onSuccess?: () => void,
+  onError?: (error: Error) => void
+): RecaptchaVerifier => {
+  // Clear existing verifier if any
+  if (window.recaptchaVerifier) {
+    window.recaptchaVerifier.clear();
+    window.recaptchaVerifier = undefined;
+  }
+
+  try {
+    const recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
+      size: 'invisible', // Use invisible reCAPTCHA for better UX
+      callback: () => {
+        console.log('✅ reCAPTCHA solved successfully');
+        onSuccess?.();
+      },
+      'expired-callback': () => {
+        console.warn('⚠️ reCAPTCHA expired');
+        const error = new Error('reCAPTCHA expired. Please try again.');
+        onError?.(error);
+      },
+      'error-callback': (error: Error) => {
+        console.error('❌ reCAPTCHA error:', error);
+        onError?.(error);
+      },
+    });
+
+    window.recaptchaVerifier = recaptchaVerifier;
+    
+    console.log('🔒 reCAPTCHA verifier initialized (invisible mode)');
+    return recaptchaVerifier;
+  } catch (error) {
+    console.error('❌ Error initializing reCAPTCHA:', error);
+    throw error;
+  }
+};
+
+/**
+ * Send OTP to the provided phone number
+ * @param phoneNumber - Phone number in E.164 format (e.g., +919999999999)
+ * @returns ConfirmationResult object for OTP verification
+ */
+export const sendOTP = async (phoneNumber: string): Promise<ConfirmationResult> => {
+  try {
+    // Ensure reCAPTCHA is initialized
+    if (!window.recaptchaVerifier) {
+      initializeRecaptcha();
+    }
+
+    // Send OTP via Firebase
+    const confirmationResult = await signInWithPhoneNumber(
+      auth,
+      phoneNumber,
+      window.recaptchaVerifier!
+    );
+
+    console.log('OTP sent successfully to:', phoneNumber);
+    return confirmationResult;
+  } catch (error: any) {
+    console.error('Error sending OTP:', error);
+    
+    // Clear reCAPTCHA on error to allow retry
+    if (window.recaptchaVerifier) {
+      window.recaptchaVerifier.clear();
+      window.recaptchaVerifier = undefined;
+    }
+
+    // Provide user-friendly error messages
+    if (error.code === 'auth/invalid-phone-number') {
+      throw new Error('Invalid phone number format. Please check and try again.');
+    } else if (error.code === 'auth/too-many-requests') {
+      throw new Error('Too many attempts. Please try again later.');
+    } else if (error.code === 'auth/quota-exceeded') {
+      throw new Error('SMS quota exceeded. Please contact support.');
+    } else {
+      throw new Error(error.message || 'Failed to send OTP. Please try again.');
+    }
+  }
+};
+
+/**
+ * Verify the OTP entered by the user
+ * @param confirmationResult - ConfirmationResult from sendOTP
+ * @param otp - OTP code entered by user
+ * @returns Promise<boolean> - true if verification successful
+ */
+export const verifyOTP = async (
+  confirmationResult: ConfirmationResult,
+  otp: string
+): Promise<boolean> => {
+  try {
+    // Verify the OTP code
+    const result = await confirmationResult.confirm(otp);
+    
+    if (result.user) {
+      console.log('OTP verified successfully for:', result.user.phoneNumber);
+      
+      // Sign out immediately after verification
+      // We only need to verify the phone number, not keep the user signed in
+      await auth.signOut();
+      
+      return true;
+    }
+    
+    return false;
+  } catch (error: any) {
+    console.error('Error verifying OTP:', error);
+    
+    // Provide user-friendly error messages
+    if (error.code === 'auth/invalid-verification-code') {
+      throw new Error('Invalid OTP. Please check and try again.');
+    } else if (error.code === 'auth/code-expired') {
+      throw new Error('OTP has expired. Please request a new code.');
+    } else {
+      throw new Error(error.message || 'Failed to verify OTP. Please try again.');
+    }
+  }
+};
+
+/**
+ * Clean up reCAPTCHA verifier
+ */
+export const cleanupRecaptcha = () => {
+  if (window.recaptchaVerifier) {
+    try {
+      window.recaptchaVerifier.clear();
+    } catch (error) {
+      console.error('Error clearing reCAPTCHA:', error);
+    }
+    window.recaptchaVerifier = undefined;
+  }
+};
+
+/**
+ * Format phone number to E.164 format
+ * @param phoneNumber - Phone number with country code
+ * @returns Formatted phone number or null if invalid
+ */
+export const formatPhoneNumber = (phoneNumber: string): string | null => {
+  // Remove all non-digit characters except '+'
+  const cleaned = phoneNumber.replace(/[^\d+]/g, '');
+  
+  // Ensure it starts with '+'
+  if (!cleaned.startsWith('+')) {
+    return `+${cleaned}`;
+  }
+  
+  return cleaned;
+};
+

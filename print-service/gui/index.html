@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>Print Service Manager</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="header-content">
+        <h1>
+          <svg class="icon-printer" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"></path>
+            <path d="M6 14h12v8H6z"></path>
+          </svg>
+          Print Service Manager
+        </h1>
+        <p class="subtitle">Brother QL-800 Label Printer</p>
+      </div>
+    </header>
+
+    <!-- Status Cards -->
+    <div class="status-grid">
+      <!-- Print Worker Status -->
+      <div class="status-card">
+        <div class="status-header">
+          <h3>Print Worker (Queue)</h3>
+          <span class="status-badge" id="worker-status">🔴 Stopped</span>
+        </div>
+        <p class="status-description">Processes print jobs from Redis queue</p>
+        <div class="button-group">
+          <button id="btn-start-worker" class="btn btn-primary">
+            <span class="btn-icon">▶</span> Start Worker
+          </button>
+          <button id="btn-stop-worker" class="btn btn-secondary" disabled>
+            <span class="btn-icon">■</span> Stop Worker
+          </button>
+        </div>
+      </div>
+
+      <!-- HTTP Server Status -->
+      <div class="status-card">
+        <div class="status-header">
+          <h3>HTTP Server (Legacy)</h3>
+          <span class="status-badge" id="server-status">🔴 Stopped</span>
+        </div>
+        <p class="status-description">Direct print endpoint (port 9100)</p>
+        <div class="button-group">
+          <button id="btn-start-server" class="btn btn-primary">
+            <span class="btn-icon">▶</span> Start Server
+          </button>
+          <button id="btn-stop-server" class="btn btn-secondary" disabled>
+            <span class="btn-icon">■</span> Stop Server
+          </button>
+        </div>
+      </div>
+
+      <!-- Redis Status -->
+      <div class="status-card">
+        <div class="status-header">
+          <h3>Redis Connection</h3>
+          <span class="status-badge" id="redis-status">⏳ Checking...</span>
+        </div>
+        <p class="status-description">Required for queue system</p>
+        <button id="btn-check-redis" class="btn btn-secondary">
+          <span class="btn-icon">🔄</span> Check Redis
+        </button>
+      </div>
+    </div>
+
+    <!-- Configuration Section -->
+    <div class="config-section">
+      <h2>Configuration</h2>
+      
+      <div class="config-grid">
+        <div class="config-item">
+          <label for="printer-select">Printer</label>
+          <select id="printer-select" class="input">
+            <option value="">Loading printers...</option>
+          </select>
+          <button id="btn-refresh-printers" class="btn btn-small">
+            <span class="btn-icon">🔄</span> Refresh
+          </button>
+        </div>
+
+        <div class="config-item">
+          <label for="redis-host">Redis Host</label>
+          <input type="text" id="redis-host" class="input" placeholder="localhost" value="localhost">
+        </div>
+
+        <div class="config-item">
+          <label for="redis-port">Redis Port</label>
+          <input type="number" id="redis-port" class="input" placeholder="6379" value="6379">
+        </div>
+
+        <div class="config-item config-item-full">
+          <button id="btn-save-config" class="btn btn-primary">
+            <span class="btn-icon">💾</span> Save Configuration
+          </button>
+          <button id="btn-open-folder" class="btn btn-secondary">
+            <span class="btn-icon">📁</span> Open Labels Folder
+          </button>
+          <button id="btn-cleanup-labels" class="btn btn-warning">
+            <span class="btn-icon">🧹</span> Cleanup Old Labels (7+ days)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Logs Section -->
+    <div class="logs-section">
+      <div class="logs-header">
+        <h2>Service Logs</h2>
+        <button id="btn-clear-logs" class="btn btn-small">Clear</button>
+      </div>
+      <div id="logs" class="logs-container"></div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>💡 Tip: This window can be minimized to system tray. Right-click the tray icon for quick actions.</p>
+    </footer>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
+
