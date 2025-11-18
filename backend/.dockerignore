@@ -43,8 +43,7 @@ docs
 .editorconfig
 .eslintrc.js
 .prettierrc
-tsconfig*.json
-nest-cli.json
+# Keep tsconfig*.json and nest-cli.json - NestJS needs these for building!
 uploads/*
 backups/*
 
