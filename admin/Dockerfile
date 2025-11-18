@@ -13,14 +13,21 @@ WORKDIR /app
 # Copy package files
 COPY package.json ./
 COPY package-lock.json ./
+
+# Copy TypeScript config files (required for project references)
 COPY tsconfig.json ./
+COPY tsconfig.app.json ./
+COPY tsconfig.node.json ./
+
+# Copy Vite config
 COPY vite.config.ts ./
 
 # Install dependencies
 RUN npm ci --legacy-peer-deps
 
-# Copy source code
+# Copy source code and assets
 COPY src ./src
+COPY public ./public
 COPY index.html ./
 
 # Set environment variables for build
