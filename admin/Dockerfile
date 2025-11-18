@@ -5,6 +5,7 @@ FROM node:22-alpine AS build
 
 # Declare build arguments
 ARG VITE_API_BASE_URL
+ARG VITE_FRONTEND_URL
 ARG VITE_ENV
 ARG GIT_SHA
 
@@ -32,6 +33,7 @@ COPY index.html ./
 
 # Set environment variables for build
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_FRONTEND_URL=$VITE_FRONTEND_URL
 ENV VITE_ENV=$VITE_ENV
 
 # Build the application
