@@ -21,13 +21,25 @@ interface PageProps {
   }>;
 }
 
+// Enable ISR - Revalidate every 60 seconds
+export const revalidate = 60;
+
 /**
- * Generate metadata for SEO
+ * Generate metadata for SEO with timeout protection
  */
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   try {
     const { exhibitionSlug } = await params;
-    const exhibition = await exhibitionsApi.getExhibitionBySlug(exhibitionSlug);
+    
+    // Add timeout protection
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Metadata fetch timeout')), 3000)
+    );
+    
+    const exhibition = await Promise.race([
+      exhibitionsApi.getExhibitionBySlug(exhibitionSlug),
+      timeoutPromise
+    ]);
 
     return {
       title: `${exhibition.name} - Registration via Exhibitor`,
@@ -35,13 +47,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   } catch (error) {
     return {
-      title: 'Exhibition Not Found',
+      title: 'Exhibition Registration',
+      description: 'Register for upcoming exhibitions',
     };
   }
 }
 
 /**
- * Exhibitor Referral Page - Server Side Rendered
+ * Exhibitor Referral Page - Server Side Rendered with timeout protection
  * Shows exhibition details with exhibitor branding and registration form
  */
 export default async function ExhibitorReferralPage({ params }: PageProps) {
@@ -49,15 +62,28 @@ export default async function ExhibitorReferralPage({ params }: PageProps) {
   let exhibition, exhibitor;
 
   try {
-    // Fetch exhibition first
-    exhibition = await exhibitionsApi.getExhibitionBySlug(exhibitionSlug);
-
-    // Then fetch exhibitor using exhibition ID
-    exhibitor = await exhibitorsApi.getExhibitorBySlug(
-      exhibition._id,
-      exhibitorSlug
+    // Add timeout protection for server-side fetching
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('API timeout')), 5000)
     );
-  } catch (error) {
+
+    // Fetch exhibition first with timeout
+    exhibition = await Promise.race([
+      exhibitionsApi.getExhibitionBySlug(exhibitionSlug),
+      timeoutPromise
+    ]);
+
+    // Then fetch exhibitor using exhibition ID with timeout
+    const exhibitorTimeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Exhibitor API timeout')), 5000)
+    );
+    
+    exhibitor = await Promise.race([
+      exhibitorsApi.getExhibitorBySlug(exhibition._id, exhibitorSlug),
+      exhibitorTimeoutPromise
+    ]);
+  } catch (error: any) {
+    console.error('[ExhibitorReferralPage] Fetch error:', error?.message || error);
     notFound();
   }
 

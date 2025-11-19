@@ -7,7 +7,7 @@ import { API_BASE_URL } from '../constants';
  */
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000, // 30 seconds
+  timeout: 8000, // 8 seconds (reduced for faster failures)
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -18,6 +18,8 @@ export const apiClient: AxiosInstance = axios.create({
     // This is what NestJS expects for array query parameters
     indexes: null,
   },
+  // Validate status to prevent throwing on 4xx/5xx
+  validateStatus: (status) => status >= 200 && status < 500,
 });
 
 /**

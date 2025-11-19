@@ -1,5 +1,11 @@
 // API Configuration
+// In production, always use the public API URL
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000/api/v1';
+
+// Log API URL for debugging
+if (typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
+  console.log('[API Config] Using API Base URL:', API_BASE_URL);
+}
 
 // App Configuration
 export const APP_CONFIG = {

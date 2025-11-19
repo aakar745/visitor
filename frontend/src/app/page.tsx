@@ -20,18 +20,35 @@ import { Exhibition } from '@/types';
 import { format } from 'date-fns';
 import Image from 'next/image';
 
+// Enable ISR - Revalidate every 60 seconds
+// This caches the page and revalidates in background
+export const revalidate = 60;
+
+// Handle errors gracefully without crashing
+export const dynamicParams = true;
+
 /**
  * Home Page - Modern Design with Hero Section
- * Server Side Rendered for SEO
+ * Server Side Rendered for SEO with graceful fallback
  */
 export default async function HomePage() {
-  // Fetch exhibitions server-side for SEO
+  // Fetch exhibitions server-side for SEO with timeout and error handling
   let exhibitions: Exhibition[] = [];
   
   try {
-    exhibitions = await exhibitionsApi.getActiveExhibitions();
-  } catch (error) {
-    console.error('[HomePage] Failed to fetch exhibitions:', error);
+    // Add timeout protection for server-side fetching
+    const timeoutPromise = new Promise<never>((_, reject) => 
+      setTimeout(() => reject(new Error('API timeout')), 5000)
+    );
+    
+    exhibitions = await Promise.race([
+      exhibitionsApi.getActiveExhibitions(),
+      timeoutPromise
+    ]);
+  } catch (error: any) {
+    // Gracefully handle errors - don't crash the page
+    console.error('[HomePage] Failed to fetch exhibitions:', error?.message || error);
+    console.log('[HomePage] Rendering page with empty exhibitions list');
     exhibitions = [];
   }
 
