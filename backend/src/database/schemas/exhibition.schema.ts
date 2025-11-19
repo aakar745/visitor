@@ -21,7 +21,17 @@ export enum RegistrationCategory {
   GUEST = 'guest',
 }
 
-@Schema({ _id: true }) // Ensure MongoDB generates _id for subdocuments
+@Schema({ 
+  _id: true, // Ensure MongoDB generates _id for subdocuments
+  toJSON: {
+    virtuals: true,
+    transform: function(doc, ret: any) {
+      // Ensure _id is always serialized as 'id' for frontend
+      ret.id = ret._id?.toString();
+      return ret;
+    }
+  }
+})
 export class DayPriceOption {
   _id: Types.ObjectId; // Explicitly add _id field
   
@@ -44,7 +54,17 @@ export class DayPriceOption {
   isActive: boolean;
 }
 
-@Schema({ _id: true }) // Ensure MongoDB generates _id for subdocuments
+@Schema({ 
+  _id: true, // Ensure MongoDB generates _id for subdocuments
+  toJSON: {
+    virtuals: true,
+    transform: function(doc, ret: any) {
+      // Ensure _id is always serialized as 'id' for frontend
+      ret.id = ret._id?.toString();
+      return ret;
+    }
+  }
+})
 export class PricingTier {
   _id: Types.ObjectId; // Explicitly add _id field
   
@@ -82,7 +102,17 @@ export class PricingTier {
   allSessionsPrice?: number;
 }
 
-@Schema({ _id: true }) // Ensure MongoDB generates _id for subdocuments
+@Schema({ 
+  _id: true, // Ensure MongoDB generates _id for subdocuments
+  toJSON: {
+    virtuals: true,
+    transform: function(doc, ret: any) {
+      // Ensure _id is always serialized as 'id' for frontend
+      ret.id = ret._id?.toString();
+      return ret;
+    }
+  }
+})
 export class InterestOption {
   _id: Types.ObjectId; // Explicitly add _id field
   
