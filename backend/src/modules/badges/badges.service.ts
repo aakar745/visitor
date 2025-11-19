@@ -175,41 +175,66 @@ export class BadgesService {
    */
   private async loadBadgeLogo(logoUrl: string): Promise<Buffer | null> {
     try {
-      // Check if it's a local file path (starts with uploads/)
-      if (logoUrl.includes('/uploads/')) {
-        const fileName = logoUrl.split('/uploads/')[1];
-        const localPath = path.join(this.uploadDir, fileName);
+      this.logger.log(`[Badge Logo] Attempting to load: ${logoUrl}`);
+      
+      // Check if it's a local file path (contains /uploads/)
+      if (logoUrl && logoUrl.includes('/uploads/')) {
+        // Extract path after /uploads/
+        const uploadPath = logoUrl.split('/uploads/')[1];
+        const localPath = path.join(this.uploadDir, uploadPath);
         
-        this.logger.debug(`[Badge Logo] Loading from local: ${localPath}`);
+        this.logger.log(`[Badge Logo] Loading from local file system`);
+        this.logger.log(`[Badge Logo] Upload path: ${uploadPath}`);
+        this.logger.log(`[Badge Logo] Full local path: ${localPath}`);
+        
+        // Check if file exists before reading
+        try {
+          await fs.access(localPath);
+          this.logger.log(`[Badge Logo] File exists, reading...`);
+        } catch (err) {
+          this.logger.warn(`[Badge Logo] File not found at: ${localPath}`);
+          throw new Error(`File not found: ${localPath}`);
+        }
+        
         const buffer = await fs.readFile(localPath);
+        this.logger.log(`[Badge Logo] File loaded successfully (${buffer.length} bytes)`);
         
         // Resize logo to standard width (600px) while maintaining aspect ratio
-        return await sharp(buffer)
+        const resizedBuffer = await sharp(buffer)
           .resize(600, null, { 
             fit: 'inside',
             withoutEnlargement: true 
           })
           .png({ quality: 100, compressionLevel: 0 })
           .toBuffer();
+        
+        this.logger.log(`[Badge Logo] Logo resized and converted to PNG (${resizedBuffer.length} bytes)`);
+        return resizedBuffer;
       }
 
-      // Otherwise, fetch from HTTP URL
-      this.logger.debug(`[Badge Logo] Fetching from URL: ${logoUrl}`);
+      // If no /uploads/ in path, try fetching from HTTP URL
+      this.logger.log(`[Badge Logo] Fetching from remote URL: ${logoUrl}`);
       const response = await axios.get(logoUrl, { 
         responseType: 'arraybuffer',
-        timeout: 5000, // 5 second timeout
+        timeout: 10000, // 10 second timeout
       });
       
+      this.logger.log(`[Badge Logo] Remote fetch successful (${response.data.length} bytes)`);
+      
       // Resize to standard width with quality preservation
-      return await sharp(Buffer.from(response.data))
+      const resizedBuffer = await sharp(Buffer.from(response.data))
         .resize(600, null, { 
           fit: 'inside',
           withoutEnlargement: true 
         })
         .png({ quality: 100, compressionLevel: 0 })
         .toBuffer();
+      
+      this.logger.log(`[Badge Logo] Logo resized and converted to PNG (${resizedBuffer.length} bytes)`);
+      return resizedBuffer;
     } catch (error) {
-      this.logger.warn(`[Badge Logo] Failed to load: ${error.message}`);
+      this.logger.error(`[Badge Logo] Failed to load: ${error.message}`);
+      this.logger.error(`[Badge Logo] Stack trace: ${error.stack}`);
       return null; // Graceful fallback - badge will be generated without logo
     }
   }
