@@ -65,11 +65,15 @@ export class ExhibitionsService {
   private validateDates(dto: CreateExhibitionDto | UpdateExhibitionDto, isUpdate: boolean = false): void {
     const { registrationStartDate, registrationEndDate, onsiteStartDate, onsiteEndDate, paidStartDate, paidEndDate, isPaid } = dto;
     
-    // Get yesterday's date at end of day (to account for timezone differences)
+    // Get yesterday's date at end of day in UTC (to account for timezone differences)
     // This allows dates that are "today" in any reasonable timezone (±12 hours)
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    yesterday.setHours(23, 59, 59, 999);
+    const now = new Date();
+    const yesterday = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate() - 1,
+      23, 59, 59, 999
+    ));
 
     // SECURITY FIX (BUG-014): Validate dates are not in the past
     // For new exhibitions, all dates must be in the future
