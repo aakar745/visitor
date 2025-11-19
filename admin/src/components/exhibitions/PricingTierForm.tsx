@@ -16,7 +16,8 @@ import {
   Modal
 } from 'antd';
 import { PlusOutlined, DeleteOutlined, DollarOutlined } from '@ant-design/icons';
-import dayjs, { toBackendDate } from '../../utils/dayjs';
+import dayjs from '../../utils/dayjs';
+import { toBackendDate } from '../../utils/dayjs';
 import type { PricingTier, DayPriceOption } from '../../types/exhibitions';
 
 const { Text, Title } = Typography;
@@ -97,8 +98,8 @@ const PricingTierForm: React.FC<PricingTierFormProps> = ({
   // Generate day options based on tier's own date range (or exhibition dates as fallback)
   const generateDayOptions = (tierStartDate?: string, tierEndDate?: string): DayPriceOption[] => {
     // Use tier dates if available, otherwise fallback to exhibition dates
-    const startDate = tierStartDate || (exhibitionStartDate ? toBackendDate(dayjs(exhibitionStartDate)) : '');
-    const endDate = tierEndDate || (exhibitionEndDate ? toBackendDate(dayjs(exhibitionEndDate)) : '');
+    const startDate = tierStartDate || (exhibitionStartDate ? toBackendDate(dayjs(exhibitionStartDate), false) : '');
+    const endDate = tierEndDate || (exhibitionEndDate ? toBackendDate(dayjs(exhibitionEndDate), true) : ''); // End of day
     
     if (!startDate || !endDate) {
       return [];
@@ -240,8 +241,8 @@ const PricingTierForm: React.FC<PricingTierFormProps> = ({
     }
     
     return {
-      start: toBackendDate(availableStart),
-      end: toBackendDate(availableEnd)
+      start: toBackendDate(availableStart, false), // Start of day
+      end: toBackendDate(availableEnd, true) // End of day (23:59)
     };
   };
 
@@ -440,8 +441,8 @@ const PricingTierForm: React.FC<PricingTierFormProps> = ({
                             updatedTier.endDate = availableDates.end;
                           } else if (!tier.startDate && exhibitionStartDate) {
                             // Fallback: Auto-fill with exhibition dates as default
-                            updatedTier.startDate = toBackendDate(dayjs(exhibitionStartDate));
-                            updatedTier.endDate = exhibitionEndDate ? toBackendDate(dayjs(exhibitionEndDate)) : '';
+                            updatedTier.startDate = toBackendDate(dayjs(exhibitionStartDate), false);
+                            updatedTier.endDate = exhibitionEndDate ? toBackendDate(dayjs(exhibitionEndDate), true) : ''; // End of day
                           }
                         }
                         
@@ -520,7 +521,7 @@ const PricingTierForm: React.FC<PricingTierFormProps> = ({
                     placeholder="Select start date"
                     value={tier.startDate ? dayjs(tier.startDate) : null}
                     onChange={(date) => {
-                      const newStartDate = date ? toBackendDate(date) : '';
+                      const newStartDate = date ? toBackendDate(date, false) : ''; // Start of day
                       
                       // For Day-wise: handle date change with price regeneration
                       if (tier.ticketType === 'day_wise' && newStartDate && tier.endDate) {
@@ -589,7 +590,7 @@ const PricingTierForm: React.FC<PricingTierFormProps> = ({
                     placeholder="Select end date"
                     value={tier.endDate ? dayjs(tier.endDate) : null}
                     onChange={(date) => {
-                      const newEndDate = date ? toBackendDate(date) : '';
+                      const newEndDate = date ? toBackendDate(date, true) : ''; // End of day (23:59)
                       
                       // For Day-wise: handle date change with price regeneration
                       if (tier.ticketType === 'day_wise' && tier.startDate && newEndDate) {

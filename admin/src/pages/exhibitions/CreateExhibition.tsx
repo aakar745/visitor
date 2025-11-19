@@ -150,13 +150,13 @@ const CreateExhibition: React.FC = () => {
         tagline: values.tagline,
         description: values.description,
         venue: values.venue,
-        registrationStartDate: toBackendDate(values.registrationStartDate),
-        registrationEndDate: toBackendDate(values.registrationEndDate),
-        onsiteStartDate: toBackendDate(values.onsiteStartDate),
-        onsiteEndDate: toBackendDate(values.onsiteEndDate),
+        registrationStartDate: toBackendDate(values.registrationStartDate, false), // Start of day
+        registrationEndDate: toBackendDate(values.registrationEndDate, true), // End of day (23:59)
+        onsiteStartDate: toBackendDate(values.onsiteStartDate, false), // Start of day
+        onsiteEndDate: toBackendDate(values.onsiteEndDate, true), // End of day (23:59)
         isPaid: values.isPaid || false,
-        paidStartDate: values.isPaid && values.paidStartDate ? toBackendDate(values.paidStartDate) : undefined,
-        paidEndDate: values.isPaid && values.paidEndDate ? toBackendDate(values.paidEndDate) : undefined,
+        paidStartDate: values.isPaid && values.paidStartDate ? toBackendDate(values.paidStartDate, false) : undefined,
+        paidEndDate: values.isPaid && values.paidEndDate ? toBackendDate(values.paidEndDate, true) : undefined, // End of day
         pricingTiers: values.isPaid ? pricingTiers : [],
         allowedCategories: values.allowedCategories || ['general'],
         customFields,

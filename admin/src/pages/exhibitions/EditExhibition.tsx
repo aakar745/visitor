@@ -175,13 +175,13 @@ const EditExhibition: React.FC = () => {
         tagline: values.tagline,
         description: values.description,
         venue: values.venue,
-        registrationStartDate: toBackendDate(values.registrationStartDate) || undefined,
-        registrationEndDate: toBackendDate(values.registrationEndDate) || undefined,
-        onsiteStartDate: toBackendDate(values.onsiteStartDate) || undefined,
-        onsiteEndDate: toBackendDate(values.onsiteEndDate) || undefined,
+        registrationStartDate: toBackendDate(values.registrationStartDate, false) || undefined, // Start of day
+        registrationEndDate: toBackendDate(values.registrationEndDate, true) || undefined, // End of day (23:59)
+        onsiteStartDate: toBackendDate(values.onsiteStartDate, false) || undefined, // Start of day
+        onsiteEndDate: toBackendDate(values.onsiteEndDate, true) || undefined, // End of day (23:59)
         isPaid: values.isPaid || false,
-        paidStartDate: values.isPaid && values.paidStartDate ? toBackendDate(values.paidStartDate) || undefined : undefined,
-        paidEndDate: values.isPaid && values.paidEndDate ? toBackendDate(values.paidEndDate) || undefined : undefined,
+        paidStartDate: values.isPaid && values.paidStartDate ? toBackendDate(values.paidStartDate, false) || undefined : undefined,
+        paidEndDate: values.isPaid && values.paidEndDate ? toBackendDate(values.paidEndDate, true) || undefined : undefined, // End of day
         pricingTiers: values.isPaid ? pricingTiers : [],
         allowedCategories: values.allowedCategories || ['general'],
         customFields,

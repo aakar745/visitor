@@ -43,11 +43,22 @@ export const parseDate = (date: string | Date | dayjs.Dayjs) => {
 /**
  * Convert date to India timezone and format as ISO string
  * This should be used when sending dates to the backend
+ * 
+ * @param date - The date to convert
+ * @param setEndOfDay - If true, sets time to 23:59:59 (for end dates)
  */
-export const toBackendDate = (date: dayjs.Dayjs | undefined | null): string => {
+export const toBackendDate = (date: dayjs.Dayjs | undefined | null, setEndOfDay: boolean = false): string => {
   if (!date) return '';
+  
+  let adjustedDate = date;
+  
+  // If this is an end date, set to end of day (23:59:59)
+  if (setEndOfDay) {
+    adjustedDate = date.endOf('day');
+  }
+  
   // Convert to India timezone, then to ISO string
-  return date.tz('Asia/Kolkata').toISOString();
+  return adjustedDate.tz('Asia/Kolkata').toISOString();
 };
 
 /**
