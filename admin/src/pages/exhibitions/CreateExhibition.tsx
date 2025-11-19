@@ -150,13 +150,13 @@ const CreateExhibition: React.FC = () => {
         tagline: values.tagline,
         description: values.description,
         venue: values.venue,
-        registrationStartDate: toBackendDate(values.registrationStartDate, false), // Start of day
-        registrationEndDate: toBackendDate(values.registrationEndDate, true), // End of day (23:59)
-        onsiteStartDate: toBackendDate(values.onsiteStartDate, false), // Start of day
-        onsiteEndDate: toBackendDate(values.onsiteEndDate, true), // End of day (23:59)
+        registrationStartDate: toBackendDate(values.registrationStartDate, false),
+        registrationEndDate: toBackendDate(values.registrationEndDate, false),
+        onsiteStartDate: toBackendDate(values.onsiteStartDate, false),
+        onsiteEndDate: toBackendDate(values.onsiteEndDate, false),
         isPaid: values.isPaid || false,
         paidStartDate: values.isPaid && values.paidStartDate ? toBackendDate(values.paidStartDate, false) : undefined,
-        paidEndDate: values.isPaid && values.paidEndDate ? toBackendDate(values.paidEndDate, true) : undefined, // End of day
+        paidEndDate: values.isPaid && values.paidEndDate ? toBackendDate(values.paidEndDate, false) : undefined,
         pricingTiers: values.isPaid ? pricingTiers : [],
         allowedCategories: values.allowedCategories || ['general'],
         customFields,
@@ -380,13 +380,9 @@ const CreateExhibition: React.FC = () => {
                   showTime
                   format="DD/MM/YYYY HH:mm"
                   onChange={(date) => {
+                    // Auto-fill Exhibition Ends date when Registration Closes is set
                     if (date) {
-                      // Set this field to end of day (23:59:59) for proper end date
-                      const endOfDayDate = date.endOf('day');
-                      form.setFieldValue('registrationEndDate', endOfDayDate);
-                      
-                      // Auto-fill Exhibition Ends date with same end-of-day time
-                      form.setFieldValue('onsiteEndDate', endOfDayDate);
+                      form.setFieldValue('onsiteEndDate', date);
                     }
                   }}
                   disabledDate={(current) => {
@@ -480,12 +476,6 @@ const CreateExhibition: React.FC = () => {
                   size="middle"
                   showTime
                   format="DD/MM/YYYY HH:mm"
-                  onChange={(date) => {
-                    if (date) {
-                      // Set to end of day (23:59:59) for proper end date
-                      form.setFieldValue('onsiteEndDate', date.endOf('day'));
-                    }
-                  }}
                   disabledDate={(current) => {
                     if (!current) return false;
                     

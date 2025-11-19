@@ -71,28 +71,10 @@ export function PricingSection({ form, exhibition }: PricingSectionProps) {
 
   /**
    * Extract tier ID from tier object
-   * MongoDB subdocuments can have _id as ObjectId or string
    */
   const getTierId = (tier: PricingTier): string => {
-    // Try all possible ID properties
-    const id = tier._id || tier.id || (tier as any)._id;
-    
-    // Convert ObjectId to string if needed
-    if (id && typeof id === 'object' && id.toString) {
-      return id.toString();
-    }
-    
-    const idStr = id ? String(id) : '';
-    console.log('[getTierId] Extracting ID from tier:', {
-      tierName: tier.name,
-      tier_id: (tier as any)._id,
-      tier_id_type: typeof (tier as any)._id,
-      tier_dot_id: tier.id,
-      tier_dot_id_type: typeof tier.id,
-      result: idStr,
-    });
-    
-    return idStr;
+    const id = tier.id || (tier as any)._id;
+    return id ? String(id) : '';
   };
 
   /**
@@ -164,52 +146,21 @@ export function PricingSection({ form, exhibition }: PricingSectionProps) {
    * Auto-select pricing tier if only one option is available (run once)
    */
   useEffect(() => {
-    console.log('[PricingSection] Auto-selection check:', {
-      hasAutoSelected: hasAutoSelectedRef.current,
-      activeTiersLength: activeTiers.length,
-      selectedTierId,
-      activeTiers: activeTiers.map(t => ({
-        name: t.name,
-        id: getTierId(t),
-        ticketType: t.ticketType,
-        startDate: t.startDate,
-        endDate: t.endDate,
-        isActive: t.isActive,
-      })),
-    });
-    
-    if (hasAutoSelectedRef.current) {
-      console.log('[PricingSection] Auto-selection already ran, skipping');
-      return; // Already ran
-    }
+    if (hasAutoSelectedRef.current) return; // Already ran
     
     if (activeTiers.length === 1 && !selectedTierId) {
-      const tier = activeTiers[0];
-      const tierId = getTierId(tier);
-      console.log('[PricingSection] Auto-selecting single tier:', {
-        tierName: tier.name,
-        tierId,
-        tierIdType: typeof tierId,
-      });
-      
+      const tierId = getTierId(activeTiers[0]);
       if (tierId) {
         setValue('pricingTierId', tierId);
-        console.log('[PricingSection] Set pricingTierId to:', tierId);
         
         // Auto-select all sessions for day-wise
+        const tier = activeTiers[0];
         if (tier.ticketType === 'day_wise' && tier.allSessionsPrice) {
           setValue('selectedDays', [0]); // Select "all sessions"
-          console.log('[PricingSection] Auto-selected all sessions for day-wise tier');
         }
         
         hasAutoSelectedRef.current = true;
-      } else {
-        console.error('[PricingSection] Failed to get tier ID for auto-selection');
       }
-    } else {
-      console.log('[PricingSection] Auto-selection not triggered:', {
-        reason: activeTiers.length !== 1 ? `Multiple tiers (${activeTiers.length})` : 'Tier already selected',
-      });
     }
   }, [activeTiers, selectedTierId, setValue]);
 

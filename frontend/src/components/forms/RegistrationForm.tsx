@@ -404,35 +404,6 @@ export function RegistrationForm({ exhibition, exhibitor }: RegistrationFormProp
       return;
     }
     
-    // CRITICAL: Validate pricing tier selection for paid exhibitions
-    if (exhibition.isPaid) {
-      if (!data.pricingTierId) {
-        toast.error('Please select a pricing tier', {
-          description: 'A pricing tier selection is required for this paid exhibition',
-          duration: 5000,
-        });
-        console.error('[Form Submit] Missing pricing tier for paid exhibition');
-        return;
-      }
-      
-      // For day-wise tickets, validate that days are selected
-      const selectedTier = exhibition.pricingTiers?.find(t => {
-        const tierId = (t.id || (t as any)._id || '').toString();
-        return tierId === data.pricingTierId;
-      });
-      
-      if (selectedTier && selectedTier.ticketType === 'day_wise') {
-        if (!data.selectedDays || data.selectedDays.length === 0) {
-          toast.error('Please select at least one day', {
-            description: 'Day selection is required for this pricing tier',
-            duration: 5000,
-          });
-          console.error('[Form Submit] Missing day selection for day-wise pricing tier');
-          return;
-        }
-      }
-    }
-    
     // Filter out undefined values from selectedInterests
     const cleanedInterests = (data.selectedInterests || []).filter(id => id !== undefined && id !== null);
     

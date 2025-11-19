@@ -99,7 +99,7 @@ const PricingTierForm: React.FC<PricingTierFormProps> = ({
   const generateDayOptions = (tierStartDate?: string, tierEndDate?: string): DayPriceOption[] => {
     // Use tier dates if available, otherwise fallback to exhibition dates
     const startDate = tierStartDate || (exhibitionStartDate ? toBackendDate(dayjs(exhibitionStartDate), false) : '');
-    const endDate = tierEndDate || (exhibitionEndDate ? toBackendDate(dayjs(exhibitionEndDate), true) : ''); // End of day
+    const endDate = tierEndDate || (exhibitionEndDate ? toBackendDate(dayjs(exhibitionEndDate), false) : '');
     
     if (!startDate || !endDate) {
       return [];
@@ -242,7 +242,7 @@ const PricingTierForm: React.FC<PricingTierFormProps> = ({
     
     return {
       start: toBackendDate(availableStart, false), // Start of day
-      end: toBackendDate(availableEnd, true) // End of day (23:59)
+      end: toBackendDate(availableEnd, false)
     };
   };
 
@@ -442,7 +442,7 @@ const PricingTierForm: React.FC<PricingTierFormProps> = ({
                           } else if (!tier.startDate && exhibitionStartDate) {
                             // Fallback: Auto-fill with exhibition dates as default
                             updatedTier.startDate = toBackendDate(dayjs(exhibitionStartDate), false);
-                            updatedTier.endDate = exhibitionEndDate ? toBackendDate(dayjs(exhibitionEndDate), true) : ''; // End of day
+                            updatedTier.endDate = exhibitionEndDate ? toBackendDate(dayjs(exhibitionEndDate), false) : '';
                           }
                         }
                         
@@ -590,7 +590,7 @@ const PricingTierForm: React.FC<PricingTierFormProps> = ({
                     placeholder="Select end date"
                     value={tier.endDate ? dayjs(tier.endDate) : null}
                     onChange={(date) => {
-                      const newEndDate = date ? toBackendDate(date, true) : ''; // End of day (23:59)
+                      const newEndDate = date ? toBackendDate(date, false) : '';
                       
                       // For Day-wise: handle date change with price regeneration
                       if (tier.ticketType === 'day_wise' && tier.startDate && newEndDate) {

@@ -65,7 +65,6 @@ export const exhibitionsApi = {
 
   /**
    * Get active pricing tiers for an exhibition
-   * Filters tiers based on current date/time and isActive flag
    */
   getActivePricingTiers(exhibition: Exhibition) {
     if (!exhibition.isPaid || !exhibition.pricingTiers) {
@@ -73,28 +72,14 @@ export const exhibitionsApi = {
     }
 
     const now = new Date();
-    const activeTiers = exhibition.pricingTiers
-      .filter(tier => {
-        if (!tier.isActive) return false;
-        
-        // Parse dates from ISO strings
-        const tierStart = new Date(tier.startDate);
-        const tierEnd = new Date(tier.endDate);
-        
-        // Tier is active if current time is between start and end
-        // Use <= for start (inclusive) and <= for end (inclusive until end of day)
-        return now >= tierStart && now <= tierEnd;
-      })
+    return exhibition.pricingTiers
+      .filter(
+        (tier) =>
+          tier.isActive &&
+          new Date(tier.startDate) <= now &&
+          new Date(tier.endDate) >= now
+      )
       .sort((a, b) => a.price - b.price);
-    
-    console.log('[PricingTiers] Total tiers:', exhibition.pricingTiers.length);
-    console.log('[PricingTiers] Active tiers:', activeTiers.length);
-    console.log('[PricingTiers] Current time:', now.toISOString());
-    exhibition.pricingTiers.forEach(tier => {
-      console.log(`[PricingTiers] Tier "${tier.name}": ${tier.startDate} to ${tier.endDate}, isActive: ${tier.isActive}`);
-    });
-    
-    return activeTiers;
   },
 
   /**

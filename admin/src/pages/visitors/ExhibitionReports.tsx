@@ -1433,7 +1433,7 @@ const ExhibitionReports: React.FC = () => {
                         ...filters,
                         dateRange: {
                           start: toBackendDate(dates[0], false), // Start of day
-                          end: toBackendDate(dates[1], true) // End of day (23:59) to include full day
+                          end: toBackendDate(dates[1], false)
                         }
                       });
                     } else {

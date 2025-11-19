@@ -40,8 +40,7 @@ export enum ExhibitionStatus {
 }
 
 export interface PricingTier {
-  id?: string; // Optional for compatibility
-  _id?: string | any; // MongoDB subdocument ID (can be ObjectId)
+  id: string;
   name: string;
   description?: string;
   price: number;
