@@ -26,8 +26,14 @@ FROM node:22-alpine
 # Set working directory
 WORKDIR /app
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install dumb-init and fonts for badge generation
+RUN apk add --no-cache \
+    dumb-init \
+    fontconfig \
+    ttf-dejavu \
+    msttcorefonts-installer \
+    && update-ms-fonts \
+    && fc-cache -f
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
