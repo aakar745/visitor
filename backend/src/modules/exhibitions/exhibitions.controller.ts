@@ -246,7 +246,6 @@ export class ExhibitionsController {
    * Upload exhibition file (logo, banner, badge-logo)
    */
   @Post('upload')
-  @SkipCsrf() // Skip CSRF for file uploads - multipart/form-data requests have issues with CSRF tokens
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload exhibition file (logo, banner, badge-logo)' })

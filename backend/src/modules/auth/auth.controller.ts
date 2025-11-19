@@ -33,11 +33,13 @@ export class AuthController {
     
     // Set httpOnly cookies for production security
     const isProduction = this.configService.get('NODE_ENV') === 'production';
+    const cookieDomain = this.configService.get('COOKIE_DOMAIN'); // e.g., '.aakarvisitors.in' for subdomain sharing
     const cookieOptions = {
       httpOnly: true,
       secure: isProduction, // Only send over HTTPS in production
       sameSite: 'lax' as const, // Lax allows top-level navigation while maintaining security
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      domain: cookieDomain || undefined, // Share cookies across subdomains if configured
     };
 
     // Set access token cookie (shorter expiry)
@@ -56,6 +58,7 @@ export class AuthController {
       secure: isProduction,
       sameSite: 'lax',
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      domain: cookieDomain || undefined, // Share across subdomains if configured
     });
 
     // Also return tokens in response body for development/localStorage fallback
@@ -155,12 +158,14 @@ export class AuthController {
     // SECURITY FIX (BUG-010): Refresh CSRF token during token refresh
     // This prevents CSRF token expiry for long-running sessions
     // CSRF tokens expire after 24 hours, but users may stay logged in longer via token refresh
+    const cookieDomain = this.configService.get('COOKIE_DOMAIN');
     const csrfToken = crypto.randomBytes(32).toString('hex');
     response.cookie('XSRF-TOKEN', csrfToken, {
       httpOnly: false, // Must be readable by JavaScript for client to include in headers
       secure: isProduction,
       sameSite: 'lax',
       maxAge: 24 * 60 * 60 * 1000, // 24 hours (same as original CSRF token expiry)
+      domain: cookieDomain || undefined, // Share across subdomains if configured
     });
 
     return result;
