@@ -203,22 +203,38 @@ api.interceptors.response.use(
     /**
      * SECURITY FIX (BUG-017): Handle 403 Forbidden errors
      * 
-     * 403 errors indicate:
-     * - User's permissions have been revoked
-     * - Role has been changed/downgraded
-     * - Account has been deactivated
-     * 
-     * Unlike 401 (which can be refreshed), 403 means user should be logged out
+     * 403 errors can indicate:
+     * 1. CSRF token missing/invalid - DON'T logout, just show error
+     * 2. User's permissions have been revoked - DO logout
+     * 3. Role has been changed/downgraded - DO logout
+     * 4. Account has been deactivated - DO logout
      */
     if (error.response?.status === 403) {
-      // Clear authentication state
+      const errorMessage = error.response.data?.message || '';
+      
+      // Check if this is a CSRF error - don't logout for these
+      const isCsrfError = errorMessage.toLowerCase().includes('csrf') || 
+                          errorMessage.toLowerCase().includes('token');
+      
+      if (isCsrfError) {
+        // CSRF error - show notification but don't logout
+        store.dispatch(addNotification({
+          type: 'error',
+          message: 'Security Token Error',
+          description: 'Your security token has expired. Please refresh the page and try again.',
+        }));
+        
+        return Promise.reject(error);
+      }
+      
+      // Real permission error - logout user
       store.dispatch(clearAuth());
       
       // Show specific message for permission issues
       store.dispatch(addNotification({
         type: 'error',
         message: 'Access Denied',
-        description: error.response.data?.message || 'You do not have permission to access this resource. Please contact your administrator.',
+        description: errorMessage || 'You do not have permission to access this resource. Please contact your administrator.',
       }));
       
       // Clear queue and redirect to login

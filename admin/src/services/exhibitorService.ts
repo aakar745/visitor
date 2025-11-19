@@ -126,11 +126,9 @@ class ExhibitorService {
     formData.append('file', file);
     formData.append('type', 'exhibitor-logo');
 
-    const response = await api.post('/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    // Don't manually set Content-Type for FormData
+    // The browser will set it automatically with the correct boundary
+    const response = await api.post('/upload', formData);
     return response.data.data;
   }
 

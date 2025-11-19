@@ -168,9 +168,9 @@ class SettingsService {
     formData.append('file', file);
     formData.append('type', type);
 
-    const response = await api.post(`${API_ENDPOINTS.SETTINGS.BASE}/upload`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    // Don't manually set Content-Type for FormData
+    // The browser will set it automatically with the correct boundary
+    const response = await api.post(`${API_ENDPOINTS.SETTINGS.BASE}/upload`, formData);
     return response.data.data;
   }
 

@@ -385,6 +385,12 @@ const EditExhibition: React.FC = () => {
                   size="middle"
                   showTime
                   format="DD/MM/YYYY HH:mm"
+                  onChange={(date) => {
+                    // Auto-fill Exhibition Ends date when Registration Closes is selected
+                    if (date) {
+                      form.setFieldValue('onsiteEndDate', date);
+                    }
+                  }}
                   disabledDate={(current) => {
                     if (!current) return false;
                     

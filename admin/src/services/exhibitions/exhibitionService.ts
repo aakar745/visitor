@@ -93,11 +93,10 @@ export const exhibitionService = {
     formData.append('file', file);
     formData.append('type', type);
 
-    const response = await api.post('/exhibitions/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    // Don't manually set Content-Type for FormData
+    // The browser will set it automatically with the correct boundary
+    // The interceptor handles removing the default Content-Type header
+    const response = await api.post('/exhibitions/upload', formData);
     return response.data.data;
   },
 
