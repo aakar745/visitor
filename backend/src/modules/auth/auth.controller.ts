@@ -5,6 +5,7 @@ import { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import { Public } from '../../common/decorators/public.decorator';
+import { SkipCsrf } from '../../common/decorators/skip-csrf.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -62,6 +63,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @SkipCsrf() // Logout doesn't need CSRF protection - prevents session lock if token is missing
   @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'User logout' })
@@ -93,6 +95,7 @@ export class AuthController {
   }
 
   @Post('logout-all')
+  @SkipCsrf() // Logout doesn't need CSRF protection
   @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Logout from all devices' })
