@@ -6,6 +6,9 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 
+// Configure Day.js with India timezone (IST) BEFORE any other imports
+import './utils/dayjs'
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

@@ -27,7 +27,7 @@ import {
   CheckCircleOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import dayjs from 'dayjs';
+import { now, toBackendDate } from '../../utils/dayjs';
 import FileUpload from '../../components/exhibitions/FileUpload';
 import PricingTierForm from '../../components/exhibitions/PricingTierForm';
 import InterestOptionForm from '../../components/exhibitions/InterestOptionForm';
@@ -150,13 +150,13 @@ const CreateExhibition: React.FC = () => {
         tagline: values.tagline,
         description: values.description,
         venue: values.venue,
-        registrationStartDate: values.registrationStartDate?.toISOString(),
-        registrationEndDate: values.registrationEndDate?.toISOString(),
-        onsiteStartDate: values.onsiteStartDate?.toISOString(),
-        onsiteEndDate: values.onsiteEndDate?.toISOString(),
+        registrationStartDate: toBackendDate(values.registrationStartDate),
+        registrationEndDate: toBackendDate(values.registrationEndDate),
+        onsiteStartDate: toBackendDate(values.onsiteStartDate),
+        onsiteEndDate: toBackendDate(values.onsiteEndDate),
         isPaid: values.isPaid || false,
-        paidStartDate: values.isPaid && values.paidStartDate ? values.paidStartDate.toISOString() : undefined,
-        paidEndDate: values.isPaid && values.paidEndDate ? values.paidEndDate.toISOString() : undefined,
+        paidStartDate: values.isPaid && values.paidStartDate ? toBackendDate(values.paidStartDate) : undefined,
+        paidEndDate: values.isPaid && values.paidEndDate ? toBackendDate(values.paidEndDate) : undefined,
         pricingTiers: values.isPaid ? pricingTiers : [],
         allowedCategories: values.allowedCategories || ['general'],
         customFields,
@@ -332,8 +332,8 @@ const CreateExhibition: React.FC = () => {
                   showTime
                   format="DD/MM/YYYY HH:mm"
                   disabledDate={(current) => {
-                    // Disable all dates before today
-                    return current && current.isBefore(dayjs().startOf('day'));
+                    // Disable all dates before today (India time)
+                    return current && current.isBefore(now().startOf('day'));
                   }}
                 />
               </Form.Item>
@@ -388,8 +388,8 @@ const CreateExhibition: React.FC = () => {
                   disabledDate={(current) => {
                     if (!current) return false;
                     
-                    // Disable all dates before today
-                    if (current.isBefore(dayjs().startOf('day'))) {
+                    // Disable all dates before today (India time)
+                    if (current.isBefore(now().startOf('day'))) {
                       return true;
                     }
                     
@@ -433,8 +433,8 @@ const CreateExhibition: React.FC = () => {
                   disabledDate={(current) => {
                     if (!current) return false;
                     
-                    // Disable all dates before today
-                    if (current.isBefore(dayjs().startOf('day'))) {
+                    // Disable all dates before today (India time)
+                    if (current.isBefore(now().startOf('day'))) {
                       return true;
                     }
                     
@@ -479,8 +479,8 @@ const CreateExhibition: React.FC = () => {
                   disabledDate={(current) => {
                     if (!current) return false;
                     
-                    // Disable all dates before today
-                    if (current.isBefore(dayjs().startOf('day'))) {
+                    // Disable all dates before today (India time)
+                    if (current.isBefore(now().startOf('day'))) {
                       return true;
                     }
                     

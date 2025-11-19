@@ -42,6 +42,7 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { formatDate, formatTime, formatDateRangeShort } from '../../utils/dateFormatter';
+import { toBackendDate } from '../../utils/dayjs';
 import { globalVisitorService } from '../../services/globalVisitorService';
 import { exhibitionService } from '../../services/exhibitions/exhibitionService';
 import type {
@@ -1431,8 +1432,8 @@ const ExhibitionReports: React.FC = () => {
                       setFilters({
                         ...filters,
                         dateRange: {
-                          start: dates[0].toISOString(),
-                          end: dates[1].toISOString()
+                          start: toBackendDate(dates[0]),
+                          end: toBackendDate(dates[1])
                         }
                       });
                     } else {

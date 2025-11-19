@@ -65,20 +65,22 @@ export class ExhibitionsService {
   private validateDates(dto: CreateExhibitionDto | UpdateExhibitionDto, isUpdate: boolean = false): void {
     const { registrationStartDate, registrationEndDate, onsiteStartDate, onsiteEndDate, paidStartDate, paidEndDate, isPaid } = dto;
     
-    // Get current date (start of today, ignoring time)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Get yesterday's date at end of day (to account for timezone differences)
+    // This allows dates that are "today" in any reasonable timezone (±12 hours)
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(23, 59, 59, 999);
 
     // SECURITY FIX (BUG-014): Validate dates are not in the past
     // For new exhibitions, all dates must be in the future
     // For updates, we're more lenient (exhibition might already be ongoing)
     if (!isUpdate) {
       // For new exhibitions, registration should start today or in the future
+      // We compare against yesterday to account for timezone differences
       if (registrationStartDate) {
         const regStart = new Date(registrationStartDate);
-        regStart.setHours(0, 0, 0, 0);
         
-        if (regStart < today) {
+        if (regStart < yesterday) {
           throw new BadRequestException(
             'Registration start date cannot be in the past. Please select today or a future date.'
           );
@@ -88,9 +90,8 @@ export class ExhibitionsService {
       // Onsite start date should be in the future
       if (onsiteStartDate) {
         const onsiteStart = new Date(onsiteStartDate);
-        onsiteStart.setHours(0, 0, 0, 0);
         
-        if (onsiteStart < today) {
+        if (onsiteStart < yesterday) {
           throw new BadRequestException(
             'Exhibition onsite start date cannot be in the past. Please select today or a future date.'
           );
@@ -171,9 +172,8 @@ export class ExhibitionsService {
         // SECURITY FIX (BUG-014): Pricing tier dates should not be in the past for new exhibitions
         if (!isUpdate) {
           const tierStart = new Date(tier.startDate);
-          tierStart.setHours(0, 0, 0, 0);
           
-          if (tierStart < today) {
+          if (tierStart < yesterday) {
             throw new BadRequestException(
               `Pricing tier "${tier.name}" has a start date in the past. ` +
               'All pricing tiers must have future dates for new exhibitions.'

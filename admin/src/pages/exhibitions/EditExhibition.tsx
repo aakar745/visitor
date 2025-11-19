@@ -28,7 +28,7 @@ import {
   CheckCircleOutlined
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
-import dayjs from 'dayjs';
+import { toBackendDate, fromBackendDate } from '../../utils/dayjs';
 import FileUpload from '../../components/exhibitions/FileUpload';
 import PricingTierForm from '../../components/exhibitions/PricingTierForm';
 import InterestOptionForm from '../../components/exhibitions/InterestOptionForm';
@@ -130,13 +130,13 @@ const EditExhibition: React.FC = () => {
         tagline: data.tagline,
         description: data.description,
         venue: data.venue,
-        registrationStartDate: dayjs(data.registrationStartDate),
-        registrationEndDate: dayjs(data.registrationEndDate),
-        onsiteStartDate: dayjs(data.onsiteStartDate),
-        onsiteEndDate: dayjs(data.onsiteEndDate),
+        registrationStartDate: fromBackendDate(data.registrationStartDate),
+        registrationEndDate: fromBackendDate(data.registrationEndDate),
+        onsiteStartDate: fromBackendDate(data.onsiteStartDate),
+        onsiteEndDate: fromBackendDate(data.onsiteEndDate),
         isPaid: data.isPaid,
-        paidStartDate: data.paidStartDate ? dayjs(data.paidStartDate) : undefined,
-        paidEndDate: data.paidEndDate ? dayjs(data.paidEndDate) : undefined,
+        paidStartDate: data.paidStartDate ? fromBackendDate(data.paidStartDate) : undefined,
+        paidEndDate: data.paidEndDate ? fromBackendDate(data.paidEndDate) : undefined,
         allowedCategories: data.allowedCategories,
       });
 
@@ -175,13 +175,13 @@ const EditExhibition: React.FC = () => {
         tagline: values.tagline,
         description: values.description,
         venue: values.venue,
-        registrationStartDate: values.registrationStartDate?.toISOString(),
-        registrationEndDate: values.registrationEndDate?.toISOString(),
-        onsiteStartDate: values.onsiteStartDate?.toISOString(),
-        onsiteEndDate: values.onsiteEndDate?.toISOString(),
+        registrationStartDate: toBackendDate(values.registrationStartDate) || undefined,
+        registrationEndDate: toBackendDate(values.registrationEndDate) || undefined,
+        onsiteStartDate: toBackendDate(values.onsiteStartDate) || undefined,
+        onsiteEndDate: toBackendDate(values.onsiteEndDate) || undefined,
         isPaid: values.isPaid || false,
-        paidStartDate: values.isPaid && values.paidStartDate ? values.paidStartDate.toISOString() : undefined,
-        paidEndDate: values.isPaid && values.paidEndDate ? values.paidEndDate.toISOString() : undefined,
+        paidStartDate: values.isPaid && values.paidStartDate ? toBackendDate(values.paidStartDate) || undefined : undefined,
+        paidEndDate: values.isPaid && values.paidEndDate ? toBackendDate(values.paidEndDate) || undefined : undefined,
         pricingTiers: values.isPaid ? pricingTiers : [],
         allowedCategories: values.allowedCategories || ['general'],
         customFields,
