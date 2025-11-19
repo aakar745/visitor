@@ -14,7 +14,7 @@ export class Country {
   name: string;
 
   @ApiProperty({ example: 'IN' })
-  @Prop({ required: true, uppercase: true, unique: true })
+  @Prop({ required: true, uppercase: true })
   code: string; // ISO 3166-1 alpha-2 code
 
   @ApiProperty({ example: true })

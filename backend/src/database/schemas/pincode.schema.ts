@@ -14,7 +14,7 @@ export class Pincode {
   cityId: Types.ObjectId;
 
   @ApiProperty({ example: '400001' })
-  @Prop({ required: true, unique: true })
+  @Prop({ required: true })
   pincode: string; // PIN code (6 digits for India)
 
   @ApiProperty({ example: 'Nariman Point' })

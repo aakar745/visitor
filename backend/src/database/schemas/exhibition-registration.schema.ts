@@ -43,7 +43,7 @@ export class ExhibitionRegistration {
   _id: Types.ObjectId;
 
   @ApiProperty()
-  @Prop({ type: String, unique: true, required: true })
+  @Prop({ type: String, required: true })
   registrationNumber: string; // Unique registration number (e.g., REG-10112025-000001)
 
   @ApiProperty()

@@ -10,7 +10,7 @@ export class GlobalVisitor {
   _id: Types.ObjectId;
 
   @ApiProperty()
-  @Prop({ lowercase: true, trim: true, sparse: true }) // sparse allows multiple null values
+  @Prop({ lowercase: true, trim: true }) // sparse index defined at schema level
   email?: string;
 
   @ApiProperty()
