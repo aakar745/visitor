@@ -365,7 +365,6 @@ export function CustomFieldsSection({
                 placeholder={field.placeholder}
                 {...register(fieldName, validationRules)}
                 autoComplete={isPincodeFieldType ? 'new-password' : undefined}
-                name={field.name}
                 className={cn(
                   fieldError ? 'border-red-500' : '',
                   isMobileFieldReadonly ? 'bg-green-50/50 border-green-200 cursor-not-allowed' : '',
@@ -713,7 +712,6 @@ export function CustomFieldsSection({
                   placeholder={field.placeholder}
                   {...register(fieldName, validationRules)}
                   autoComplete={isPincodeFieldAPI ? 'new-password' : undefined}
-                  name={field.name}
                   className={cn(
                     fieldError ? 'border-red-500' : '',
                     isLocationFieldAPI && pincodeFound ? 'bg-green-50/50 border-green-200' : ''

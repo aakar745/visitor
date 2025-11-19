@@ -419,6 +419,32 @@ export class ExhibitionsService {
     // Prepare update data with internal fields
     const updateData: any = { ...updateExhibitionDto };
 
+    // Preserve currentCount for pricing tiers (read-only, managed by backend)
+    if (updateData.pricingTiers && Array.isArray(updateData.pricingTiers)) {
+      const existingTiers = exhibition.pricingTiers || [];
+      
+      updateData.pricingTiers = updateData.pricingTiers.map((newTier: any) => {
+        // Find existing tier by _id (if it exists)
+        const existingTier = existingTiers.find((et: any) => 
+          et._id && newTier._id && et._id.toString() === newTier._id.toString()
+        );
+        
+        // If tier exists, preserve its currentCount
+        if (existingTier) {
+          return {
+            ...newTier,
+            currentCount: existingTier.currentCount || 0, // Preserve existing count
+          };
+        }
+        
+        // For new tiers, initialize currentCount to 0
+        return {
+          ...newTier,
+          currentCount: 0,
+        };
+      });
+    }
+
     // Update slug if name changed
     if (updateExhibitionDto.name && updateExhibitionDto.name !== exhibition.name) {
       const baseSlug = this.generateSlug(updateExhibitionDto.name);

@@ -377,7 +377,6 @@ export function RegistrationForm({ exhibition, exhibitor }: RegistrationFormProp
 
   // Handle form submission
   const onSubmit = (data: DynamicRegistrationFormData) => {
-    console.log('[Form Submit] Raw data:', data);
     
     // Extract all fields from customFieldData
     const customData = data.customFieldData || {};

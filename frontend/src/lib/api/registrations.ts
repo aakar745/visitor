@@ -20,6 +20,7 @@ export const registrationsApi = {
       data: RegistrationResponse;
       message: string;
     }>(API_ENDPOINTS.registrations.create, data);
+    
     return response.data.data;
   },
 

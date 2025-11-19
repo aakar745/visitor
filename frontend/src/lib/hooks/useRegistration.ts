@@ -22,11 +22,8 @@ export function useCreateRegistration() {
       toast.loading('Submitting your registration...', { id: 'registration' });
     },
     onSuccess: (data) => {
+      
       setFormSubmitting(false);
-      console.log('[Registration Success] Full response:', data);
-      console.log('[Registration Success] Full response JSON:', JSON.stringify(data, null, 2));
-      console.log('[Registration Success] Registration object:', data.registration);
-      console.log('[Registration Success] Registration ID:', data.registration?._id);
       
       toast.success('Registration successful! 🎉', { id: 'registration' });
       
@@ -45,6 +42,7 @@ export function useCreateRegistration() {
       router.push(`/success?registrationId=${data.registration._id}`);
     },
     onError: (error: any) => {
+      
       setFormSubmitting(false);
       const errorMessage = error.message || 'Failed to submit registration. Please try again.';
       

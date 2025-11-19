@@ -72,13 +72,13 @@ export const exhibitionsApi = {
     }
 
     const now = new Date();
+    
     return exhibition.pricingTiers
-      .filter(
-        (tier) =>
-          tier.isActive &&
-          new Date(tier.startDate) <= now &&
-          new Date(tier.endDate) >= now
-      )
+      .filter((tier) => {
+        const start = new Date(tier.startDate);
+        const end = new Date(tier.endDate);
+        return tier.isActive && start <= now && end >= now;
+      })
       .sort((a, b) => a.price - b.price);
   },
 

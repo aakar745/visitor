@@ -110,6 +110,11 @@ export class PricingTierDto {
   @IsBoolean()
   isActive: boolean;
 
+  @ApiPropertyOptional({ description: 'Current registration count (read-only, auto-managed by backend)', example: 0 })
+  @IsNumber()
+  @IsOptional()
+  currentCount?: number;
+
   @ApiProperty({ description: 'Ticket type: full_access or day_wise', example: 'full_access', enum: ['full_access', 'day_wise'] })
   @IsString()
   @IsEnum(['full_access', 'day_wise'])

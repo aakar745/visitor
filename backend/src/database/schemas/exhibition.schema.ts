@@ -214,7 +214,7 @@ export class Exhibition {
   paidEndDate?: Date;
 
   @ApiProperty({ type: [PricingTier] })
-  @Prop({ type: [{ type: Object }], default: [] })
+  @Prop({ type: [PricingTier], default: [] })
   pricingTiers: PricingTier[];
 
   @ApiProperty({ type: [String], enum: RegistrationCategory })
@@ -222,7 +222,7 @@ export class Exhibition {
   allowedCategories: string[];
 
   @ApiProperty({ type: [CustomField] })
-  @Prop({ type: [{ type: Object }], default: [] })
+  @Prop({ type: [CustomField], default: [] })
   customFields: CustomField[];
 
   @ApiProperty()
@@ -230,7 +230,7 @@ export class Exhibition {
   currentRegistrations: number;
 
   @ApiProperty({ type: [InterestOption] })
-  @Prop({ type: [{ type: Object }], default: [] })
+  @Prop({ type: [InterestOption], default: [] })
   interestOptions: InterestOption[];
 
   @ApiProperty()

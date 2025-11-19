@@ -34,10 +34,9 @@ export function PricingSection({ form, exhibition }: PricingSectionProps) {
   const hasAutoSelectedRef = useRef(false);
   
   // Memoize active tiers
-  const activeTiers = useMemo(() => 
-    exhibitionsApi.getActivePricingTiers(exhibition),
-    [exhibition]
-  );
+  const activeTiers = useMemo(() => {
+    return exhibitionsApi.getActivePricingTiers(exhibition);
+  }, [exhibition]);
 
   // If not a paid exhibition, don't render pricing section
   if (!exhibition.isPaid) {
