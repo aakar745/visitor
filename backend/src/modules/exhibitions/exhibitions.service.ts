@@ -195,6 +195,53 @@ export class ExhibitionsService {
   }
 
   /**
+   * Calculate exhibition status based on current date and exhibition dates
+   * 
+   * Status Logic:
+   * - COMPLETED: Exhibition has ended (now > onsiteEndDate)
+   * - LIVE_EVENT: Exhibition is currently happening (now between onsiteStartDate and onsiteEndDate)
+   * - REGISTRATION_OPEN: Registration is currently open (now between registrationStartDate and registrationEndDate)
+   * - ACTIVE: Exhibition is scheduled for the future (registration not yet open)
+   */
+  private calculateStatus(
+    registrationStartDate: Date,
+    registrationEndDate: Date,
+    onsiteStartDate: Date,
+    onsiteEndDate: Date,
+  ): ExhibitionStatus {
+    const now = new Date();
+
+    // Convert to Date objects if they're strings
+    const regStart = new Date(registrationStartDate);
+    const regEnd = new Date(registrationEndDate);
+    const eventStart = new Date(onsiteStartDate);
+    const eventEnd = new Date(onsiteEndDate);
+
+    // 1. Exhibition has ended
+    if (now > eventEnd) {
+      return ExhibitionStatus.COMPLETED;
+    }
+
+    // 2. Exhibition is currently happening (live event)
+    if (now >= eventStart && now <= eventEnd) {
+      return ExhibitionStatus.LIVE_EVENT;
+    }
+
+    // 3. Registration is currently open (before or during event)
+    if (now >= regStart && now <= regEnd) {
+      return ExhibitionStatus.REGISTRATION_OPEN;
+    }
+
+    // 4. Future event (registration hasn't started yet)
+    if (now < regStart) {
+      return ExhibitionStatus.ACTIVE;
+    }
+
+    // 5. Registration closed but event hasn't started yet
+    return ExhibitionStatus.ACTIVE;
+  }
+
+  /**
    * Create a new exhibition
    */
   async create(createExhibitionDto: CreateExhibitionDto, userId?: string): Promise<Exhibition> {
@@ -213,12 +260,20 @@ export class ExhibitionsService {
       throw new ConflictException('An exhibition with this name already exists');
     }
 
+    // Calculate initial status based on dates
+    const initialStatus = this.calculateStatus(
+      createExhibitionDto.registrationStartDate,
+      createExhibitionDto.registrationEndDate,
+      createExhibitionDto.onsiteStartDate,
+      createExhibitionDto.onsiteEndDate,
+    );
+
     // Create exhibition
     const exhibition = new this.exhibitionModel({
       ...createExhibitionDto,
       slug,
       currentRegistrations: 0,
-      status: ExhibitionStatus.DRAFT,
+      status: initialStatus,
       createdBy: userId ? new Types.ObjectId(userId) : undefined,
       updatedBy: userId ? new Types.ObjectId(userId) : undefined,
     });
@@ -370,6 +425,24 @@ export class ExhibitionsService {
       updateData.slug = await this.ensureUniqueSlug(baseSlug, id);
     }
 
+    // Recalculate status if any dates are being updated
+    const datesBeingUpdated = 
+      updateExhibitionDto.registrationStartDate ||
+      updateExhibitionDto.registrationEndDate ||
+      updateExhibitionDto.onsiteStartDate ||
+      updateExhibitionDto.onsiteEndDate;
+
+    if (datesBeingUpdated) {
+      // Use updated dates if provided, otherwise use existing dates
+      const existingData = exhibition.toObject();
+      const regStart = updateExhibitionDto.registrationStartDate || existingData.registrationStartDate;
+      const regEnd = updateExhibitionDto.registrationEndDate || existingData.registrationEndDate;
+      const eventStart = updateExhibitionDto.onsiteStartDate || existingData.onsiteStartDate;
+      const eventEnd = updateExhibitionDto.onsiteEndDate || existingData.onsiteEndDate;
+
+      updateData.status = this.calculateStatus(regStart, regEnd, eventStart, eventEnd);
+    }
+
     // Add updatedBy
     if (userId) {
       updateData.updatedBy = new Types.ObjectId(userId);
@@ -499,7 +572,12 @@ export class ExhibitionsService {
       _id: undefined,
       name: trimmedName,
       slug,
-      status: ExhibitionStatus.DRAFT,
+      status: this.calculateStatus(
+        original.registrationStartDate,
+        original.registrationEndDate,
+        original.onsiteStartDate,
+        original.onsiteEndDate,
+      ),
       currentRegistrations: 0,
       createdBy: userId ? new Types.ObjectId(userId) : undefined,
       updatedBy: userId ? new Types.ObjectId(userId) : undefined,
