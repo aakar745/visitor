@@ -10,7 +10,7 @@ export class State {
   _id: Types.ObjectId;
 
   @ApiProperty({ type: String })
-  @Prop({ type: Types.ObjectId, ref: 'Country', required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: 'Country', required: true })
   countryId: Types.ObjectId;
 
   @ApiProperty({ example: 'Maharashtra' })
@@ -22,7 +22,7 @@ export class State {
   code: string; // State code (e.g., MH, DL, KA)
 
   @ApiProperty({ example: true })
-  @Prop({ default: true, index: true })
+  @Prop({ default: true })
   isActive: boolean;
 
   @ApiProperty({ example: 45 })

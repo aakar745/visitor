@@ -10,7 +10,7 @@ export class City {
   _id: Types.ObjectId;
 
   @ApiProperty({ type: String })
-  @Prop({ type: Types.ObjectId, ref: 'State', required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: 'State', required: true })
   stateId: Types.ObjectId;
 
   @ApiProperty({ example: 'Mumbai' })
@@ -18,7 +18,7 @@ export class City {
   name: string;
 
   @ApiProperty({ example: true })
-  @Prop({ default: true, index: true })
+  @Prop({ default: true })
   isActive: boolean;
 
   @ApiProperty({ example: 85 })

@@ -7,7 +7,7 @@ export type KioskSettingsDocument = KioskSettings & Document;
 @Schema({ timestamps: true, collection: 'kiosk_settings' })
 export class KioskSettings {
   @ApiProperty()
-  @Prop({ type: String, required: true, unique: true, default: 'default' })
+  @Prop({ type: String, required: true, default: 'default' })
   settingsKey: string; // Always 'default' - single settings document
 
   @ApiProperty({ description: 'Enable/disable public kiosk check-in page' })

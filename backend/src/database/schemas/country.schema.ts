@@ -10,15 +10,15 @@ export class Country {
   _id: Types.ObjectId;
 
   @ApiProperty({ example: 'India' })
-  @Prop({ required: true, trim: true, index: true })
+  @Prop({ required: true, trim: true })
   name: string;
 
   @ApiProperty({ example: 'IN' })
-  @Prop({ required: true, uppercase: true, unique: true, index: true })
+  @Prop({ required: true, uppercase: true, unique: true })
   code: string; // ISO 3166-1 alpha-2 code
 
   @ApiProperty({ example: true })
-  @Prop({ default: true, index: true })
+  @Prop({ default: true })
   isActive: boolean;
 
   @ApiProperty({ example: 36 })

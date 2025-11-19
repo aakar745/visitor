@@ -10,7 +10,7 @@ export class Exhibitor {
   _id: Types.ObjectId;
 
   @ApiProperty()
-  @Prop({ type: Types.ObjectId, ref: 'Exhibition', required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: 'Exhibition', required: true })
   exhibitionId: Types.ObjectId;
 
   @ApiProperty()
@@ -22,7 +22,7 @@ export class Exhibitor {
   companyName: string;
 
   @ApiProperty()
-  @Prop({ required: true, index: true })
+  @Prop({ required: true })
   slug: string;
 
   @ApiProperty()

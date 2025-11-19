@@ -8,7 +8,7 @@ import { Document } from 'mongoose';
  */
 @Schema({ timestamps: true })
 export class RegistrationCounter extends Document {
-  @Prop({ required: true, unique: true })
+  @Prop({ required: true })
   date: string; // Format: DDMMYYYY
 
   @Prop({ required: true, default: 0 })

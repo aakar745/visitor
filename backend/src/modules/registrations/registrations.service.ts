@@ -103,27 +103,6 @@ export class RegistrationsService {
       throw new BadRequestException('Exhibition is not accepting registrations');
     }
 
-    // ===== DEBUG: Log incoming data =====
-    this.logger.debug('========== INCOMING DTO DATA ==========');
-    this.logger.debug('Top-level fields:');
-    this.logger.debug(`  dto.name: "${dto.name}"`);
-    this.logger.debug(`  dto.email: "${dto.email}"`);
-    this.logger.debug(`  dto.phone: "${dto.phone}"`);
-    this.logger.debug(`  dto.company: "${dto.company}"`);
-    this.logger.debug(`  dto.designation: "${dto.designation}"`);
-    this.logger.debug(`  dto.city: "${dto.city}"`);
-    this.logger.debug(`  dto.state: "${dto.state}"`);
-    this.logger.debug(`  dto.pincode: "${dto.pincode}"`);
-    this.logger.debug('customFieldData:');
-    if (dto.customFieldData) {
-      Object.keys(dto.customFieldData).forEach(key => {
-        this.logger.debug(`  customFieldData.${key}: "${dto.customFieldData![key]}"`);
-      });
-    } else {
-      this.logger.debug('  (no customFieldData)');
-    }
-    this.logger.debug('=======================================');
-
     // Extract standard fields from customFieldData if not provided at top level
     // This handles cases where frontend sends all data in customFieldData
     if (dto.customFieldData && typeof dto.customFieldData === 'object') {
@@ -284,16 +263,6 @@ export class RegistrationsService {
       } else {
         this.logger.log(`No updates needed - visitor ${visitor._id} already has complete data`);
       }
-      
-      // Debug: Log visitor data after update
-      this.logger.debug('========== VISITOR DATA (EXISTING - AFTER UPDATE) ==========');
-      this.logger.debug(`  visitor.name: "${visitor.name}"`);
-      this.logger.debug(`  visitor.email: "${visitor.email}"`);
-      this.logger.debug(`  visitor.company: "${visitor.company}"`);
-      this.logger.debug(`  visitor.designation: "${visitor.designation}"`);
-      this.logger.debug(`  visitor.city: "${visitor.city}"`);
-      this.logger.debug(`  visitor.state: "${visitor.state}"`);
-      this.logger.debug('===========================================================');
     } else {
       // Create new visitor (handle optional fields from dynamic forms)
       // At least one of email or phone must be provided
@@ -319,17 +288,6 @@ export class RegistrationsService {
         
         visitor = await this.visitorModel.create(visitorData);
         this.logger.log(`New visitor created with normalized phone: ${normalizedPhone} and ${Object.keys(globalDynamicFields).length} dynamic fields`);
-        
-        // Debug: Log visitor data after creation
-        this.logger.debug('========== VISITOR DATA (NEW - AFTER CREATION) ==========');
-        this.logger.debug(`  visitor.name: "${visitor.name}"`);
-        this.logger.debug(`  visitor.email: "${visitor.email}"`);
-        this.logger.debug(`  visitor.company: "${visitor.company}"`);
-        this.logger.debug(`  visitor.designation: "${visitor.designation}"`);
-        this.logger.debug(`  visitor.city: "${visitor.city}"`);
-        this.logger.debug(`  visitor.state: "${visitor.state}"`);
-        this.logger.debug('========================================================');
-        
         // Note: MeiliSearch indexing happens later after registeredExhibitions is updated
       } catch (error) {
         // Handle duplicate key error (E11000) - phone number already exists

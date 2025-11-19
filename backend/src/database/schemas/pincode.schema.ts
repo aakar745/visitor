@@ -10,11 +10,11 @@ export class Pincode {
   _id: Types.ObjectId;
 
   @ApiProperty({ type: String })
-  @Prop({ type: Types.ObjectId, ref: 'City', required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: 'City', required: true })
   cityId: Types.ObjectId;
 
   @ApiProperty({ example: '400001' })
-  @Prop({ required: true, unique: true, index: true })
+  @Prop({ required: true, unique: true })
   pincode: string; // PIN code (6 digits for India)
 
   @ApiProperty({ example: 'Nariman Point' })
@@ -22,7 +22,7 @@ export class Pincode {
   area?: string; // Optional locality/area name
 
   @ApiProperty({ example: true })
-  @Prop({ default: true, index: true })
+  @Prop({ default: true })
   isActive: boolean;
 
   @ApiProperty({ example: 234 })
