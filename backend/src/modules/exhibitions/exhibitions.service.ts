@@ -65,14 +65,15 @@ export class ExhibitionsService {
   private validateDates(dto: CreateExhibitionDto | UpdateExhibitionDto, isUpdate: boolean = false): void {
     const { registrationStartDate, registrationEndDate, onsiteStartDate, onsiteEndDate, paidStartDate, paidEndDate, isPaid } = dto;
     
-    // Get yesterday's date at end of day in UTC (to account for timezone differences)
-    // This allows dates that are "today" in any reasonable timezone (±12 hours)
+    // Get cutoff date for validation (start of 2 days ago in UTC)
+    // This allows dates that are "today" in any timezone worldwide
+    // Example: Nov 19 00:00 IST = Nov 18 18:30 UTC, which is after Nov 17 00:00 UTC ✓
     const now = new Date();
-    const yesterday = new Date(Date.UTC(
+    const twoDaysAgo = new Date(Date.UTC(
       now.getUTCFullYear(),
       now.getUTCMonth(),
-      now.getUTCDate() - 1,
-      23, 59, 59, 999
+      now.getUTCDate() - 2,
+      0, 0, 0, 0
     ));
 
     // SECURITY FIX (BUG-014): Validate dates are not in the past
@@ -80,11 +81,11 @@ export class ExhibitionsService {
     // For updates, we're more lenient (exhibition might already be ongoing)
     if (!isUpdate) {
       // For new exhibitions, registration should start today or in the future
-      // We compare against yesterday to account for timezone differences
+      // We compare against 2 days ago to account for timezone differences (IST is UTC+5:30)
       if (registrationStartDate) {
         const regStart = new Date(registrationStartDate);
         
-        if (regStart < yesterday) {
+        if (regStart < twoDaysAgo) {
           throw new BadRequestException(
             'Registration start date cannot be in the past. Please select today or a future date.'
           );
@@ -95,7 +96,7 @@ export class ExhibitionsService {
       if (onsiteStartDate) {
         const onsiteStart = new Date(onsiteStartDate);
         
-        if (onsiteStart < yesterday) {
+        if (onsiteStart < twoDaysAgo) {
           throw new BadRequestException(
             'Exhibition onsite start date cannot be in the past. Please select today or a future date.'
           );
@@ -177,7 +178,7 @@ export class ExhibitionsService {
         if (!isUpdate) {
           const tierStart = new Date(tier.startDate);
           
-          if (tierStart < yesterday) {
+          if (tierStart < twoDaysAgo) {
             throw new BadRequestException(
               `Pricing tier "${tier.name}" has a start date in the past. ` +
               'All pricing tiers must have future dates for new exhibitions.'
