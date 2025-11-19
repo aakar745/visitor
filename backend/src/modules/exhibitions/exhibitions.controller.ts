@@ -25,6 +25,7 @@ import { UploadsService } from '../uploads/uploads.service';
 import { ExhibitorsService } from '../exhibitors/exhibitors.service';
 import { QueryExhibitorDto } from '../exhibitors/dto';
 import { Public } from '../../common/decorators/public.decorator';
+import { SkipCsrf } from '../../common/decorators/skip-csrf.decorator';
 
 @ApiTags('Exhibitions')
 @ApiBearerAuth()
@@ -245,6 +246,7 @@ export class ExhibitionsController {
    * Upload exhibition file (logo, banner, badge-logo)
    */
   @Post('upload')
+  @SkipCsrf() // Skip CSRF for file uploads - multipart/form-data requests have issues with CSRF tokens
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload exhibition file (logo, banner, badge-logo)' })
