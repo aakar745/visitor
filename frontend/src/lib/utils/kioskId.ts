@@ -22,16 +22,41 @@ function generateKioskId(): string {
 
 /**
  * Get or create kiosk ID
- * Returns existing ID from localStorage, or generates a new one
+ * Priority:
+ * 1. URL parameter (kioskId=xxx)
+ * 2. Existing ID from localStorage
+ * 3. Generate new ID
  */
 export function getKioskId(): string {
-  // Try to get existing ID
+  // Check URL parameter first
+  if (typeof window !== 'undefined') {
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlKioskId = urlParams.get('kioskId');
+    
+    if (urlKioskId && urlKioskId.trim() !== '') {
+      // Save URL parameter to localStorage
+      const trimmedId = urlKioskId.trim();
+      const existing = localStorage.getItem(KIOSK_ID_KEY);
+      
+      if (existing !== trimmedId) {
+        localStorage.setItem(KIOSK_ID_KEY, trimmedId);
+        console.log('[Kiosk ID] Set from URL parameter:', trimmedId);
+      } else {
+        console.log('[Kiosk ID] Loaded from URL:', trimmedId);
+      }
+      
+      return trimmedId;
+    }
+  }
+
+  // Try to get existing ID from localStorage
   const existing = localStorage.getItem(KIOSK_ID_KEY);
   if (existing) {
+    console.log('[Kiosk ID] Loaded existing ID:', existing);
     return existing;
   }
 
-  // Generate new ID
+  // Generate new ID as fallback
   const newId = generateKioskId();
   localStorage.setItem(KIOSK_ID_KEY, newId);
   
