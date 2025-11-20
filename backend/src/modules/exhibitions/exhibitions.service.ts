@@ -6,6 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { ConfigService } from '@nestjs/config';
 import { Model, Types } from 'mongoose';
 import { Exhibition, ExhibitionDocument, ExhibitionStatus } from '../../database/schemas/exhibition.schema';
 import { ExhibitionRegistration, ExhibitionRegistrationDocument } from '../../database/schemas/exhibition-registration.schema';
@@ -13,15 +14,23 @@ import { CreateExhibitionDto, UpdateExhibitionDto, QueryExhibitionDto, UpdateSta
 import { sanitizeSearch } from '../../common/utils/sanitize.util';
 import { sanitizePagination } from '../../common/constants/pagination.constants';
 import { generateSlugWithSuffix } from '../../common/utils/slug.util';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 @Injectable()
 export class ExhibitionsService {
   private readonly logger = new Logger(ExhibitionsService.name);
+  private readonly uploadDir: string;
+  private readonly badgeDir: string;
 
   constructor(
     @InjectModel(Exhibition.name) private exhibitionModel: Model<ExhibitionDocument>,
     @InjectModel(ExhibitionRegistration.name) private registrationModel: Model<ExhibitionRegistrationDocument>,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.uploadDir = this.configService.get('UPLOAD_DIR', './uploads');
+    this.badgeDir = path.join(this.uploadDir, 'badges');
+  }
 
   /**
    * Generate URL-friendly slug from exhibition name
@@ -414,6 +423,16 @@ export class ExhibitionsService {
         pricingTiers: updateExhibitionDto.pricingTiers || existingData.pricingTiers,
       };
       this.validateDates(mergedData as any, true);
+    }
+
+    // If badge logo is being updated, delete all existing badges for this exhibition
+    // They will be regenerated on-demand with the new logo
+    if (updateExhibitionDto.badgeLogo && updateExhibitionDto.badgeLogo !== exhibition.badgeLogo) {
+      this.logger.log(`🔄 Badge logo changed for exhibition ${id}, scheduling badge cleanup...`);
+      // Run cleanup asynchronously (don't block the update)
+      this.cleanupExhibitionBadges(id).catch(err => {
+        this.logger.error(`Failed to cleanup badges for exhibition ${id}:`, err);
+      });
     }
 
     // Prepare update data with internal fields
@@ -908,6 +927,57 @@ export class ExhibitionsService {
       },
       message: 'Registrations retrieved successfully',
     };
+  }
+
+  /**
+   * Clean up all badge files for an exhibition
+   * Called when badge logo is updated
+   * Badges will be regenerated on-demand with new logo
+   */
+  private async cleanupExhibitionBadges(exhibitionId: string): Promise<void> {
+    try {
+      this.logger.log(`🧹 Starting badge cleanup for exhibition: ${exhibitionId}`);
+
+      // Find all registrations for this exhibition
+      const registrations = await this.registrationModel
+        .find({ exhibitionId })
+        .select('_id')
+        .exec();
+
+      if (!registrations || registrations.length === 0) {
+        this.logger.log(`ℹ️ No registrations found for exhibition ${exhibitionId}`);
+        return;
+      }
+
+      this.logger.log(`📋 Found ${registrations.length} registrations, deleting badges...`);
+
+      let deletedCount = 0;
+      let notFoundCount = 0;
+
+      // Delete each badge file
+      for (const registration of registrations) {
+        const badgeFilePath = path.join(this.badgeDir, `${registration._id}.png`);
+        
+        try {
+          await fs.unlink(badgeFilePath);
+          deletedCount++;
+        } catch (error: any) {
+          if (error.code === 'ENOENT') {
+            // File doesn't exist, that's okay
+            notFoundCount++;
+          } else {
+            this.logger.warn(`⚠️ Failed to delete badge ${registration._id}: ${error.message}`);
+          }
+        }
+      }
+
+      this.logger.log(
+        `✅ Badge cleanup complete: ${deletedCount} deleted, ${notFoundCount} not found`
+      );
+    } catch (error) {
+      this.logger.error(`❌ Badge cleanup failed for exhibition ${exhibitionId}:`, error);
+      throw error;
+    }
   }
 }
 

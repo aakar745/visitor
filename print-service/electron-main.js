@@ -60,16 +60,23 @@ let serviceStatus = {
 /**
  * Check if Redis is already running on a given port
  */
-async function isRedisRunning(host = 'localhost', port = 6379) {
+async function isRedisRunning(host = 'localhost', port = 6379, password = '') {
   try {
-    const testRedis = new Redis({
+    const config = {
       host,
       port,
       retryStrategy: () => null, // Don't retry
       lazyConnect: true,
       maxRetriesPerRequest: 1,
       connectTimeout: 2000
-    });
+    };
+    
+    // Add password if provided
+    if (password) {
+      config.password = password;
+    }
+    
+    const testRedis = new Redis(config);
     
     await testRedis.connect();
     await testRedis.ping();
@@ -84,16 +91,38 @@ async function isRedisRunning(host = 'localhost', port = 6379) {
  * Start bundled Redis server (only if not already running)
  */
 async function startBundledRedis() {
-  const REDIS_HOST = 'localhost';
-  const REDIS_PORT = 6379;
+  // Read Redis config from .env if exists
+  let REDIS_HOST = 'localhost';
+  let REDIS_PORT = 6379;
+  let REDIS_PASSWORD = '';
   
-  // First, check if Redis is already running
+  try {
+    const envPath = path.join(__dirname, '.env');
+    if (fs.existsSync(envPath)) {
+      const envContent = fs.readFileSync(envPath, 'utf8');
+      const hostMatch = envContent.match(/REDIS_HOST=(.+)/);
+      const portMatch = envContent.match(/REDIS_PORT=(.+)/);
+      const passMatch = envContent.match(/REDIS_PASSWORD=(.+)/);
+      
+      if (hostMatch) REDIS_HOST = hostMatch[1].trim();
+      if (portMatch) REDIS_PORT = parseInt(portMatch[1].trim(), 10);
+      if (passMatch) REDIS_PASSWORD = passMatch[1].trim();
+    }
+  } catch (err) {
+    // Use defaults
+  }
+  
+  // First, check if Redis is already running (external or production)
   console.log('🔍 Checking if Redis is already running...');
-  const alreadyRunning = await isRedisRunning(REDIS_HOST, REDIS_PORT);
+  const alreadyRunning = await isRedisRunning(REDIS_HOST, REDIS_PORT, REDIS_PASSWORD);
   
   if (alreadyRunning) {
     console.log(`✅ Redis is already running on ${REDIS_HOST}:${REDIS_PORT}`);
-    console.log('ℹ️  Using existing Redis instance (no need to start bundled Redis)');
+    if (REDIS_HOST !== 'localhost' && REDIS_HOST !== '127.0.0.1') {
+      console.log(`🌐 Using PRODUCTION Redis server at ${REDIS_HOST}`);
+    } else {
+      console.log('ℹ️  Using existing Redis instance (no need to start bundled Redis)');
+    }
     serviceStatus.redis = 'external';
     return;
   }
@@ -526,6 +555,8 @@ async function checkRedis() {
   // Read Redis config from .env if exists
   let redisHost = 'localhost';
   let redisPort = 6379;
+  let redisPassword = '';
+  let redisDb = 0;
   
   try {
     const envPath = path.join(__dirname, '.env');
@@ -533,21 +564,34 @@ async function checkRedis() {
       const envContent = fs.readFileSync(envPath, 'utf8');
       const hostMatch = envContent.match(/REDIS_HOST=(.+)/);
       const portMatch = envContent.match(/REDIS_PORT=(.+)/);
+      const passMatch = envContent.match(/REDIS_PASSWORD=(.+)/);
+      const dbMatch = envContent.match(/REDIS_DB=(.+)/);
+      
       if (hostMatch) redisHost = hostMatch[1].trim();
       if (portMatch) redisPort = parseInt(portMatch[1].trim(), 10);
+      if (passMatch) redisPassword = passMatch[1].trim();
+      if (dbMatch) redisDb = parseInt(dbMatch[1].trim(), 10);
     }
   } catch (err) {
     // Use defaults
   }
   
   // Create Redis client with timeout
-  const redisClient = new Redis({
+  const config = {
     host: redisHost,
     port: redisPort,
+    db: redisDb,
     connectTimeout: 3000,
     retryStrategy: () => null, // Don't retry, fail fast
     lazyConnect: true,
-  });
+  };
+  
+  // Add password if provided
+  if (redisPassword) {
+    config.password = redisPassword;
+  }
+  
+  const redisClient = new Redis(config);
   
   try {
     // Try to connect
@@ -722,9 +766,9 @@ ipcMain.handle('save-config', async (event, config) => {
       }
     };
     
+    // SECURITY: Only allow saving printer name from GUI
+    // Redis credentials must be configured manually in .env file
     if (config.printerName) updateEnvValue('PRINTER_NAME', config.printerName);
-    if (config.redisHost) updateEnvValue('REDIS_HOST', config.redisHost);
-    if (config.redisPort) updateEnvValue('REDIS_PORT', config.redisPort);
     
     fs.writeFileSync(envPath, envContent.trim() + '\n');
     
@@ -739,32 +783,30 @@ ipcMain.handle('save-config', async (event, config) => {
 // =============================================================================
 
 app.whenReady().then(async () => {
-  // Start bundled Redis server FIRST (before anything else)
-  await startBundledRedis();
+  // PRODUCTION MODE: Connect to external Redis (no bundled Redis)
+  // Redis credentials must be configured in .env file
+  console.log('🔍 Production Mode: Looking for external Redis...');
   
-  // Wait 2 seconds for Redis to fully start, then create UI
+  createWindow();
+  createTray();
+  
+  // Check Redis connection after a brief delay
   setTimeout(() => {
-    createWindow();
-    createTray();
-    
-    // Check Redis connection after a brief delay
+    checkRedis();
+  }, 1000);
+  
+  // Periodically check Redis status (every 30 seconds)
+  setInterval(() => {
+    checkRedis();
+  }, 30000);
+  
+  // Auto-start worker if configured
+  const autoStart = process.env.AUTO_START_WORKER === 'true';
+  if (autoStart) {
     setTimeout(() => {
-      checkRedis();
-    }, 1000);
-    
-    // Periodically check Redis status (every 30 seconds)
-    setInterval(() => {
-      checkRedis();
-    }, 30000);
-    
-    // Auto-start worker if configured
-    const autoStart = process.env.AUTO_START_WORKER === 'true';
-    if (autoStart) {
-      setTimeout(() => {
-        startWorker();
-      }, 2000);
-    }
-  }, 2000);
+      startWorker();
+    }, 2000);
+  }
 });
 
 app.on('window-all-closed', () => {

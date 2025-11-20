@@ -5,7 +5,6 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar, Menu, X, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ThemeToggle } from './ThemeToggle';
 
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -67,9 +66,8 @@ export function Header() {
             </Link>
           </nav>
 
-          {/* Theme Toggle & CTA Button */}
+          {/* CTA Button */}
           <div className="hidden md:flex items-center space-x-2">
-            <ThemeToggle />
             <Button
               asChild
               className="bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white shadow-lg hover:shadow-xl transition-all duration-300"
@@ -81,9 +79,8 @@ export function Header() {
             </Button>
           </div>
 
-          {/* Mobile Menu Button & Theme Toggle */}
-          <div className="flex md:hidden items-center space-x-2">
-            <ThemeToggle />
+          {/* Mobile Menu Button */}
+          <div className="flex md:hidden items-center">
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="p-2 rounded-lg hover:bg-muted transition-colors"

@@ -61,7 +61,6 @@
       "print-worker.js",
       "gui/**/*",
       "labels/",
-      "redis/**/*",
       "node_modules/**/*",
       "package.json"
     ],

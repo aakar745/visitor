@@ -45,6 +45,7 @@ async function bootstrap() {
   app.use(cookieParser());
 
   // Static file serving for uploads with CORS support
+  // NOTE: /uploads/badges/ is handled by BadgesController for on-demand generation
   const uploadDir = configService.get('UPLOAD_DIR', './uploads');
   app.useStaticAssets(uploadDir, {
     prefix: '/uploads/',
@@ -56,6 +57,7 @@ async function bootstrap() {
     },
   });
   console.log(`📁 Static files served from: ${uploadDir} at /uploads/ (CORS enabled)`);
+  console.log(`🎨 Badge generation: On-demand via /uploads/badges/:id.png`);
 
   // CORS configuration
   const corsOriginsString = configService.get<string>('CORS_ORIGINS') || 'http://localhost:5173';

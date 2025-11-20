@@ -33,8 +33,6 @@ const elements = {
   // Configuration
   printerSelect: document.getElementById('printer-select'),
   btnRefreshPrinters: document.getElementById('btn-refresh-printers'),
-  redisHost: document.getElementById('redis-host'),
-  redisPort: document.getElementById('redis-port'),
   btnSaveConfig: document.getElementById('btn-save-config'),
   btnOpenFolder: document.getElementById('btn-open-folder'),
   btnCleanupLabels: document.getElementById('btn-cleanup-labels'),
@@ -273,15 +271,13 @@ async function loadPrinters() {
 async function saveConfiguration() {
   try {
     const config = {
-      printerName: elements.printerSelect.value,
-      redisHost: elements.redisHost.value || 'localhost',
-      redisPort: elements.redisPort.value || '6379'
+      printerName: elements.printerSelect.value
     };
 
     const result = await window.electronAPI.saveConfig(config);
     
     if (result.success) {
-      addLog('✅ Configuration saved successfully');
+      addLog('✅ Printer configuration saved successfully');
       addLog('💡 Restart the worker for changes to take effect');
     } else {
       addLog(`❌ Error saving configuration: ${result.error}`);

@@ -28,6 +28,8 @@ require('dotenv').config();
 // Configuration
 const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
 const REDIS_PORT = parseInt(process.env.REDIS_PORT || '6379');
+const REDIS_PASSWORD = process.env.REDIS_PASSWORD || '';
+const REDIS_DB = parseInt(process.env.REDIS_DB || '0');
 const PRINTER_NAME = process.env.PRINTER_NAME || 'Brother QL-800';
 
 // Use a writable directory (AppData/Local for Windows, or system temp)
@@ -405,6 +407,8 @@ const worker = new Worker(
     connection: {
       host: REDIS_HOST,
       port: REDIS_PORT,
+      password: REDIS_PASSWORD || undefined,
+      db: REDIS_DB,
     },
     limiter: {
       max: 1, // Max 1 job at a time
