@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Res, NotFoundException, Logger } from '@nestjs/common';
+import { Controller, Get, Param, Res, NotFoundException, Logger, VERSION_NEUTRAL } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
 import { Response } from 'express';
 import { BadgesService } from './badges.service';
@@ -21,10 +21,11 @@ import { ConfigService } from '@nestjs/config';
  * - Serves existing badge if available
  * - Handles old registrations from 2024 that need badges in 2025
  * 
- * Route: /uploads/badges/:id.png (matches static file pattern)
+ * Route: /uploads/badges/:id.png (no /api prefix, no versioning)
+ * Excluded from global prefix and versioning to match static file URLs
  */
 @ApiTags('Badges')
-@Controller('uploads/badges')
+@Controller({ path: 'uploads/badges', version: VERSION_NEUTRAL })
 export class BadgesController {
   private readonly logger = new Logger(BadgesController.name);
   private readonly uploadDir: string;

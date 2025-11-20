@@ -101,11 +101,19 @@ async function seed() {
     console.log(`   Roles: ${existingRolesCount}`);
     console.log(`   Users: ${existingUsersCount}\n`);
 
-    if (existingRolesCount > 0 && existingUsersCount > 0) {
-      console.log('⚠️  Database already seeded!');
-      console.log('   To force re-seed, manually delete collections first.\n');
+    // ✅ ALWAYS check and fix admin user role, even if already seeded
+    const adminUser = await User.findOne({ email: 'admin@visitor-system.com' });
+    const needsRoleFix = adminUser && !adminUser.role;
+
+    if (existingRolesCount > 0 && existingUsersCount > 0 && !needsRoleFix) {
+      console.log('⚠️  Database already seeded and admin has role!');
+      console.log('   All good - no changes needed.\n');
       await mongoose.disconnect();
       return;
+    }
+
+    if (needsRoleFix) {
+      console.log('⚠️  Admin user exists but has NO ROLE - fixing...\n');
     }
 
     // Seed roles
@@ -126,7 +134,7 @@ async function seed() {
       throw new Error('Super admin role not created!');
     }
 
-    // Seed users
+    // Seed users OR fix admin role
     if (existingUsersCount === 0) {
       console.log('👥 Creating users...');
       
@@ -158,8 +166,18 @@ async function seed() {
 
       await User.insertMany(defaultUsers);
       console.log(`✅ Created ${defaultUsers.length} users\n`);
+    } else if (needsRoleFix) {
+      // Fix admin user role if it's missing
+      console.log('🔧 Fixing admin user role...');
+      await User.updateOne(
+        { email: 'admin@visitor-system.com' },
+        { $set: { role: superAdminRole._id } }
+      );
+      console.log(`✅ Admin role fixed: assigned super_admin\n`);
+    }
 
-      // Display credentials
+    // Display credentials (only if users were newly created)
+    if (existingUsersCount === 0) {
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('🎉 Database seeded successfully!');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');

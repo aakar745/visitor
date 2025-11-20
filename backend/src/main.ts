@@ -47,17 +47,40 @@ async function bootstrap() {
   // Static file serving for uploads with CORS support
   // NOTE: /uploads/badges/ is handled by BadgesController for on-demand generation
   const uploadDir = configService.get('UPLOAD_DIR', './uploads');
-  app.useStaticAssets(uploadDir, {
-    prefix: '/uploads/',
-    setHeaders: (res) => {
+  const express = require('express');
+  const path = require('path');
+  const fs = require('fs');
+  
+  // Middleware to intercept badge requests and pass them to controller
+  app.use('/uploads/badges', (req: any, res: any, next: any) => {
+    // Let BadgesController handle all badge requests (don't try static serving)
+    next();
+  });
+  
+  // Serve other uploads statically  
+  app.use('/uploads', (req: any, res: any, next: any) => {
+    // If request is for badges, skip static serving
+    if (req.url.startsWith('/badges/')) {
+      return next('route'); // Skip to next route handler (controller)
+    }
+    
+    // Serve static files for non-badge uploads
+    const filePath = path.join(uploadDir, req.url);
+    fs.access(filePath, fs.constants.F_OK, (err: any) => {
+      if (err) {
+        return next(); // File doesn't exist, continue
+      }
+      // File exists, serve it
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
       res.setHeader('Access-Control-Allow-Methods', 'GET');
       res.setHeader('Cache-Control', 'public, max-age=31536000');
-    },
+      res.sendFile(filePath);
+    });
   });
+  
   console.log(`📁 Static files served from: ${uploadDir} at /uploads/ (CORS enabled)`);
-  console.log(`🎨 Badge generation: On-demand via /uploads/badges/:id.png`);
+  console.log(`🎨 Badge generation: On-demand via BadgesController`);
 
   // CORS configuration
   const corsOriginsString = configService.get<string>('CORS_ORIGINS') || 'http://localhost:5173';
@@ -94,8 +117,10 @@ async function bootstrap() {
     optionsSuccessStatus: 204,
   });
 
-  // API prefix and versioning
-  app.setGlobalPrefix('api');
+  // API prefix and versioning (exclude /uploads from API prefix)
+  app.setGlobalPrefix('api', {
+    exclude: ['uploads/badges/:path*'], // Exclude badge routes from /api prefix
+  });
   
   app.enableVersioning({
     type: VersioningType.URI,
