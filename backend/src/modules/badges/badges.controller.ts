@@ -1,6 +1,7 @@
 import { Controller, Get, Param, Res, NotFoundException, Logger, VERSION_NEUTRAL } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
 import { Response } from 'express';
+import { Public } from '../../common/decorators/public.decorator';
 import { BadgesService } from './badges.service';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -50,9 +51,12 @@ export class BadgesController {
    * - Old registrations from 2024
    * - Registrations where badge generation failed
    * - Badges that were cleaned up by auto-cleanup
+   * 
+   * PUBLIC ENDPOINT - No authentication required (images should be publicly accessible)
    */
+  @Public()
   @Get(':registrationId.png')
-  @ApiOperation({ summary: 'Get or generate badge for registration' })
+  @ApiOperation({ summary: 'Get or generate badge for registration (Public)' })
   @ApiParam({ name: 'registrationId', description: 'Registration ID' })
   @ApiResponse({ status: 200, description: 'Badge image (PNG)' })
   @ApiResponse({ status: 404, description: 'Registration not found' })
