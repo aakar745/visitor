@@ -264,9 +264,9 @@ export interface ExhibitionRequest {
   interestOptions: Omit<InterestOption, 'id'>[];
   allowGuests: boolean;
   requiresApproval: boolean;
-  exhibitionLogo?: string;
-  badgeLogo?: string;
-  bannerImage?: string;
+  exhibitionLogo?: string | null;
+  badgeLogo?: string | null;
+  bannerImage?: string | null;
   badgeConfig?: BadgeOverlayConfig;
 }
 

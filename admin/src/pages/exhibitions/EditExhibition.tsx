@@ -186,9 +186,9 @@ const EditExhibition: React.FC = () => {
         allowedCategories: values.allowedCategories || ['general'],
         customFields,
         interestOptions: interestOptions.map(({ id, ...option }) => option), // Remove id for request
-        exhibitionLogo: exhibitionLogo || undefined,
-        badgeLogo: badgeLogo || undefined,
-        bannerImage: bannerImage || undefined,
+        exhibitionLogo: exhibitionLogo === null ? null : exhibitionLogo,
+        badgeLogo: badgeLogo === null ? null : badgeLogo,
+        bannerImage: bannerImage === null ? null : bannerImage,
       };
 
       await exhibitionService.updateExhibition(id!, exhibitionData);

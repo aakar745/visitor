@@ -425,10 +425,10 @@ export class ExhibitionsService {
       this.validateDates(mergedData as any, true);
     }
 
-    // If badge logo is being updated, delete all existing badges for this exhibition
-    // They will be regenerated on-demand with the new logo
-    if (updateExhibitionDto.badgeLogo && updateExhibitionDto.badgeLogo !== exhibition.badgeLogo) {
-      this.logger.log(`🔄 Badge logo changed for exhibition ${id}, scheduling badge cleanup...`);
+    // If badge logo is being updated or removed, delete all existing badges for this exhibition
+    // They will be regenerated on-demand with the new logo (or without logo if removed)
+    if (updateExhibitionDto.badgeLogo !== undefined && updateExhibitionDto.badgeLogo !== exhibition.badgeLogo) {
+      this.logger.log(`🔄 Badge logo ${updateExhibitionDto.badgeLogo === null ? 'removed' : 'changed'} for exhibition ${id}, scheduling badge cleanup...`);
       // Run cleanup asynchronously (don't block the update)
       this.cleanupExhibitionBadges(id).catch(err => {
         this.logger.error(`Failed to cleanup badges for exhibition ${id}:`, err);
