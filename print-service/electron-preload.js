@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getStatus: () => ipcRenderer.invoke('get-status'),
   checkRedis: () => ipcRenderer.invoke('check-redis'),
   getPrinters: () => ipcRenderer.invoke('get-printers'),
+  getConfig: () => ipcRenderer.invoke('get-config'),
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),
   
   // Utilities

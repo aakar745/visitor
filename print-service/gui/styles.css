@@ -243,6 +243,13 @@ header {
   gap: 8px;
 }
 
+.config-hint {
+  font-size: 11px;
+  color: #666;
+  margin-top: -4px;
+  font-style: italic;
+}
+
 .config-item-full {
   grid-column: 1 / -1;
   flex-direction: row;

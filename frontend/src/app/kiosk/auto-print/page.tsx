@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, CheckCircle, AlertCircle, Printer, User, MapPin, Hash, Camera, ScanLine } from 'lucide-react';
 import { toast } from 'sonner';
 import QRCode from 'qrcode';
+import { getKioskId } from '@/lib/utils/kioskId';
 
 export default function AutoPrintPage() {
   // State
@@ -236,10 +237,13 @@ export default function AutoPrintPage() {
         });
       } else {
         // Real printing - queue the job
+        const kioskId = getKioskId(); // Get unique kiosk ID from localStorage
+        console.log('[Auto-Print] Using kiosk ID:', kioskId);
+        
         const queueResult = await kioskApi.queuePrintJob(
           registrationNumber,
           currentConfig.printerServiceUrl || 'http://localhost:9100',
-          'kiosk-1' // TODO: Get actual kiosk ID from config or browser
+          kioskId
         );
         
         console.log('[Auto-Print] ✅ Print job queued:', queueResult);

@@ -87,6 +87,18 @@
           </button>
         </div>
 
+        <div class="config-item">
+          <label for="kiosk-id-input">Kiosk ID</label>
+          <input 
+            type="text" 
+            id="kiosk-id-input" 
+            class="input" 
+            placeholder="e.g., entrance-kiosk or kiosk-1"
+            title="Unique identifier for this kiosk (leave empty for default queue)"
+          />
+          <small class="config-hint">Each kiosk needs a unique ID to route print jobs correctly</small>
+        </div>
+
         <div class="config-item config-item-full">
           <button id="btn-save-config" class="btn btn-primary">
             <span class="btn-icon">💾</span> Save Configuration

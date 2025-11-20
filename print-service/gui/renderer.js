@@ -32,6 +32,7 @@ const elements = {
   
   // Configuration
   printerSelect: document.getElementById('printer-select'),
+  kioskIdInput: document.getElementById('kiosk-id-input'),
   btnRefreshPrinters: document.getElementById('btn-refresh-printers'),
   btnSaveConfig: document.getElementById('btn-save-config'),
   btnOpenFolder: document.getElementById('btn-open-folder'),
@@ -49,6 +50,9 @@ const elements = {
 async function initialize() {
   addLog('🚀 Print Service Manager started');
   addLog('💡 System tray icon is active - you can minimize this window');
+  
+  // Load configuration
+  await loadConfiguration();
   
   // Load status
   await updateStatus();
@@ -268,16 +272,42 @@ async function loadPrinters() {
 // Configuration
 // =============================================================================
 
+/**
+ * Load configuration from .env file
+ */
+async function loadConfiguration() {
+  try {
+    const result = await window.electronAPI.getConfig();
+    
+    if (result.success && result.config) {
+      // Set kiosk ID if available
+      if (result.config.kioskId) {
+        elements.kioskIdInput.value = result.config.kioskId;
+        addLog(`📋 Loaded kiosk ID: ${result.config.kioskId}`);
+      }
+    }
+  } catch (error) {
+    addLog(`⚠️ Could not load configuration: ${error.message}`);
+  }
+}
+
+/**
+ * Save configuration to .env file
+ */
 async function saveConfiguration() {
   try {
     const config = {
-      printerName: elements.printerSelect.value
+      printerName: elements.printerSelect.value,
+      kioskId: elements.kioskIdInput.value.trim()
     };
 
     const result = await window.electronAPI.saveConfig(config);
     
     if (result.success) {
-      addLog('✅ Printer configuration saved successfully');
+      addLog('✅ Configuration saved successfully');
+      if (config.kioskId) {
+        addLog(`📋 Kiosk ID: ${config.kioskId}`);
+      }
       addLog('💡 Restart the worker for changes to take effect');
     } else {
       addLog(`❌ Error saving configuration: ${result.error}`);

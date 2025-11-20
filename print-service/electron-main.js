@@ -747,6 +747,32 @@ ipcMain.handle('cleanup-labels', async () => {
   }
 });
 
+ipcMain.handle('get-config', async () => {
+  try {
+    const envPath = path.join(__dirname, '.env');
+    
+    if (!fs.existsSync(envPath)) {
+      return { success: true, config: { kioskId: '', printerName: '' } };
+    }
+    
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    const lines = envContent.split('\n');
+    const config = {};
+    
+    lines.forEach(line => {
+      const match = line.match(/^(KIOSK_ID|PRINTER_NAME)=(.*)$/);
+      if (match) {
+        const key = match[1] === 'KIOSK_ID' ? 'kioskId' : 'printerName';
+        config[key] = match[2].trim();
+      }
+    });
+    
+    return { success: true, config };
+  } catch (error) {
+    return { success: false, error: error.message, config: {} };
+  }
+});
+
 ipcMain.handle('save-config', async (event, config) => {
   try {
     const envPath = path.join(__dirname, '.env');
@@ -766,9 +792,10 @@ ipcMain.handle('save-config', async (event, config) => {
       }
     };
     
-    // SECURITY: Only allow saving printer name from GUI
+    // SECURITY: Only allow saving printer name and kiosk ID from GUI
     // Redis credentials must be configured manually in .env file
     if (config.printerName) updateEnvValue('PRINTER_NAME', config.printerName);
+    if (config.kioskId !== undefined) updateEnvValue('KIOSK_ID', config.kioskId);
     
     fs.writeFileSync(envPath, envContent.trim() + '\n');
     

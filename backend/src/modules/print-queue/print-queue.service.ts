@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
-import { Queue, Job } from 'bullmq';
+import { Queue, Job, ConnectionOptions } from 'bullmq';
 import { Redis } from 'ioredis';
 
 /**
@@ -34,6 +34,8 @@ export interface PrintJobData {
 export class PrintQueueService implements OnModuleInit {
   private readonly logger = new Logger(PrintQueueService.name);
   private redisClient: Redis;
+  private connectionOptions: ConnectionOptions;
+  private kioskQueues: Map<string, Queue> = new Map();
 
   constructor(
     @InjectQueue('print-jobs') private printQueue: Queue,
@@ -50,8 +52,42 @@ export class PrintQueueService implements OnModuleInit {
       password: redisPassword,
     });
 
+    // Store connection options for dynamic queue creation
+    this.connectionOptions = {
+      host: redisHost,
+      port: redisPort,
+      password: redisPassword,
+    };
+
     this.logger.log('✅ Print Queue Service initialized');
     this.logger.log(`📍 Redis: ${redisHost}:${redisPort}`);
+  }
+
+  /**
+   * Get or create a kiosk-specific queue
+   * Each kiosk gets its own queue to ensure jobs are printed on the correct printer
+   */
+  private getKioskQueue(kioskId?: string): Queue {
+    // If no kioskId provided, use default queue
+    if (!kioskId) {
+      return this.printQueue;
+    }
+
+    // Check if queue already exists
+    if (this.kioskQueues.has(kioskId)) {
+      return this.kioskQueues.get(kioskId)!;
+    }
+
+    // Create new queue for this kiosk
+    const queueName = `print-jobs-${kioskId}`;
+    this.logger.log(`📝 Creating new queue for kiosk: ${queueName}`);
+    
+    const queue = new Queue(queueName, {
+      connection: this.connectionOptions,
+    });
+
+    this.kioskQueues.set(kioskId, queue);
+    return queue;
   }
 
   /**
@@ -162,10 +198,19 @@ export class PrintQueueService implements OnModuleInit {
     
     this.logger.log(`[Queue] Adding print job: ${jobId}`);
     this.logger.log(`[Queue] Visitor: ${jobData.visitorName} | Exhibition: ${jobData.exhibitionName}`);
+    if (jobData.kioskId) {
+      this.logger.log(`[Queue] Kiosk ID: ${jobData.kioskId}`);
+    }
 
     try {
+      // Get the appropriate queue for this kiosk
+      const queue = this.getKioskQueue(jobData.kioskId);
+      const queueName = jobData.kioskId ? `print-jobs-${jobData.kioskId}` : 'print-jobs';
+      
+      this.logger.log(`[Queue] Using queue: ${queueName}`);
+
       // Add job to queue
-      const job = await this.printQueue.add(
+      const job = await queue.add(
         'print-badge', // Job name
         jobData,
         {
@@ -175,7 +220,7 @@ export class PrintQueueService implements OnModuleInit {
       );
 
       // Get current queue position
-      const waitingJobs = await this.printQueue.getWaitingCount();
+      const waitingJobs = await queue.getWaitingCount();
       
       this.logger.log(`[Queue] ✅ Job added: ${jobId}`);
       this.logger.log(`[Queue] Queue position: ${waitingJobs + 1}`);

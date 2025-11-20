@@ -31,6 +31,7 @@ const REDIS_PORT = parseInt(process.env.REDIS_PORT || '6379');
 const REDIS_PASSWORD = process.env.REDIS_PASSWORD || '';
 const REDIS_DB = parseInt(process.env.REDIS_DB || '0');
 const PRINTER_NAME = process.env.PRINTER_NAME || 'Brother QL-800';
+const KIOSK_ID = process.env.KIOSK_ID || ''; // Unique identifier for this kiosk
 
 // Use a writable directory (AppData/Local for Windows, or system temp)
 // C:\Program Files is read-only, so we use user's local app data folder
@@ -45,10 +46,15 @@ if (!fs.existsSync(OUTPUT_DIR)) {
   console.log(`📁 Created output directory: ${OUTPUT_DIR}`);
 }
 
+// Determine queue name based on kiosk ID
+const QUEUE_NAME = KIOSK_ID ? `print-jobs-${KIOSK_ID}` : 'print-jobs';
+
 console.log(`
 ╔═══════════════════════════════════════════════════╗
 ║   🖨️  Print Service Worker - Starting...         ║
 ║                                                   ║
+║   Kiosk ID: ${(KIOSK_ID || 'default').padEnd(36)} ║
+║   Queue: ${QUEUE_NAME.padEnd(39)} ║
 ║   Redis: ${REDIS_HOST}:${REDIS_PORT}                            ║
 ║   Printer: ${PRINTER_NAME.padEnd(36)} ║
 ║   Output: ${OUTPUT_DIR.substring(0, 44)}...   ║
@@ -399,9 +405,10 @@ async function processPrintJob(job) {
 
 /**
  * Create and start the worker
+ * Each kiosk consumes from its own queue to ensure jobs are printed on the correct printer
  */
 const worker = new Worker(
-  'print-jobs', // Queue name (must match backend)
+  QUEUE_NAME, // Queue name (kiosk-specific or default)
   processPrintJob,
   {
     connection: {
