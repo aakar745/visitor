@@ -44,7 +44,7 @@ export class LocationsController {
 
   @Post('countries')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'super-admin')
+  @Roles('admin', 'super_admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new country' })
   @ApiResponse({ status: 201, description: 'Country created successfully' })
@@ -95,7 +95,7 @@ export class LocationsController {
 
   @Put('countries/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'super-admin')
+  @Roles('admin', 'super_admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update country' })
   async updateCountry(@Param('id') id: string, @Body() dto: UpdateCountryDto) {
@@ -109,7 +109,7 @@ export class LocationsController {
 
   @Delete('countries/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'super-admin')
+  @Roles('admin', 'super_admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete country' })
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -123,7 +123,7 @@ export class LocationsController {
 
   @Post('states')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'super-admin')
+  @Roles('admin', 'super_admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new state' })
   async createState(@Body() dto: CreateStateDto) {
@@ -170,7 +170,7 @@ export class LocationsController {
 
   @Put('states/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'super-admin')
+  @Roles('admin', 'super_admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update state' })
   async updateState(@Param('id') id: string, @Body() dto: UpdateStateDto) {
@@ -184,7 +184,7 @@ export class LocationsController {
 
   @Delete('states/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'super-admin')
+  @Roles('admin', 'super_admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete state' })
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -198,7 +198,7 @@ export class LocationsController {
 
   @Post('cities')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'super-admin')
+  @Roles('admin', 'super_admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new city' })
   async createCity(@Body() dto: CreateCityDto) {
@@ -245,7 +245,7 @@ export class LocationsController {
 
   @Put('cities/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'super-admin')
+  @Roles('admin', 'super_admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update city' })
   async updateCity(@Param('id') id: string, @Body() dto: UpdateCityDto) {
@@ -259,7 +259,7 @@ export class LocationsController {
 
   @Delete('cities/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'super-admin')
+  @Roles('admin', 'super_admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete city' })
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -273,7 +273,7 @@ export class LocationsController {
 
   @Post('pincodes')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'super-admin')
+  @Roles('admin', 'super_admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new PIN code' })
   async createPincode(@Body() dto: CreatePincodeDto) {
@@ -320,7 +320,7 @@ export class LocationsController {
 
   @Put('pincodes/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'super-admin')
+  @Roles('admin', 'super_admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update PIN code' })
   async updatePincode(@Param('id') id: string, @Body() dto: UpdatePincodeDto) {
@@ -334,7 +334,7 @@ export class LocationsController {
 
   @Delete('pincodes/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'super-admin')
+  @Roles('admin', 'super_admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete PIN code' })
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -445,7 +445,7 @@ export class LocationsController {
 
   @Post('bulk-import')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'super-admin')
+  @Roles('admin', 'super_admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Bulk import locations from CSV data' })
   async bulkImport(@Body() dto: BulkImportDto) {
@@ -459,7 +459,7 @@ export class LocationsController {
 
   @Get('export')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'super-admin')
+  @Roles('admin', 'super_admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Export all locations as CSV' })
   async exportLocations(@Res() res: Response) {
