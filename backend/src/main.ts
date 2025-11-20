@@ -46,10 +46,15 @@ async function bootstrap() {
 
   // Static file serving for uploads with CORS support
   // NOTE: /uploads/badges/ is handled by BadgesController for on-demand generation
-  const uploadDir = configService.get('UPLOAD_DIR', './uploads');
-  const express = require('express');
   const path = require('path');
   const fs = require('fs');
+  const express = require('express');
+  
+  // Resolve upload directory to absolute path (required for res.sendFile)
+  const uploadDirRaw = configService.get('UPLOAD_DIR', './uploads');
+  const uploadDir = path.isAbsolute(uploadDirRaw) 
+    ? uploadDirRaw 
+    : path.resolve(process.cwd(), uploadDirRaw);
   
   // Middleware to intercept badge requests and pass them to controller
   app.use('/uploads/badges', (req: any, res: any, next: any) => {

@@ -36,7 +36,10 @@ export class BadgesController {
     private registrationModel: Model<ExhibitionRegistrationDocument>,
     private configService: ConfigService,
   ) {
-    this.uploadDir = this.configService.get('UPLOAD_DIR', './uploads');
+    // Use absolute path for upload directory
+    const uploadDir = this.configService.get('UPLOAD_DIR', './uploads');
+    this.uploadDir = path.isAbsolute(uploadDir) ? uploadDir : path.resolve(process.cwd(), uploadDir);
+    this.logger.log(`[Badge Controller] Upload directory: ${this.uploadDir}`);
   }
 
   /**

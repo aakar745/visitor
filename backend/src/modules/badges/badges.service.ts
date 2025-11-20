@@ -22,8 +22,12 @@ export class BadgesService {
   private readonly badgeDir: string;
 
   constructor(private configService: ConfigService) {
-    this.uploadDir = this.configService.get('UPLOAD_DIR', './uploads');
+    // Use absolute path for upload directory
+    const uploadDir = this.configService.get('UPLOAD_DIR', './uploads');
+    this.uploadDir = path.isAbsolute(uploadDir) ? uploadDir : path.resolve(process.cwd(), uploadDir);
     this.badgeDir = path.join(this.uploadDir, 'badges');
+    this.logger.log(`[Badge Service] Upload directory: ${this.uploadDir}`);
+    this.logger.log(`[Badge Service] Badge directory: ${this.badgeDir}`);
     this.ensureBadgeDirectory();
   }
 
