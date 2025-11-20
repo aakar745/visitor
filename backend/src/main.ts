@@ -119,7 +119,7 @@ async function bootstrap() {
 
   // API prefix and versioning (exclude /uploads from API prefix)
   app.setGlobalPrefix('api', {
-    exclude: ['uploads/badges/(.*)', 'health'], // Exclude badge routes from /api prefix
+    exclude: ['uploads/badges/(.*)'], // Exclude badge routes from /api prefix
   });
   
   app.enableVersioning({
