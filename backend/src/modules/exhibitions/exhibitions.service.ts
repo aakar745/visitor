@@ -4,9 +4,12 @@ import {
   BadRequestException,
   ConflictException,
   Logger,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { Model, Types } from 'mongoose';
 import { Exhibition, ExhibitionDocument, ExhibitionStatus } from '../../database/schemas/exhibition.schema';
 import { ExhibitionRegistration, ExhibitionRegistrationDocument } from '../../database/schemas/exhibition-registration.schema';
@@ -14,6 +17,7 @@ import { CreateExhibitionDto, UpdateExhibitionDto, QueryExhibitionDto, UpdateSta
 import { sanitizeSearch } from '../../common/utils/sanitize.util';
 import { sanitizePagination } from '../../common/constants/pagination.constants';
 import { generateSlugWithSuffix } from '../../common/utils/slug.util';
+import { RegistrationsService } from '../registrations/registrations.service';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -27,6 +31,8 @@ export class ExhibitionsService {
     @InjectModel(Exhibition.name) private exhibitionModel: Model<ExhibitionDocument>,
     @InjectModel(ExhibitionRegistration.name) private registrationModel: Model<ExhibitionRegistrationDocument>,
     private readonly configService: ConfigService,
+    @Inject(forwardRef(() => RegistrationsService))
+    private readonly registrationsService: RegistrationsService,
   ) {
     this.uploadDir = this.configService.get('UPLOAD_DIR', './uploads');
     this.badgeDir = path.join(this.uploadDir, 'badges');
@@ -425,14 +431,24 @@ export class ExhibitionsService {
       this.validateDates(mergedData as any, true);
     }
 
-    // If badge logo is being updated or removed, delete all existing badges for this exhibition
-    // They will be regenerated on-demand with the new logo (or without logo if removed)
+    // If badge logo is being updated or removed, regenerate all badges for this exhibition
+    // All visitors will get badges with the NEW logo immediately
     if (updateExhibitionDto.badgeLogo !== undefined && updateExhibitionDto.badgeLogo !== exhibition.badgeLogo) {
-      this.logger.log(`🔄 Badge logo ${updateExhibitionDto.badgeLogo === null ? 'removed' : 'changed'} for exhibition ${id}, scheduling badge cleanup...`);
-      // Run cleanup asynchronously (don't block the update)
-      this.cleanupExhibitionBadges(id).catch(err => {
-        this.logger.error(`Failed to cleanup badges for exhibition ${id}:`, err);
-      });
+      this.logger.log(`🔄 Badge logo ${updateExhibitionDto.badgeLogo === null ? 'removed' : 'changed'} for exhibition ${id}`);
+      this.logger.log(`   Triggering automatic regeneration of ALL badges with new logo...`);
+      
+      // Run badge regeneration asynchronously (don't block the update)
+      // This ensures all visitors automatically get badges with the new logo
+      this.registrationsService.regenerateAllBadges(id)
+        .then((result) => {
+          this.logger.log(`✅ Auto-regeneration complete: ${result.successCount}/${result.totalRegistrations} badges updated`);
+          if (result.failureCount > 0) {
+            this.logger.warn(`⚠️ ${result.failureCount} badges failed to regenerate`);
+          }
+        })
+        .catch((err) => {
+          this.logger.error(`Failed to auto-regenerate badges for exhibition ${id}:`, err.message);
+        });
     }
 
     // Prepare update data with internal fields
@@ -976,6 +992,166 @@ export class ExhibitionsService {
       );
     } catch (error) {
       this.logger.error(`❌ Badge cleanup failed for exhibition ${exhibitionId}:`, error);
+      throw error;
+    }
+  }
+
+  // =============================================================================
+  // 🔄 AUTOMATED STATUS UPDATES (CRON JOB)
+  // =============================================================================
+
+  /**
+   * Automatically update exhibition statuses based on current date/time
+   * 
+   * Runs daily at 2:00 AM to ensure all exhibition statuses are accurate
+   * without requiring manual updates from admins.
+   * 
+   * Status transitions:
+   * - ACTIVE → REGISTRATION_OPEN (when registration period starts)
+   * - REGISTRATION_OPEN → ACTIVE (when registration ends but event hasn't started)
+   * - ACTIVE → LIVE_EVENT (when event period starts)
+   * - REGISTRATION_OPEN → LIVE_EVENT (when event starts during registration)
+   * - LIVE_EVENT → COMPLETED (when event ends)
+   * 
+   * IMPORTANT: This only updates exhibitions that are NOT in DRAFT status.
+   * Draft exhibitions are manually managed and should not be auto-updated.
+   * 
+   * Schedule: Daily at 2:00 AM (uses server timezone)
+   * Alternative: Use CronExpression.EVERY_DAY_AT_2AM for clarity
+   */
+  @Cron('0 2 * * *', {
+    name: 'update-exhibition-statuses',
+    timeZone: 'Asia/Kolkata', // Adjust to your server timezone
+  })
+  async updateExhibitionStatuses(): Promise<void> {
+    this.logger.log('🔄 [CRON] Starting automatic exhibition status updates...');
+    
+    try {
+      // Find all exhibitions that are not DRAFT or COMPLETED
+      // These are the only ones that need status updates
+      const exhibitions = await this.exhibitionModel.find({
+        status: { 
+          $nin: [ExhibitionStatus.DRAFT, ExhibitionStatus.COMPLETED] 
+        }
+      }).exec();
+
+      if (exhibitions.length === 0) {
+        this.logger.log('   No exhibitions need status updates');
+        return;
+      }
+
+      this.logger.log(`   Found ${exhibitions.length} exhibition(s) to check`);
+
+      let updatedCount = 0;
+      const updates: Array<{ name: string; from: string; to: string }> = [];
+
+      for (const exhibition of exhibitions) {
+        // Calculate what the status SHOULD be based on current time
+        const newStatus = this.calculateStatus(
+          exhibition.registrationStartDate,
+          exhibition.registrationEndDate,
+          exhibition.onsiteStartDate,
+          exhibition.onsiteEndDate,
+        );
+
+        // Only update if status has changed
+        if (newStatus !== exhibition.status) {
+          const oldStatus = exhibition.status;
+          
+          exhibition.status = newStatus;
+          await exhibition.save();
+          
+          updatedCount++;
+          updates.push({
+            name: exhibition.name,
+            from: oldStatus,
+            to: newStatus,
+          });
+
+          this.logger.log(
+            `   ✅ Updated "${exhibition.name}": ${oldStatus} → ${newStatus}`
+          );
+        }
+      }
+
+      if (updatedCount > 0) {
+        this.logger.log(
+          `✅ [CRON] Exhibition status update complete: ${updatedCount} exhibition(s) updated`
+        );
+        
+        // Log summary of changes
+        updates.forEach(update => {
+          this.logger.log(`   • ${update.name}: ${update.from} → ${update.to}`);
+        });
+      } else {
+        this.logger.log('✅ [CRON] All exhibition statuses are already up to date');
+      }
+    } catch (error) {
+      this.logger.error('❌ [CRON] Failed to update exhibition statuses:', error);
+      // Don't throw - cron should continue on next run
+    }
+  }
+
+  /**
+   * Manual trigger for status updates (for testing or immediate updates)
+   * Can be called via API endpoint if needed
+   */
+  async manualUpdateStatuses(): Promise<{
+    success: boolean;
+    updatedCount: number;
+    updates: Array<{ id: string; name: string; from: string; to: string }>;
+  }> {
+    this.logger.log('🔄 [MANUAL] Starting manual exhibition status updates...');
+    
+    try {
+      const exhibitions = await this.exhibitionModel.find({
+        status: { 
+          $nin: [ExhibitionStatus.DRAFT, ExhibitionStatus.COMPLETED] 
+        }
+      }).exec();
+
+      let updatedCount = 0;
+      const updates: Array<{ id: string; name: string; from: string; to: string }> = [];
+
+      for (const exhibition of exhibitions) {
+        const newStatus = this.calculateStatus(
+          exhibition.registrationStartDate,
+          exhibition.registrationEndDate,
+          exhibition.onsiteStartDate,
+          exhibition.onsiteEndDate,
+        );
+
+        if (newStatus !== exhibition.status) {
+          const oldStatus = exhibition.status;
+          
+          exhibition.status = newStatus;
+          await exhibition.save();
+          
+          updatedCount++;
+          updates.push({
+            id: exhibition._id.toString(),
+            name: exhibition.name,
+            from: oldStatus,
+            to: newStatus,
+          });
+
+          this.logger.log(
+            `   ✅ Updated "${exhibition.name}": ${oldStatus} → ${newStatus}`
+          );
+        }
+      }
+
+      this.logger.log(
+        `✅ [MANUAL] Manual status update complete: ${updatedCount} exhibition(s) updated`
+      );
+
+      return {
+        success: true,
+        updatedCount,
+        updates,
+      };
+    } catch (error) {
+      this.logger.error('❌ [MANUAL] Failed to update exhibition statuses:', error);
       throw error;
     }
   }

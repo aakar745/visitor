@@ -239,5 +239,111 @@ export class RegistrationsController {
   async getCheckInStats(@Param('exhibitionId') exhibitionId: string) {
     return await this.registrationsService.getCheckInStats(exhibitionId);
   }
+
+  // =============================================================================
+  // 🔄 BADGE REGENERATION ENDPOINTS
+  // =============================================================================
+
+  /**
+   * Regenerate badge for a single registration
+   * 
+   * Use cases:
+   * - Exhibition logo was updated after registration
+   * - Badge file was corrupted or deleted
+   * - Visitor information was updated
+   * - Admin needs to reprint with latest exhibition branding
+   * 
+   * This will generate a NEW versioned badge file and update the registration
+   * with the new badge URL. Old badge versions are cleaned up automatically.
+   * 
+   * Protected: Requires authentication (admin only)
+   */
+  @ApiBearerAuth()
+  @Post(':id/regenerate-badge')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: 'Regenerate badge for a registration',
+    description: 'Generates a new badge with current exhibition logo and visitor details. Useful when exhibition branding changes after registration.'
+  })
+  @ApiParam({ name: 'id', description: 'Registration ID' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Badge regenerated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Badge regenerated successfully' },
+        data: {
+          type: 'object',
+          properties: {
+            registrationId: { type: 'string' },
+            badgeUrl: { type: 'string', example: 'https://api.example.com/uploads/badges/abc123-v1731500000000.png' },
+            oldBadgeUrl: { type: 'string', nullable: true }
+          }
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 404, description: 'Registration not found' })
+  async regenerateBadge(@Param('id') id: string) {
+    return await this.registrationsService.regenerateBadge(id);
+  }
+
+  /**
+   * Regenerate badges for all registrations in an exhibition
+   * 
+   * Use cases:
+   * - Exhibition logo was updated and all badges need new branding
+   * - Bulk badge regeneration after exhibition details change
+   * - Mass rebranding of all visitor badges
+   * 
+   * WARNING: This can be expensive for exhibitions with thousands of registrations!
+   * Consider using background job queue for large exhibitions.
+   * 
+   * Protected: Requires authentication (admin only)
+   */
+  @ApiBearerAuth()
+  @Post('exhibition/:exhibitionId/regenerate-all-badges')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: 'Regenerate badges for all registrations in an exhibition',
+    description: 'Regenerates ALL badges with current exhibition logo. Use this after updating exhibition branding. WARNING: Can be slow for large exhibitions.'
+  })
+  @ApiParam({ name: 'exhibitionId', description: 'Exhibition ID' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Badges regeneration started',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Successfully regenerated badges for 142 registrations' },
+        data: {
+          type: 'object',
+          properties: {
+            exhibitionId: { type: 'string' },
+            totalRegistrations: { type: 'number', example: 150 },
+            successCount: { type: 'number', example: 142 },
+            failureCount: { type: 'number', example: 8 },
+            failures: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  registrationId: { type: 'string' },
+                  error: { type: 'string' }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 404, description: 'Exhibition not found' })
+  async regenerateAllBadges(@Param('exhibitionId') exhibitionId: string) {
+    return await this.registrationsService.regenerateAllBadges(exhibitionId);
+  }
 }
 

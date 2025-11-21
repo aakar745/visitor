@@ -128,110 +128,22 @@ testClient.on('ready', () => {
 });
 
 // ==========================================
-// 🧹 CLEANUP SYSTEM - Prevent Folder Bloat
+// 🧹 CLEANUP SYSTEM - Removed
 // ==========================================
-
-/**
- * Delete old label files to prevent disk space issues
- * Keeps only files from the last 7 days
- * Runs daily at 3 AM (or on startup if never run)
- */
-async function cleanupOldLabels() {
-  const MAX_AGE_DAYS = 7; // Keep files for 7 days
-  const MAX_AGE_MS = MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
-  
-  console.log('\n🧹 [CLEANUP] Starting label folder cleanup...');
-  console.log(`   Keeping files newer than ${MAX_AGE_DAYS} days`);
-  
-  try {
-    const files = await fs.promises.readdir(OUTPUT_DIR);
-    const now = Date.now();
-    
-    let deletedCount = 0;
-    let keptCount = 0;
-    let totalSize = 0;
-    
-    for (const file of files) {
-      // Skip hidden files and directories
-      if (file.startsWith('.')) {
-        continue;
-      }
-      
-      const filePath = path.join(OUTPUT_DIR, file);
-      
-      try {
-        const stats = await fs.promises.stat(filePath);
-        
-        // Skip directories
-        if (stats.isDirectory()) {
-          continue;
-        }
-        
-        const fileAge = now - stats.mtimeMs;
-        
-        if (fileAge > MAX_AGE_MS) {
-          // Delete old file
-          await fs.promises.unlink(filePath);
-          deletedCount++;
-          totalSize += stats.size;
-        } else {
-          keptCount++;
-        }
-      } catch (err) {
-        console.warn(`[CLEANUP] ⚠️  Error processing file ${file}: ${err.message}`);
-      }
-    }
-    
-    const sizeMB = (totalSize / (1024 * 1024)).toFixed(2);
-    
-    console.log(`✅ [CLEANUP] Completed:`);
-    console.log(`   Files deleted: ${deletedCount}`);
-    console.log(`   Files kept: ${keptCount}`);
-    console.log(`   Disk space freed: ${sizeMB} MB`);
-    
-  } catch (err) {
-    console.error(`❌ [CLEANUP] Error: ${err.message}`);
-  }
-}
-
-/**
- * Schedule daily cleanup at 3 AM
- * Also runs once on startup (after 5 minutes to avoid interfering with worker init)
- */
-function scheduleCleanup() {
-  // Run initial cleanup after 5 minutes (on startup)
-  // Delay longer than server.js to avoid both cleaning at same time
-  setTimeout(() => {
-    console.log('🧹 [CLEANUP] Running initial cleanup (startup)...');
-    cleanupOldLabels();
-  }, 5 * 60 * 1000); // 5 minutes
-  
-  // Schedule daily cleanup at 3 AM
-  const scheduleNextCleanup = () => {
-    const now = new Date();
-    const next3AM = new Date();
-    next3AM.setHours(3, 0, 0, 0);
-    
-    // If 3 AM already passed today, schedule for tomorrow
-    if (now > next3AM) {
-      next3AM.setDate(next3AM.getDate() + 1);
-    }
-    
-    const timeUntil3AM = next3AM - now;
-    
-    console.log(`🧹 [CLEANUP] Next cleanup scheduled for: ${next3AM.toLocaleString()}`);
-    
-    setTimeout(() => {
-      cleanupOldLabels();
-      scheduleNextCleanup(); // Schedule next day
-    }, timeUntil3AM);
-  };
-  
-  scheduleNextCleanup();
-}
-
-// Start cleanup scheduler
-scheduleCleanup();
+// NOTE: File cleanup is now handled exclusively by server.js
+// This prevents race conditions where both processes try to delete the same files.
+// The worker's responsibility is to process print jobs only.
+//
+// Cleanup details:
+// - Managed by: server.js (ONLY)
+// - Multi-strategy schedule:
+//   1. On startup (after 1 minute) - handles daily PC restarts
+//   2. Every 6 hours - handles extended uptime (PC left on for days/weeks)
+//   3. Daily at 3 AM - traditional maintenance (if PC is on)
+// - Retention: 7 days
+// - Location: ./labels/ directory
+//
+// This multi-layered approach ensures cleanup happens regardless of PC power schedule!
 
 /**
  * Generate label image (PNG)

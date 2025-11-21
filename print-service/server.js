@@ -57,11 +57,28 @@ if (!fs.existsSync(OUTPUT_DIR)) {
 // ==========================================
 // 🧹 CLEANUP SYSTEM - Prevent Folder Bloat
 // ==========================================
+// NOTE: This is the ONLY process that performs cleanup.
+// print-worker.js does NOT run cleanup to prevent race conditions.
+// This ensures files are only deleted once, avoiding conflicts and error logs.
+//
+// CLEANUP STRATEGY (Multi-layered approach):
+// 1. Startup: Runs 1 minute after server starts (handles daily restarts)
+// 2. Periodic: Runs every 6 hours (handles extended uptime)
+// 3. Scheduled: Runs at 3 AM daily (traditional maintenance, if PC is on)
+//
+// This ensures cleanup happens regardless of PC power schedule!
 
 /**
  * Delete old label files to prevent disk space issues
  * Keeps only files from the last 7 days
- * Runs daily at 3 AM (or on startup if never run)
+ * 
+ * Runs via multiple strategies:
+ * - On startup (after 1 minute)
+ * - Every 6 hours (periodic)
+ * - Daily at 3 AM (if PC is on)
+ * 
+ * IMPORTANT: This cleanup function is ONLY in server.js (not in print-worker.js)
+ * to prevent race conditions where both processes try to delete the same files.
  */
 async function cleanupOldLabels() {
   const MAX_AGE_DAYS = 7; // Keep files for 7 days
@@ -122,17 +139,46 @@ async function cleanupOldLabels() {
 }
 
 /**
- * Schedule daily cleanup at 3 AM
- * Also runs once on startup (after 1 minute)
+ * Schedule cleanup with multiple strategies to ensure it runs regardless of PC schedule
+ * 
+ * Strategy 1: Startup cleanup (1 minute after start) - handles daily PC restarts
+ * Strategy 2: Periodic cleanup (every 6 hours) - handles PCs left on for days/weeks
+ * Strategy 3: 3 AM cleanup (if PC is on) - traditional scheduled maintenance
+ * 
+ * This multi-strategy approach ensures cleanup happens whether the PC is:
+ * - Turned on/off daily (startup cleanup runs daily)
+ * - Always on 24/7 (periodic + 3AM cleanup runs)
+ * - On for extended periods (periodic cleanup prevents accumulation)
  */
 function scheduleCleanup() {
+  // ============================================
+  // STRATEGY 1: Startup Cleanup
+  // ============================================
   // Run initial cleanup after 1 minute (on startup)
   setTimeout(() => {
     console.log('🧹 [CLEANUP] Running initial cleanup (startup)...');
     cleanupOldLabels();
   }, 60 * 1000); // 1 minute
   
-  // Schedule daily cleanup at 3 AM
+  // ============================================
+  // STRATEGY 2: Periodic Cleanup (Every 6 Hours)
+  // ============================================
+  // This ensures cleanup runs even if PC is never on at 3 AM
+  // or left running for days/weeks without restart
+  const CLEANUP_INTERVAL = 6 * 60 * 60 * 1000; // 6 hours
+  
+  setInterval(() => {
+    const now = new Date();
+    console.log(`🧹 [CLEANUP] Running periodic cleanup (${now.toLocaleString()})...`);
+    cleanupOldLabels();
+  }, CLEANUP_INTERVAL);
+  
+  console.log(`🧹 [CLEANUP] Periodic cleanup scheduled: Every 6 hours`);
+  
+  // ============================================
+  // STRATEGY 3: 3 AM Cleanup (Traditional)
+  // ============================================
+  // Schedule daily cleanup at 3 AM (if PC is on)
   const scheduleNextCleanup = () => {
     const now = new Date();
     const next3AM = new Date();
@@ -145,7 +191,7 @@ function scheduleCleanup() {
     
     const timeUntil3AM = next3AM - now;
     
-    console.log(`🧹 [CLEANUP] Next cleanup scheduled for: ${next3AM.toLocaleString()}`);
+    console.log(`🧹 [CLEANUP] 3 AM cleanup scheduled for: ${next3AM.toLocaleString()}`);
     
     setTimeout(() => {
       cleanupOldLabels();
@@ -681,6 +727,97 @@ async function printImageDirectly(imagePath, printerName) {
   }
 }
 
+// =============================================================================
+// 🧹 MANUAL CLEANUP ENDPOINT
+// =============================================================================
+
+/**
+ * Manual cleanup endpoint - Allows cleanup to be triggered via HTTP API
+ * Used by GUI and can be called manually for immediate cleanup
+ * 
+ * GET /api/cleanup - Trigger cleanup of old labels (7+ days)
+ * 
+ * Returns:
+ * {
+ *   success: true,
+ *   deletedCount: 142,
+ *   keptCount: 8,
+ *   sizeMB: "3.42",
+ *   message: "Cleanup completed successfully"
+ * }
+ */
+app.get('/api/cleanup', async (req, res) => {
+  console.log('\n🧹 [API] Manual cleanup triggered via HTTP endpoint');
+  
+  try {
+    const result = await performManualCleanup();
+    
+    res.json({
+      success: true,
+      ...result,
+      message: 'Cleanup completed successfully'
+    });
+  } catch (error) {
+    console.error('[API] ❌ Manual cleanup failed:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Cleanup failed',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Perform manual cleanup (can be called via API or internally)
+ * Extracts the cleanup logic for reuse
+ */
+async function performManualCleanup() {
+  const MAX_AGE_DAYS = 7;
+  const MAX_AGE_MS = MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+  
+  console.log(`🧹 [MANUAL CLEANUP] Scanning ${OUTPUT_DIR}...`);
+  console.log(`   Retention: ${MAX_AGE_DAYS} days`);
+  
+  const files = await fs.promises.readdir(OUTPUT_DIR);
+  const now = Date.now();
+  
+  let deletedCount = 0;
+  let keptCount = 0;
+  let totalSize = 0;
+  
+  for (const file of files) {
+    if (file.startsWith('.')) continue;
+    
+    const filePath = path.join(OUTPUT_DIR, file);
+    
+    try {
+      const stats = await fs.promises.stat(filePath);
+      if (stats.isDirectory()) continue;
+      
+      const fileAge = now - stats.mtimeMs;
+      
+      if (fileAge > MAX_AGE_MS) {
+        await fs.promises.unlink(filePath);
+        deletedCount++;
+        totalSize += stats.size;
+      } else {
+        keptCount++;
+      }
+    } catch (err) {
+      console.warn(`[MANUAL CLEANUP] ⚠️  Error processing ${file}: ${err.message}`);
+    }
+  }
+  
+  const sizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+  
+  console.log(`✅ [MANUAL CLEANUP] Completed:`);
+  console.log(`   Files deleted: ${deletedCount}`);
+  console.log(`   Files kept: ${keptCount}`);
+  console.log(`   Disk space freed: ${sizeMB} MB\n`);
+  
+  return { deletedCount, keptCount, sizeMB };
+}
+
 
 // Start server
 app.listen(PORT, () => {
@@ -700,6 +837,7 @@ app.listen(PORT, () => {
 ║   • GET  /test-connection - Test printer          ║
 ║   • POST /print - ${AUTO_PRINT_ENABLED ? 'Print automatically' : 'Generate label'}        ║
 ║   • POST /test-print - Test print                 ║
+║   • GET  /api/cleanup - Manual cleanup (7+ days)  ║
 ║                                                   ║
 ║   Ready to print badges! 🎟️                       ║
 ╚═══════════════════════════════════════════════════╝

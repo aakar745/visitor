@@ -26,7 +26,7 @@ import { MeilisearchModule } from '../meilisearch/meilisearch.module';
   ],
   controllers: [RegistrationsController],
   providers: [RegistrationsService],
-  exports: [RegistrationsService],
+  exports: [RegistrationsService], // Export for use in ExhibitionsModule
 })
 export class RegistrationsModule {}
 

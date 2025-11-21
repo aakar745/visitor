@@ -1,5 +1,5 @@
-import { Controller, Get, Param, Res, NotFoundException, Logger, VERSION_NEUTRAL } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
+import { Controller, Get, Post, Param, Res, NotFoundException, Logger, VERSION_NEUTRAL, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiParam, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Response } from 'express';
 import { Public } from '../../common/decorators/public.decorator';
 import { BadgesService } from './badges.service';
@@ -146,6 +146,76 @@ export class BadgesController {
           error: 'Internal Server Error',
         });
       }
+    }
+  }
+
+  // =============================================================================
+  // 🧹 BADGE CLEANUP ENDPOINTS
+  // =============================================================================
+
+  /**
+   * Manually trigger smart badge cleanup
+   * 
+   * This endpoint allows admins to manually trigger the smart badge cleanup
+   * without waiting for the weekly cron job (Sunday 4 AM).
+   * 
+   * Use cases:
+   * - Testing cleanup logic
+   * - Immediate cleanup when disk space is low
+   * - Custom cleanup schedules
+   * - Verifying cleanup behavior
+   * 
+   * The cleanup logic:
+   * - Only deletes badges for COMPLETED exhibitions
+   * - Only exhibitions that ended 7+ days ago
+   * - Database records are preserved for on-demand regeneration
+   * - Returns detailed statistics (exhibitions processed, badges deleted, disk space freed)
+   * 
+   * Security:
+   * - Protected by JWT authentication (admin only)
+   * - CSRF protection enabled (admin panel must include CSRF token)
+   * 
+   * Note: This endpoint should be called from the admin panel, which automatically
+   * handles CSRF token inclusion in requests.
+   */
+  @ApiBearerAuth()
+  @Post('cleanup/smart')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: 'Manually trigger smart badge cleanup (Admin only)',
+    description: 'Cleans up badges for COMPLETED exhibitions that ended 90+ days ago. Provides detailed statistics.'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Cleanup completed successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        exhibitionsProcessed: { type: 'number', example: 5 },
+        badgesDeleted: { type: 'number', example: 12543 },
+        diskSpaceFreed: { type: 'string', example: '4250.00 MB' },
+        errors: { type: 'number', example: 0 },
+        message: { type: 'string', example: 'Smart badge cleanup completed successfully' }
+      }
+    }
+  })
+  @ApiResponse({ status: 500, description: 'Cleanup failed' })
+  async triggerSmartCleanup() {
+    this.logger.log('🔧 [API] Manual smart badge cleanup triggered by admin');
+    
+    try {
+      const result = await this.badgesService.manualSmartBadgeCleanup();
+      
+      return {
+        ...result,
+        message: result.success 
+          ? 'Smart badge cleanup completed successfully' 
+          : 'Smart badge cleanup completed with errors',
+      };
+    } catch (error) {
+      this.logger.error('❌ [API] Manual cleanup failed:', error);
+      throw error;
     }
   }
 }

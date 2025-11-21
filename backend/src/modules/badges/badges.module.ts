@@ -6,11 +6,16 @@ import {
   ExhibitionRegistration,
   ExhibitionRegistrationSchema,
 } from '../../database/schemas/exhibition-registration.schema';
+import {
+  Exhibition,
+  ExhibitionSchema,
+} from '../../database/schemas/exhibition.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: ExhibitionRegistration.name, schema: ExhibitionRegistrationSchema },
+      { name: Exhibition.name, schema: ExhibitionSchema }, // For smart badge cleanup
     ]),
   ],
   controllers: [BadgesController], // ✅ Enabled for on-demand badge generation

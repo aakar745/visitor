@@ -695,10 +695,20 @@ ipcMain.handle('open-folder', async () => {
 /**
  * Manual cleanup trigger for GUI
  * Delete old label files (older than 7 days)
+ * 
+ * NOTE: This cleanup logic mirrors server.js performManualCleanup()
+ * Both use the same retention period (7 days) and logic.
+ * 
+ * The automated cleanup schedule in server.js:
+ * 1. On startup (after 1 minute) - handles daily PC restarts
+ * 2. Every 6 hours - handles extended uptime (PC left on for days/weeks)
+ * 3. Daily at 3 AM - traditional maintenance (if PC is on)
+ * 
+ * This GUI button allows manual cleanup on demand, independent of the schedule.
  */
 ipcMain.handle('cleanup-labels', async () => {
   const labelsPath = path.join(__dirname, 'labels');
-  const MAX_AGE_DAYS = 7;
+  const MAX_AGE_DAYS = 7; // Must match server.js MAX_AGE_DAYS
   const MAX_AGE_MS = MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
   
   sendToWindow('log', '🧹 Starting manual cleanup...');

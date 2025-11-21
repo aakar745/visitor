@@ -342,5 +342,70 @@ export class ExhibitionsController {
   async remove(@Param('id') id: string): Promise<void> {
     await this.exhibitionsService.remove(id);
   }
+
+  /**
+   * Manually trigger exhibition status updates
+   * 
+   * This endpoint allows admins to manually trigger the status update process
+   * without waiting for the daily cron job (2 AM).
+   * 
+   * Useful for:
+   * - Testing the status update logic
+   * - Immediate updates after date changes
+   * - Fixing incorrect statuses without waiting for cron
+   * 
+   * Protected: Requires authentication (admin only)
+   */
+  @Post('update-statuses')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: 'Manually update all exhibition statuses',
+    description: 'Triggers an immediate update of exhibition statuses based on current date/time. Normally runs automatically daily at 2 AM.'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Status update completed',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Status update completed successfully' },
+        data: {
+          type: 'object',
+          properties: {
+            updatedCount: { type: 'number', example: 3 },
+            updates: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  name: { type: 'string' },
+                  from: { type: 'string' },
+                  to: { type: 'string' }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 500, description: 'Status update failed' })
+  async updateStatuses(): Promise<{
+    success: boolean;
+    updatedCount: number;
+    updates: Array<{ id: string; name: string; from: string; to: string }>;
+    message: string;
+  }> {
+    const result = await this.exhibitionsService.manualUpdateStatuses();
+    
+    return {
+      ...result,
+      message: result.updatedCount > 0 
+        ? `Successfully updated ${result.updatedCount} exhibition(s)`
+        : 'All exhibition statuses are already up to date'
+    };
+  }
 }
 

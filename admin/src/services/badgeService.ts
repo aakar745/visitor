@@ -109,16 +109,48 @@ class BadgeService {
   }
 
   /**
-   * Regenerate badge (if visitor details changed)
+   * Regenerate badge for a registration
+   * 
+   * Use cases:
+   * - Exhibition logo was updated after registration
+   * - Badge file was corrupted or deleted
+   * - Visitor information was updated
+   * 
+   * This generates a NEW versioned badge with current exhibition branding.
+   * 
+   * @param registrationId The registration ID (not visitor ID!)
+   * @returns Response with new badge URL
    */
-  async regenerateBadge(visitorId: string, exhibitionId: string): Promise<Blob> {
-    const response = await api.post('/badges/regenerate', {
-      visitorId,
-      exhibitionId,
-    }, {
-      responseType: 'blob',
-    });
-    return response.data;
+  async regenerateBadge(registrationId: string): Promise<{
+    success: boolean;
+    registrationId: string;
+    badgeUrl: string | null;
+    oldBadgeUrl: string | null;
+    message: string;
+  }> {
+    const response = await api.post(`/registrations/${registrationId}/regenerate-badge`);
+    return response.data.data; // Extract data from TransformInterceptor wrapper
+  }
+
+  /**
+   * Regenerate all badges for an exhibition
+   * 
+   * WARNING: This can be slow for large exhibitions!
+   * 
+   * @param exhibitionId The exhibition ID
+   * @returns Statistics about regeneration process
+   */
+  async regenerateAllBadges(exhibitionId: string): Promise<{
+    success: boolean;
+    exhibitionId: string;
+    totalRegistrations: number;
+    successCount: number;
+    failureCount: number;
+    failures: Array<{ registrationId: string; error: string }>;
+    message: string;
+  }> {
+    const response = await api.post(`/registrations/exhibition/${exhibitionId}/regenerate-all-badges`);
+    return response.data.data; // Extract data from TransformInterceptor wrapper
   }
 
   /**
