@@ -397,12 +397,15 @@ async function startWorker() {
   sendToWindow('log', `Using Node.js: ${nodePath}`);
   sendToWindow('log', `Worker path: ${workerPath}`);
   
+  const userDataPath = app.getPath('userData');
+  
   workerProcess = spawn(nodePath, [workerPath], {
     cwd: appPath, // Set working directory so worker can find node_modules
     stdio: ['ignore', 'pipe', 'pipe'],
     env: { 
       ...process.env,
-      ELECTRON_RUN_AS_NODE: '1' // Critical: Run as Node.js, not as GUI!
+      ELECTRON_RUN_AS_NODE: '1', // Critical: Run as Node.js, not as GUI!
+      USER_DATA_PATH: userDataPath // Pass user data path for .env file location
     }
   });
 
@@ -484,12 +487,15 @@ function startServer() {
   sendToWindow('log', `Using Node.js: ${nodePath}`);
   sendToWindow('log', `Server path: ${serverPath}`);
   
+  const userDataPath = app.getPath('userData');
+  
   serverProcess = spawn(nodePath, [serverPath], {
     cwd: appPath, // Set working directory so server can find node_modules
     stdio: ['ignore', 'pipe', 'pipe'],
     env: { 
       ...process.env,
-      ELECTRON_RUN_AS_NODE: '1' // Critical: Run as Node.js, not as GUI!
+      ELECTRON_RUN_AS_NODE: '1', // Critical: Run as Node.js, not as GUI!
+      USER_DATA_PATH: userDataPath // Pass user data path for .env file location
     }
   });
 
@@ -749,7 +755,9 @@ ipcMain.handle('cleanup-labels', async () => {
 
 ipcMain.handle('get-config', async () => {
   try {
-    const envPath = path.join(__dirname, '.env');
+    // Use user data directory (writable, no admin required)
+    const userDataPath = app.getPath('userData');
+    const envPath = path.join(userDataPath, '.env');
     
     if (!fs.existsSync(envPath)) {
       return { success: true, config: { kioskId: '', printerName: '' } };
@@ -775,29 +783,76 @@ ipcMain.handle('get-config', async () => {
 
 ipcMain.handle('save-config', async (event, config) => {
   try {
-    const envPath = path.join(__dirname, '.env');
+    // Use user data directory (writable, no admin required)
+    const userDataPath = app.getPath('userData');
+    const envPath = path.join(userDataPath, '.env');
+    
+    console.log(`💾 Saving config to: ${envPath}`);
+    sendToWindow('log', `💾 Config location: ${envPath}`);
+    
     let envContent = '';
     
+    // Try to load existing .env from new location
     if (fs.existsSync(envPath)) {
       envContent = fs.readFileSync(envPath, 'utf8');
+    } else {
+      // If new location doesn't exist, try to migrate from old location
+      const oldEnvPath = path.join(__dirname, '.env');
+      if (fs.existsSync(oldEnvPath)) {
+        try {
+          envContent = fs.readFileSync(oldEnvPath, 'utf8');
+          sendToWindow('log', '🔄 Migrating configuration from old location...');
+        } catch (error) {
+          // Can't read old location (permission denied), start fresh
+          sendToWindow('log', '⚠️ Creating new configuration file...');
+        }
+      }
     }
     
-    // Update or add config values
-    const updateEnvValue = (key, value) => {
-      const regex = new RegExp(`^${key}=.*$`, 'm');
-      if (regex.test(envContent)) {
-        envContent = envContent.replace(regex, `${key}=${value}`);
-      } else {
-        envContent += `\n${key}=${value}`;
+    // Parse existing env content into key-value pairs
+    const envVars = {};
+    if (envContent) {
+      envContent.split('\n').forEach(line => {
+        const trimmedLine = line.trim();
+        if (trimmedLine && !trimmedLine.startsWith('#')) {
+          const [key, ...valueParts] = trimmedLine.split('=');
+          if (key) {
+            envVars[key.trim()] = valueParts.join('=').trim();
+          }
+        }
+      });
+    }
+    
+    // Update only the values we manage
+    if (config.printerName !== undefined) {
+      envVars['PRINTER_NAME'] = config.printerName;
+    }
+    if (config.kioskId !== undefined) {
+      envVars['KIOSK_ID'] = config.kioskId;
+    }
+    
+    // Rebuild .env content preserving ALL variables
+    const newEnvContent = Object.entries(envVars)
+      .map(([key, value]) => `${key}=${value}`)
+      .join('\n');
+    
+    fs.writeFileSync(envPath, newEnvContent + '\n');
+    
+    // Debug: Show what was saved
+    sendToWindow('log', '✅ Configuration file updated successfully');
+    sendToWindow('log', '📝 File contents:');
+    const savedLines = envContent.trim().split('\n');
+    savedLines.forEach(line => {
+      if (line && !line.startsWith('#')) {
+        // Hide password values
+        if (line.includes('PASSWORD')) {
+          const key = line.split('=')[0];
+          sendToWindow('log', `   ${key}=***`);
+        } else {
+          sendToWindow('log', `   ${line}`);
+        }
       }
-    };
-    
-    // SECURITY: Only allow saving printer name and kiosk ID from GUI
-    // Redis credentials must be configured manually in .env file
-    if (config.printerName) updateEnvValue('PRINTER_NAME', config.printerName);
-    if (config.kioskId !== undefined) updateEnvValue('KIOSK_ID', config.kioskId);
-    
-    fs.writeFileSync(envPath, envContent.trim() + '\n');
+    });
     
     return { success: true };
   } catch (error) {

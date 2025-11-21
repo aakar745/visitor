@@ -7,7 +7,31 @@ const { exec, execSync } = require('child_process');
 const sharp = require('sharp');
 const { PDFDocument } = require('pdf-lib');
 const ptp = require('pdf-to-printer');
-require('dotenv').config();
+
+// Load environment variables from user data directory (writable location)
+let envPath = null;
+
+// 1. User data path (set by Electron when running from GUI)
+if (process.env.USER_DATA_PATH) {
+  const userEnvPath = path.join(process.env.USER_DATA_PATH, '.env');
+  if (fs.existsSync(userEnvPath)) {
+    envPath = userEnvPath;
+  }
+}
+
+// 2. Current directory (for development/manual runs)
+if (!envPath && fs.existsSync(path.join(__dirname, '.env'))) {
+  envPath = path.join(__dirname, '.env');
+}
+
+// Load environment variables
+if (envPath) {
+  require('dotenv').config({ path: envPath });
+  console.log(`📁 Loaded config from: ${envPath}`);
+} else {
+  require('dotenv').config(); // Try default location
+  console.log('⚠️ No .env file found, using environment variables');
+}
 
 const app = express();
 const PORT = process.env.PORT || 9100;

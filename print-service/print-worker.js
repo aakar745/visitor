@@ -22,16 +22,57 @@ const sharp = require('sharp');
 const { PDFDocument } = require('pdf-lib');
 const ptp = require('pdf-to-printer');
 
+// Load environment variables from user data directory (writable location)
+// Try multiple locations for .env file
+let envPath = null;
+
+// 1. User data path (set by Electron when running from GUI)
+if (process.env.USER_DATA_PATH) {
+  const userEnvPath = path.join(process.env.USER_DATA_PATH, '.env');
+  if (fs.existsSync(userEnvPath)) {
+    envPath = userEnvPath;
+  }
+}
+
+// 2. Current directory (for development/manual runs)
+if (!envPath && fs.existsSync(path.join(__dirname, '.env'))) {
+  envPath = path.join(__dirname, '.env');
+}
+
 // Load environment variables
-require('dotenv').config();
+if (envPath) {
+  require('dotenv').config({ path: envPath });
+  console.log(`📁 Loaded config from: ${envPath}`);
+} else {
+  require('dotenv').config(); // Try default location
+  console.log('⚠️ No .env file found, using environment variables');
+}
 
 // Configuration
-const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
+const REDIS_HOST = process.env.REDIS_HOST;
 const REDIS_PORT = parseInt(process.env.REDIS_PORT || '6379');
-const REDIS_PASSWORD = process.env.REDIS_PASSWORD || '';
+const REDIS_PASSWORD = process.env.REDIS_PASSWORD;
 const REDIS_DB = parseInt(process.env.REDIS_DB || '0');
 const PRINTER_NAME = process.env.PRINTER_NAME || 'Brother QL-800';
 const KIOSK_ID = process.env.KIOSK_ID || ''; // Unique identifier for this kiosk
+
+// Validate required Redis configuration
+if (!REDIS_HOST || !REDIS_PASSWORD) {
+  console.error('\n❌ ERROR: Missing Redis Configuration!\n');
+  console.error('Please configure Redis credentials in .env file:');
+  console.error(`Location: ${envPath || 'Not found'}\n`);
+  console.error('Required settings:');
+  console.error('  REDIS_HOST=<your-redis-host>');
+  console.error('  REDIS_PORT=6379');
+  console.error('  REDIS_PASSWORD=<your-redis-password>');
+  console.error('  REDIS_DB=0\n');
+  console.error('Current values:');
+  console.error(`  REDIS_HOST: ${REDIS_HOST || '(NOT SET)'}`);
+  console.error(`  REDIS_PASSWORD: ${REDIS_PASSWORD ? 'SET' : '(NOT SET)'}\n`);
+  console.error('Worker cannot start without Redis configuration.');
+  console.error('Exiting...\n');
+  process.exit(1);
+}
 
 // Use a writable directory (AppData/Local for Windows, or system temp)
 // C:\Program Files is read-only, so we use user's local app data folder
@@ -61,6 +102,30 @@ console.log(`
 ║   Rate Limit: ${RATE_LIMIT_DELAY}ms between jobs                  ║
 ╚═══════════════════════════════════════════════════╝
 `);
+
+// Test Redis connection before starting worker
+console.log('🔍 Testing Redis connection...');
+const { Redis: RedisTest } = require('ioredis');
+const testClient = new RedisTest({
+  host: REDIS_HOST,
+  port: REDIS_PORT,
+  password: REDIS_PASSWORD,
+  db: REDIS_DB,
+  maxRetriesPerRequest: 1,
+  connectTimeout: 5000,
+});
+
+testClient.on('error', (err) => {
+  console.error('\n❌ Redis connection test failed!');
+  console.error(`Error: ${err.message}`);
+  console.error(`\nCannot start worker without Redis connection.`);
+  process.exit(1);
+});
+
+testClient.on('ready', () => {
+  console.log('✅ Redis connection successful!\n');
+  testClient.disconnect();
+});
 
 // ==========================================
 // 🧹 CLEANUP SYSTEM - Prevent Folder Bloat
@@ -449,7 +514,24 @@ worker.on('active', (job) => {
 });
 
 worker.on('error', (error) => {
-  console.error('\n🚨 [WORKER ERROR]', error.message, '\n');
+  console.error('\n🚨 [WORKER ERROR] Connection failed!');
+  console.error(`Error: ${error.message}`);
+  
+  // Provide helpful context based on error type
+  if (error.code === 'ECONNREFUSED') {
+    console.error('\n❌ Cannot connect to Redis server!');
+    console.error(`   Tried to connect to: ${REDIS_HOST}:${REDIS_PORT}`);
+    console.error('\n💡 Troubleshooting:');
+    console.error('   1. Check if Redis is running');
+    console.error('   2. Verify REDIS_HOST and REDIS_PORT in .env');
+    console.error('   3. Check firewall/security group settings');
+  } else if (error.message.includes('WRONGPASS') || error.message.includes('NOAUTH')) {
+    console.error('\n❌ Redis authentication failed!');
+    console.error('\n💡 Troubleshooting:');
+    console.error('   1. Check REDIS_PASSWORD in .env file');
+    console.error('   2. Verify password is correct');
+  }
+  console.error('\n');
 });
 
 // Graceful shutdown
@@ -469,7 +551,7 @@ process.on('SIGINT', async () => {
 
 console.log(`
 ✅ Worker started successfully!
-🎧 Listening for print jobs on queue: "print-jobs"
+🎧 Listening for print jobs on queue: "${QUEUE_NAME}"
 🖨️  Ready to print badges on ${PRINTER_NAME}
 
 Press Ctrl+C to stop the worker.
