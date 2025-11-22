@@ -53,6 +53,7 @@
     "cookie-parser": "^1.4.7",
     "helmet": "^8.0.0",
     "ioredis": "^5.8.2",
+    "libphonenumber-js": "^1.12.29",
     "meilisearch": "^0.45.0",
     "mongoose": "^8.8.4",
     "multer": "^2.0.2",

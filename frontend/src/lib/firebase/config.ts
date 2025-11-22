@@ -23,6 +23,12 @@ if (process.env.NODE_ENV === 'development') {
     authDomain: firebaseConfig.authDomain,
   });
   
+  // DEBUG: Log all Firebase env variables
+  console.log('🔍 [DEBUG] All Firebase Environment Variables:');
+  console.log('  NEXT_PUBLIC_FIREBASE_API_KEY:', process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.substring(0, 20) + '...');
+  console.log('  NEXT_PUBLIC_FIREBASE_PROJECT_ID:', process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
+  console.log('  NEXT_PUBLIC_FIREBASE_APPCHECK_ENTERPRISE_KEY:', process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_ENTERPRISE_KEY);
+  
   if (!firebaseConfig.apiKey) {
     console.error('❌ Firebase configuration is missing! Please copy env.example.txt to .env.local and add your Firebase credentials.');
   }
@@ -46,23 +52,36 @@ if (typeof window !== 'undefined') {
   auth.languageCode = 'en';
   
   // Initialize App Check with reCAPTCHA Enterprise
-  // Provides additional security against abuse and bots
-  // Key must be configured in Google Cloud Console with authorized domains
+  // Required for Identity Platform phone authentication
+  // Make sure to add debug token to Firebase Console for localhost testing
+  
   if (process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_ENTERPRISE_KEY) {
     try {
-      initializeAppCheck(app, {
+      // DEBUG: Log the App Check key being used
+      console.log('🔑 [DEBUG] App Check Enterprise Key from env:', process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_ENTERPRISE_KEY);
+      console.log('🔑 [DEBUG] Full key:', process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_ENTERPRISE_KEY);
+      
+      // Enable debug mode for localhost
+      if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+        // Use the existing registered debug token from Firebase Console
+        // This prevents generating a new token every time
+        // @ts-ignore
+        self.FIREBASE_APPCHECK_DEBUG_TOKEN = process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN || true;
+        console.log('🔧 App Check Debug Mode: Using registered debug token');
+      }
+
+      const appCheck = initializeAppCheck(app, {
         provider: new ReCaptchaEnterpriseProvider(process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_ENTERPRISE_KEY),
         isTokenAutoRefreshEnabled: true,
       });
-      console.log('✅ Firebase App Check initialized with reCAPTCHA Enterprise');
-      console.log('🔒 Key:', process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_ENTERPRISE_KEY.substring(0, 20) + '...');
+      
+      console.log('✅ App Check initialized with reCAPTCHA Enterprise');
+      console.log('🔑 [DEBUG] App Check provider key:', process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_ENTERPRISE_KEY);
     } catch (error: any) {
-      console.error('❌ App Check initialization failed:', error.message);
-      console.error('💡 Make sure the key is configured for localhost in Google Cloud Console');
+      console.error('❌ App Check error:', error.message);
     }
   } else {
-    console.warn('⚠️ NEXT_PUBLIC_FIREBASE_APPCHECK_ENTERPRISE_KEY not set');
-    console.log('💡 App Check provides additional security - configure it for production');
+    console.warn('⚠️ [DEBUG] NEXT_PUBLIC_FIREBASE_APPCHECK_ENTERPRISE_KEY is not set!');
   }
 }
 

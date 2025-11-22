@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase OTP Test - reCAPTCHA Enterprise</title>
+    
+    <!-- Tailwind CSS CDN for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Firebase SDK v10+ (modular) -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js';
+        import { 
+            getAuth, 
+            RecaptchaVerifier, 
+            signInWithPhoneNumber,
+            signOut
+        } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js';
+        import { 
+            initializeAppCheck, 
+            ReCaptchaEnterpriseProvider 
+        } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-app-check.js';
+
+        // ==============================================
+        // FIREBASE CONFIGURATION
+        // ==============================================
+        // ⚠️ REPLACE THESE WITH YOUR ACTUAL VALUES
+        const firebaseConfig = {
+            apiKey: "AIzaSyCDHoBVqY9vf7huA7bWyPzjGhO9udy53gY",
+            authDomain: "aakar-visitor-management.firebaseapp.com",
+            projectId: "aakar-visitor-management",
+            storageBucket: "aakar-visitor-management.firebasestorage.app",
+            messagingSenderId: "201513145029",
+            appId: "1:201513145029:web:2e8b8da86127f72a6756ac",
+            measurementId: "G-9H1JXNHNM1"
+        };
+
+        // reCAPTCHA Enterprise Site Key (Public Key)
+        // Get from: Google Cloud Console > Security > reCAPTCHA Enterprise
+        const RECAPTCHA_ENTERPRISE_SITE_KEY = "6LdH2hQsAAAAALtjjlCCZA2Dmrw97WE0FwinST7w";
+
+        // ==============================================
+        // INITIALIZE FIREBASE
+        // ==============================================
+        let app, auth, recaptchaVerifier, confirmationResult;
+
+        try {
+            // Initialize Firebase App
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            auth.languageCode = 'en';
+
+            log('✅ Firebase App initialized successfully', 'success');
+            log(`📱 Project ID: ${firebaseConfig.projectId}`, 'info');
+            log(`🔑 Auth Domain: ${firebaseConfig.authDomain}`, 'info');
+
+            // Initialize App Check with reCAPTCHA Enterprise
+            // This is required for Blaze plan with Identity Platform
+            if (RECAPTCHA_ENTERPRISE_SITE_KEY) {
+                try {
+                    const appCheck = initializeAppCheck(app, {
+                        provider: new ReCaptchaEnterpriseProvider(RECAPTCHA_ENTERPRISE_SITE_KEY),
+                        isTokenAutoRefreshEnabled: true
+                    });
+                    log('✅ App Check initialized with reCAPTCHA Enterprise', 'success');
+                    log(`🔒 Site Key: ${RECAPTCHA_ENTERPRISE_SITE_KEY.substring(0, 20)}...`, 'info');
+                } catch (error) {
+                    log(`❌ App Check initialization failed: ${error.message}`, 'error');
+                    log('💡 Make sure localhost is authorized in Google Cloud Console', 'warning');
+                    log('💡 Path: Security > reCAPTCHA Enterprise > [Your Key] > Domains', 'warning');
+                }
+            } else {
+                log('⚠️ RECAPTCHA_ENTERPRISE_SITE_KEY not configured', 'warning');
+            }
+
+        } catch (error) {
+            log(`❌ Firebase initialization failed: ${error.message}`, 'error');
+        }
+
+        // ==============================================
+        // LOGGING UTILITY
+        // ==============================================
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logContainer = document.getElementById('logs');
+            const logEntry = document.createElement('div');
+            
+            const colors = {
+                success: 'text-green-600 bg-green-50 border-green-200',
+                error: 'text-red-600 bg-red-50 border-red-200',
+                warning: 'text-yellow-600 bg-yellow-50 border-yellow-200',
+                info: 'text-blue-600 bg-blue-50 border-blue-200'
+            };
+
+            logEntry.className = `p-3 mb-2 border-l-4 rounded ${colors[type] || colors.info}`;
+            logEntry.innerHTML = `
+                <span class="text-xs opacity-60">[${timestamp}]</span>
+                <span class="ml-2">${message}</span>
+            `;
+            
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            
+            // Also log to browser console
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        // ==============================================
+        // CLEAR LOGS
+        // ==============================================
+        window.clearLogs = function() {
+            document.getElementById('logs').innerHTML = '';
+            log('📝 Logs cleared', 'info');
+        }
+
+        // ==============================================
+        // INITIALIZE reCAPTCHA
+        // ==============================================
+        window.initRecaptcha = function() {
+            try {
+                // Clear existing verifier
+                if (recaptchaVerifier) {
+                    recaptchaVerifier.clear();
+                    recaptchaVerifier = null;
+                    log('🧹 Cleared existing reCAPTCHA', 'info');
+                }
+
+                // Create new verifier
+                recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+                    size: 'normal', // Use 'normal' for testing, 'invisible' for production
+                    callback: (response) => {
+                        log('✅ reCAPTCHA solved successfully', 'success');
+                        log(`📋 Response token: ${response.substring(0, 30)}...`, 'info');
+                    },
+                    'expired-callback': () => {
+                        log('⏰ reCAPTCHA expired. Please refresh and try again.', 'warning');
+                    },
+                    'error-callback': (error) => {
+                        log(`❌ reCAPTCHA error: ${error}`, 'error');
+                    }
+                });
+
+                // Render the reCAPTCHA
+                recaptchaVerifier.render().then((widgetId) => {
+                    window.recaptchaWidgetId = widgetId;
+                    log('🔒 reCAPTCHA initialized successfully', 'success');
+                    log(`🎯 Widget ID: ${widgetId}`, 'info');
+                    document.getElementById('sendOtpBtn').disabled = false;
+                }).catch((error) => {
+                    log(`❌ reCAPTCHA render failed: ${error.message}`, 'error');
+                    log('💡 Check browser console for detailed errors', 'warning');
+                });
+
+            } catch (error) {
+                log(`❌ Error initializing reCAPTCHA: ${error.message}`, 'error');
+            }
+        }
+
+        // ==============================================
+        // SEND OTP
+        // ==============================================
+        window.sendOTP = async function() {
+            try {
+                const phoneInput = document.getElementById('phoneNumber').value;
+                
+                // Validate phone number
+                if (!phoneInput) {
+                    log('❌ Please enter a phone number', 'error');
+                    return;
+                }
+
+                // Format phone number to E.164
+                let phoneNumber = phoneInput.replace(/\s/g, '');
+                if (!phoneNumber.startsWith('+')) {
+                    phoneNumber = '+' + phoneNumber;
+                }
+
+                log(`📞 Attempting to send OTP to: ${phoneNumber}`, 'info');
+                
+                // Ensure reCAPTCHA is initialized
+                if (!recaptchaVerifier) {
+                    log('❌ reCAPTCHA not initialized. Click "Initialize reCAPTCHA" first.', 'error');
+                    return;
+                }
+
+                // Disable button to prevent multiple clicks
+                document.getElementById('sendOtpBtn').disabled = true;
+                document.getElementById('sendOtpBtn').textContent = 'Sending...';
+
+                // Send OTP
+                confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+                
+                log('✅ OTP sent successfully!', 'success');
+                log(`📱 Check your phone for the 6-digit code`, 'success');
+                log(`📋 ConfirmationResult ID: ${confirmationResult.verificationId}`, 'info');
+                
+                // Enable OTP verification section
+                document.getElementById('verifySection').classList.remove('hidden');
+                document.getElementById('otpCode').focus();
+                
+            } catch (error) {
+                log(`❌ Error sending OTP: ${error.code}`, 'error');
+                log(`📝 Error message: ${error.message}`, 'error');
+                
+                // Provide specific guidance based on error code
+                if (error.code === 'auth/invalid-phone-number') {
+                    log('💡 Phone number format should be: +[country code][number]', 'warning');
+                    log('💡 Example: +919876543210 (India)', 'warning');
+                } else if (error.code === 'auth/too-many-requests') {
+                    log('💡 Too many requests. Wait a few minutes and try again.', 'warning');
+                } else if (error.code === 'auth/quota-exceeded') {
+                    log('💡 SMS quota exceeded. Check Firebase Console for limits.', 'warning');
+                } else if (error.code === 'auth/captcha-check-failed') {
+                    log('💡 reCAPTCHA verification failed. Refresh and try again.', 'warning');
+                } else if (error.code === 'auth/missing-app-credential') {
+                    log('💡 App Check credential missing. Verify reCAPTCHA Enterprise setup.', 'warning');
+                }
+                
+                // Reset reCAPTCHA on error
+                if (recaptchaVerifier) {
+                    recaptchaVerifier.clear();
+                    recaptchaVerifier = null;
+                }
+                
+                // Re-initialize reCAPTCHA
+                setTimeout(() => {
+                    window.initRecaptcha();
+                }, 1000);
+                
+            } finally {
+                document.getElementById('sendOtpBtn').textContent = 'Send OTP';
+                document.getElementById('sendOtpBtn').disabled = false;
+            }
+        }
+
+        // ==============================================
+        // VERIFY OTP
+        // ==============================================
+        window.verifyOTP = async function() {
+            try {
+                const otpCode = document.getElementById('otpCode').value;
+                
+                // Validate OTP code
+                if (!otpCode || otpCode.length !== 6) {
+                    log('❌ Please enter a valid 6-digit OTP code', 'error');
+                    return;
+                }
+
+                if (!confirmationResult) {
+                    log('❌ No OTP session found. Please send OTP first.', 'error');
+                    return;
+                }
+
+                log(`🔍 Verifying OTP code: ${otpCode}`, 'info');
+                
+                // Disable button
+                document.getElementById('verifyOtpBtn').disabled = true;
+                document.getElementById('verifyOtpBtn').textContent = 'Verifying...';
+
+                // Verify the OTP
+                const result = await confirmationResult.confirm(otpCode);
+                
+                log('✅ OTP VERIFIED SUCCESSFULLY! 🎉', 'success');
+                log(`👤 User UID: ${result.user.uid}`, 'success');
+                log(`📱 Phone Number: ${result.user.phoneNumber}`, 'success');
+                log(`🕐 Created: ${result.user.metadata.creationTime}`, 'info');
+                log(`🕐 Last Sign In: ${result.user.metadata.lastSignInTime}`, 'info');
+                
+                // Show success section
+                document.getElementById('successSection').classList.remove('hidden');
+                document.getElementById('userPhone').textContent = result.user.phoneNumber;
+                document.getElementById('userUid').textContent = result.user.uid;
+                
+                // Sign out after verification (we only need to verify, not keep signed in)
+                await signOut(auth);
+                log('🚪 Signed out after verification (phone verification only)', 'info');
+                
+            } catch (error) {
+                log(`❌ Error verifying OTP: ${error.code}`, 'error');
+                log(`📝 Error message: ${error.message}`, 'error');
+                
+                if (error.code === 'auth/invalid-verification-code') {
+                    log('💡 Invalid OTP code. Please check and try again.', 'warning');
+                } else if (error.code === 'auth/code-expired') {
+                    log('💡 OTP expired. Please request a new code.', 'warning');
+                }
+                
+            } finally {
+                document.getElementById('verifyOtpBtn').textContent = 'Verify OTP';
+                document.getElementById('verifyOtpBtn').disabled = false;
+            }
+        }
+
+        // ==============================================
+        // RESET TEST
+        // ==============================================
+        window.resetTest = function() {
+            // Clear form
+            document.getElementById('phoneNumber').value = '';
+            document.getElementById('otpCode').value = '';
+            
+            // Hide sections
+            document.getElementById('verifySection').classList.add('hidden');
+            document.getElementById('successSection').classList.add('hidden');
+            
+            // Clear reCAPTCHA
+            if (recaptchaVerifier) {
+                recaptchaVerifier.clear();
+                recaptchaVerifier = null;
+            }
+            
+            // Clear confirmation result
+            confirmationResult = null;
+            
+            log('🔄 Test reset. Click "Initialize reCAPTCHA" to start again.', 'info');
+        }
+
+        // Auto-initialize on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            log('🚀 Firebase OTP Test Tool loaded', 'success');
+            log('📱 Ready to test phone authentication', 'info');
+            log('', 'info');
+            log('📋 STEPS:', 'info');
+            log('1. Click "Initialize reCAPTCHA"', 'info');
+            log('2. Solve the reCAPTCHA (if visible)', 'info');
+            log('3. Enter phone number with country code (e.g., +919876543210)', 'info');
+            log('4. Click "Send OTP"', 'info');
+            log('5. Check your phone for the SMS', 'info');
+            log('6. Enter the 6-digit OTP code', 'info');
+            log('7. Click "Verify OTP"', 'info');
+        });
+    </script>
+</head>
+<body class="bg-gray-100 min-h-screen p-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-8 rounded-t-lg shadow-lg">
+            <h1 class="text-4xl font-bold mb-2">🔥 Firebase OTP Test Tool</h1>
+            <p class="text-blue-100">reCAPTCHA Enterprise • Blaze Plan • Phone Authentication</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <!-- Left Column: Testing Interface -->
+            <div class="space-y-6">
+                <!-- Configuration Info -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-bold mb-4 text-gray-800">📋 Configuration</h2>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Project ID:</span>
+                            <span class="font-mono text-xs bg-gray-100 px-2 py-1 rounded">aakar-visitor-management</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Plan:</span>
+                            <span class="font-semibold text-green-600">Blaze (Pay as you go)</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">reCAPTCHA:</span>
+                            <span class="font-semibold text-purple-600">Enterprise</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">App Check:</span>
+                            <span class="font-semibold text-blue-600">Enabled</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 1: Initialize reCAPTCHA -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-bold mb-4 text-gray-800">🔒 Step 1: Initialize reCAPTCHA</h2>
+                    <button 
+                        onclick="initRecaptcha()" 
+                        class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 shadow-md"
+                    >
+                        Initialize reCAPTCHA
+                    </button>
+                    <div id="recaptcha-container" class="mt-4"></div>
+                </div>
+
+                <!-- Step 2: Send OTP -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-bold mb-4 text-gray-800">📱 Step 2: Send OTP</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Phone Number (with country code)
+                            </label>
+                            <input 
+                                type="tel" 
+                                id="phoneNumber" 
+                                placeholder="+919876543210"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                            <p class="text-xs text-gray-500 mt-1">
+                                Format: +[country code][number] • Example: +919876543210 (India)
+                            </p>
+                        </div>
+                        <button 
+                            id="sendOtpBtn"
+                            onclick="sendOTP()" 
+                            disabled
+                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Send OTP
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Verify OTP -->
+                <div id="verifySection" class="bg-white rounded-lg shadow-md p-6 hidden">
+                    <h2 class="text-xl font-bold mb-4 text-gray-800">✅ Step 3: Verify OTP</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Enter 6-digit OTP Code
+                            </label>
+                            <input 
+                                type="text" 
+                                id="otpCode" 
+                                maxlength="6"
+                                placeholder="123456"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-center text-2xl tracking-widest font-mono"
+                            />
+                        </div>
+                        <button 
+                            id="verifyOtpBtn"
+                            onclick="verifyOTP()" 
+                            class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 shadow-md"
+                        >
+                            Verify OTP
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Success -->
+                <div id="successSection" class="bg-green-50 border-2 border-green-500 rounded-lg shadow-md p-6 hidden">
+                    <div class="text-center mb-4">
+                        <div class="text-6xl mb-2">🎉</div>
+                        <h2 class="text-2xl font-bold text-green-800">OTP Verified Successfully!</h2>
+                    </div>
+                    <div class="bg-white rounded-lg p-4 space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Phone:</span>
+                            <span id="userPhone" class="font-semibold text-green-700"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">User UID:</span>
+                            <span id="userUid" class="font-mono text-xs text-gray-700"></span>
+                        </div>
+                    </div>
+                    <button 
+                        onclick="resetTest()" 
+                        class="w-full mt-4 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
+                    >
+                        Test Again
+                    </button>
+                </div>
+
+                <!-- Actions -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <div class="flex gap-2">
+                        <button 
+                            onclick="resetTest()" 
+                            class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
+                        >
+                            Reset Test
+                        </button>
+                        <button 
+                            onclick="clearLogs()" 
+                            class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
+                        >
+                            Clear Logs
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Logs -->
+            <div class="space-y-6">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-bold mb-4 text-gray-800">📝 Debug Logs</h2>
+                    <div 
+                        id="logs" 
+                        class="h-[800px] overflow-y-auto bg-gray-50 rounded-lg p-4 font-mono text-sm"
+                    >
+                        <!-- Logs will be appended here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer Instructions -->
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-6 mt-6 rounded-lg">
+            <h3 class="font-bold text-yellow-800 mb-2">⚠️ Important Notes:</h3>
+            <ul class="text-sm text-yellow-700 space-y-1 list-disc list-inside">
+                <li>This is a standalone test file for Firebase OTP with reCAPTCHA Enterprise</li>
+                <li>Make sure your Firebase project is on the <strong>Blaze (Pay as you go)</strong> plan</li>
+                <li>Ensure <strong>localhost</strong> is authorized in Google Cloud Console → Security → reCAPTCHA Enterprise</li>
+                <li>Phone numbers must be in <strong>E.164 format</strong>: +[country code][number]</li>
+                <li>Check your phone for the SMS (may take 5-30 seconds)</li>
+                <li>For testing without SMS costs, add test phone numbers in Firebase Console → Authentication → Settings</li>
+                <li>All logs are displayed in the right panel for debugging</li>
+            </ul>
+        </div>
+
+        <!-- Setup Instructions -->
+        <div class="bg-blue-50 border-l-4 border-blue-400 p-6 mt-6 rounded-lg">
+            <h3 class="font-bold text-blue-800 mb-2">🔧 Setup Checklist:</h3>
+            <ul class="text-sm text-blue-700 space-y-1 list-disc list-inside">
+                <li><strong>Firebase Project:</strong> Create/select project in Firebase Console</li>
+                <li><strong>Blaze Plan:</strong> Upgrade to Blaze plan (Settings → Usage and billing)</li>
+                <li><strong>Authentication:</strong> Enable Phone authentication (Authentication → Sign-in method)</li>
+                <li><strong>reCAPTCHA Enterprise:</strong> Create key in Google Cloud Console → Security → reCAPTCHA Enterprise</li>
+                <li><strong>App Check:</strong> Enable in Firebase Console → App Check</li>
+                <li><strong>Authorized Domains:</strong> Add localhost and your production domain (Authentication → Settings → Authorized domains)</li>
+                <li><strong>reCAPTCHA Domains:</strong> Add localhost and your domain in Google Cloud Console → reCAPTCHA Enterprise → [Your Key] → Domains</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
+

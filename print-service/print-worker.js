@@ -22,31 +22,12 @@ const sharp = require('sharp');
 const { PDFDocument } = require('pdf-lib');
 const ptp = require('pdf-to-printer');
 
-// Load environment variables from user data directory (writable location)
-// Try multiple locations for .env file
-let envPath = null;
+// ✅ Load environment variables using shared loader (Electron-aware)
+const { loadEnv } = require('./lib/env-loader');
+loadEnv();
 
-// 1. User data path (set by Electron when running from GUI)
-if (process.env.USER_DATA_PATH) {
-  const userEnvPath = path.join(process.env.USER_DATA_PATH, '.env');
-  if (fs.existsSync(userEnvPath)) {
-    envPath = userEnvPath;
-  }
-}
-
-// 2. Current directory (for development/manual runs)
-if (!envPath && fs.existsSync(path.join(__dirname, '.env'))) {
-  envPath = path.join(__dirname, '.env');
-}
-
-// Load environment variables
-if (envPath) {
-  require('dotenv').config({ path: envPath });
-  console.log(`📁 Loaded config from: ${envPath}`);
-} else {
-  require('dotenv').config(); // Try default location
-  console.log('⚠️ No .env file found, using environment variables');
-}
+// ✅ Import shared functions from server.js (avoids duplication)
+const { generateLabelImage, printImageDirectly } = require('./server');
 
 // Configuration
 const REDIS_HOST = process.env.REDIS_HOST;
@@ -145,158 +126,8 @@ testClient.on('ready', () => {
 //
 // This multi-layered approach ensures cleanup happens regardless of PC power schedule!
 
-/**
- * Generate label image (PNG)
- * Same function as in server.js but standalone for worker
- */
-async function generateLabelImage(qrPath, name, location, regNumber, company) {
-  const outputPath = qrPath.replace('-qr.png', '-label.png');
-
-  // Label dimensions for Brother QL-800 (90mm x 29mm LANDSCAPE at 300 DPI)
-  const width = 1063;  // 90mm at 300 DPI (horizontal)
-  const height = 325;  // 29mm at 300 DPI (vertical)
-
-  // Read QR code image - fits 29mm height with SHARP edges (no blur)
-  const qrSize = 280; // Fits in 29mm height with margins
-  const qrImage = await sharp(qrPath)
-    .resize(qrSize, qrSize, { 
-      kernel: 'nearest' // Critical: prevents blurring for QR codes
-    })
-    .png({ 
-      quality: 100, 
-      compressionLevel: 0 
-    })
-    .toBuffer();
-
-  // Determine layout based on which fields are present
-  const hasCompany = company && company.trim() !== '';
-  const hasLocation = location && location.trim() !== '';
-  
-  // Calculate dynamic Y positions
-  let currentY = hasCompany || hasLocation ? 85 : 140; // Start higher if we have more fields
-  const nameY = currentY;
-  currentY += 65; // Space after name
-  
-  const companyY = currentY;
-  if (hasCompany) currentY += 50; // Space after company
-  
-  const locationY = currentY;
-  if (hasLocation) currentY += 50; // Space after location
-  
-  const regNumberY = currentY;
-
-  // Create label with white background (LANDSCAPE LAYOUT)
-  const svg = `
-    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-      <rect width="${width}" height="${height}" fill="white"/>
-
-      <!-- QR Code placeholder (will be composited on LEFT) -->
-      <rect x="20" y="23" width="${qrSize}" height="${qrSize}" fill="#f0f0f0"/>
-
-      <!-- Name (RIGHT SIDE) -->
-      <text x="340" y="${nameY}" text-anchor="start"
-            font-family="Arial, sans-serif" font-size="64" font-weight="bold" fill="#000">
-        ${name.substring(0, 20)}
-      </text>
-
-      ${hasCompany ? `
-      <!-- Company -->
-      <text x="340" y="${companyY}" text-anchor="start"
-            font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="#333">
-        ${company.length > 25 ? company.substring(0, 25) + '...' : company}
-      </text>
-      ` : ''}
-
-      ${hasLocation ? `
-      <!-- Location -->
-      <text x="340" y="${locationY}" text-anchor="start"
-            font-family="Arial, sans-serif" font-size="42" font-weight="normal" fill="#555">
-        ${location.length > 30 ? location.substring(0, 30) + '...' : location}
-      </text>
-      ` : ''}
-
-      <!-- Registration Number -->
-      <text x="340" y="${regNumberY}" text-anchor="start"
-            font-family="Arial, sans-serif" font-size="32" font-weight="600" fill="#666">
-        ${regNumber}
-      </text>
-    </svg>
-  `;
-
-  // Create label image with maximum quality
-  await sharp(Buffer.from(svg))
-    .composite([
-      {
-        input: qrImage,
-        top: 23,
-        left: 20
-      }
-    ])
-    .png({ 
-      quality: 100, // Maximum quality for printing
-      compressionLevel: 0, // No compression for QR clarity
-      palette: false // Full color depth
-    })
-    .toFile(outputPath);
-
-  return outputPath;
-}
-
-/**
- * Print image directly to printer
- * Converts PNG to PDF, then uses pdf-to-printer
- */
-async function printImageDirectly(imagePath, printerName) {
-  try {
-    console.log('[Worker] 📄 Converting PNG to PDF for printing...');
-    
-    // Read PNG image
-    const imageBytes = fs.readFileSync(imagePath);
-    
-    // Create PDF document
-    const pdfDoc = await PDFDocument.create();
-    
-    // Embed PNG image
-    const pngImage = await pdfDoc.embedPng(imageBytes);
-    
-    // Brother QL-800 label size: 90mm x 29mm (LANDSCAPE)
-    // Convert to points (1mm = 2.83465 points)
-    const pageWidth = 90 * 2.83465;  // ~255.1 points
-    const pageHeight = 29 * 2.83465; // ~82.2 points
-    
-    // Add page with label dimensions
-    const page = pdfDoc.addPage([pageWidth, pageHeight]);
-    
-    // Draw image to fit the page
-    page.drawImage(pngImage, {
-      x: 0,
-      y: 0,
-      width: pageWidth,
-      height: pageHeight,
-    });
-    
-    // Save PDF
-    const pdfBytes = await pdfDoc.save();
-    const pdfPath = imagePath.replace('-label.png', '-label.pdf');
-    fs.writeFileSync(pdfPath, pdfBytes);
-    
-    console.log('[Worker] ✅ PDF created:', path.basename(pdfPath));
-    console.log('[Worker] 🖨️  Sending to printer:', printerName);
-    
-    // Print PDF silently using pdf-to-printer
-    await ptp.print(pdfPath, {
-      printer: printerName,
-      silent: true,
-    });
-    
-    console.log('[Worker] ✅ Print job sent successfully!');
-    
-    return true;
-  } catch (error) {
-    console.error('[Worker] ❌ Print failed:', error.message);
-    throw error;
-  }
-}
+// ✅ REFACTORED: generateLabelImage() and printImageDirectly() are now imported from server.js
+// This eliminates 180+ lines of duplicate code and ensures consistency between HTTP API and queue worker
 
 /**
  * Process print job

@@ -59,18 +59,36 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
     clearDraft();
     console.log('[OTP] Cleared old form drafts');
 
-    if (typeof window !== 'undefined') {
-      try {
-        initializeRecaptcha('recaptcha-container');
-      } catch (error) {
-        console.error('Failed to initialize reCAPTCHA:', error);
-      }
-    }
-
     return () => {
       cleanupRecaptcha();
     };
   }, []);
+
+  // Initialize reCAPTCHA when SMS method is selected
+  useEffect(() => {
+    if (typeof window !== 'undefined' && otpMethod === 'sms') {
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(async () => {
+        try {
+          await initializeRecaptcha('recaptcha-container');
+          console.log('[OTP] reCAPTCHA initialized for SMS');
+        } catch (error) {
+          console.error('Failed to initialize reCAPTCHA:', error);
+          toast.error('Security verification failed to load', {
+            description: 'Please refresh the page and try again',
+          });
+        }
+      }, 100);
+      
+      return () => {
+        clearTimeout(timer);
+        cleanupRecaptcha();
+      };
+    } else {
+      // Clean up reCAPTCHA when switching to WhatsApp
+      cleanupRecaptcha();
+    }
+  }, [otpMethod]);
 
   // Validate phone number
   const isValidPhone = (): boolean => {
@@ -142,6 +160,14 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
         });
       } else {
         // Send OTP via SMS (Firebase)
+        // Ensure reCAPTCHA is initialized and solved
+        if (!window.recaptchaVerifier) {
+          toast.error('Security verification required', {
+            description: 'Please complete the reCAPTCHA verification',
+          });
+          return;
+        }
+        
         const result = await sendOTP(phoneNumber);
         setConfirmationResult(result);
         setShowOTPModal(true);
@@ -393,8 +419,17 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
         otpMethod={otpMethod}
       />
 
-      {/* Hidden reCAPTCHA container */}
-      <div id="recaptcha-container"></div>
+      {/* reCAPTCHA container - visible for SMS verification */}
+      {otpMethod === 'sms' && (
+        <Card className="p-6">
+          <div className="text-center mb-4">
+            <p className="text-sm text-muted-foreground">
+              Please complete the security verification below
+            </p>
+          </div>
+          <div id="recaptcha-container" className="flex justify-center"></div>
+        </Card>
+      )}
 
       {/* Security Note */}
       <div className="text-center">

@@ -356,6 +356,7 @@ export class ExhibitionsService {
         .sort(sort)
         .skip(skip)
         .limit(limit)
+        .lean() // ✅ FIX: Use lean() for better memory efficiency (no Mongoose document overhead)
         .exec(),
       this.exhibitionModel.countDocuments(filter),
     ]);

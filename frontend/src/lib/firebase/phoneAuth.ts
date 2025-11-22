@@ -21,11 +21,11 @@ declare global {
  * @param onSuccess - Callback when reCAPTCHA is solved
  * @param onError - Callback when reCAPTCHA encounters an error
  */
-export const initializeRecaptcha = (
+export const initializeRecaptcha = async (
   containerId: string = 'recaptcha-container',
   onSuccess?: () => void,
   onError?: (error: Error) => void
-): RecaptchaVerifier => {
+): Promise<RecaptchaVerifier> => {
   // Clear existing verifier if any
   if (window.recaptchaVerifier) {
     window.recaptchaVerifier.clear();
@@ -34,7 +34,7 @@ export const initializeRecaptcha = (
 
   try {
     const recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
-      size: 'invisible', // Use invisible reCAPTCHA for better UX
+      size: 'normal', // Use normal (visible) reCAPTCHA for Enterprise compatibility
       callback: () => {
         console.log('✅ reCAPTCHA solved successfully');
         onSuccess?.();
@@ -52,7 +52,10 @@ export const initializeRecaptcha = (
 
     window.recaptchaVerifier = recaptchaVerifier;
     
-    console.log('🔒 reCAPTCHA verifier initialized (invisible mode)');
+    // Render the reCAPTCHA widget
+    await recaptchaVerifier.render();
+    
+    console.log('🔒 reCAPTCHA verifier initialized (visible mode)');
     return recaptchaVerifier;
   } catch (error) {
     console.error('❌ Error initializing reCAPTCHA:', error);
@@ -67,22 +70,32 @@ export const initializeRecaptcha = (
  */
 export const sendOTP = async (phoneNumber: string): Promise<ConfirmationResult> => {
   try {
+    console.log('📱 [DEBUG] Attempting to send OTP...');
+    console.log('📱 [DEBUG] Phone number:', phoneNumber);
+    console.log('📱 [DEBUG] reCAPTCHA verifier exists:', !!window.recaptchaVerifier);
+    
     // Ensure reCAPTCHA is initialized
     if (!window.recaptchaVerifier) {
-      initializeRecaptcha();
+      throw new Error('reCAPTCHA not initialized. Please refresh and try again.');
     }
 
+    console.log('📱 [DEBUG] Calling signInWithPhoneNumber...');
+    
     // Send OTP via Firebase
     const confirmationResult = await signInWithPhoneNumber(
       auth,
       phoneNumber,
-      window.recaptchaVerifier!
+      window.recaptchaVerifier
     );
 
-    console.log('OTP sent successfully to:', phoneNumber);
+    console.log('✅ OTP sent successfully to:', phoneNumber);
+    console.log('📱 [DEBUG] Confirmation result received');
     return confirmationResult;
   } catch (error: any) {
-    console.error('Error sending OTP:', error);
+    console.error('❌ [DEBUG] Error sending OTP:', error);
+    console.error('❌ [DEBUG] Error code:', error.code);
+    console.error('❌ [DEBUG] Error message:', error.message);
+    console.error('❌ [DEBUG] Full error:', JSON.stringify(error, null, 2));
     
     // Clear reCAPTCHA on error to allow retry
     if (window.recaptchaVerifier) {

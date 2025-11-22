@@ -58,6 +58,11 @@ export class Exhibitor {
 
 export const ExhibitorSchema = SchemaFactory.createForClass(Exhibitor);
 
-// Create compound index for exhibition + slug uniqueness
-ExhibitorSchema.index({ exhibitionId: 1, slug: 1 }, { unique: true });
+// Indexes
+ExhibitorSchema.index({ exhibitionId: 1, slug: 1 }, { unique: true }); // Unique slug per exhibition
+
+// ✅ NEW: Performance indexes for common queries
+ExhibitorSchema.index({ exhibitionId: 1, isActive: 1 }); // For listing active exhibitors per exhibition
+ExhibitorSchema.index({ exhibitionId: 1, totalRegistrations: -1 }); // For exhibitor leaderboard/stats
+ExhibitorSchema.index({ name: 'text', companyName: 'text' }); // For search functionality
 

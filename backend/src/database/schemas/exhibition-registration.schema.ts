@@ -182,3 +182,8 @@ ExhibitionRegistrationSchema.index({ registrationDate: -1 });
 ExhibitionRegistrationSchema.index({ checkInTime: 1 });
 ExhibitionRegistrationSchema.index({ createdAt: -1 });
 
+// ✅ NEW: Performance indexes for common queries
+ExhibitionRegistrationSchema.index({ exhibitionId: 1, registrationDate: -1 }); // For exhibition registrations list (sorted by date)
+ExhibitionRegistrationSchema.index({ visitorId: 1, status: 1 }); // For visitor's active registrations
+ExhibitionRegistrationSchema.index({ exhibitionId: 1, checkInTime: 1 }); // For exhibition check-in stats/reports
+

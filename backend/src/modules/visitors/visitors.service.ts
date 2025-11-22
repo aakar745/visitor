@@ -293,6 +293,7 @@ export class VisitorsService {
       this.visitorModel.aggregate([
         { $group: { _id: '$state', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
+        { $limit: 50 }, // ✅ FIX: Limit to top 50 states to prevent memory issues
       ]).exec(),
       this.visitorModel.aggregate([
         { $group: { _id: '$city', count: { $sum: 1 } } },
@@ -327,6 +328,7 @@ export class VisitorsService {
 
   /**
    * Get visitor's registrations
+   * ✅ FIX: Added limit to prevent memory issues with visitors who have many registrations
    */
   async getVisitorRegistrations(visitorId: string): Promise<ExhibitionRegistration[]> {
     if (!Types.ObjectId.isValid(visitorId)) {
@@ -342,6 +344,8 @@ export class VisitorsService {
       .find({ visitorId: new Types.ObjectId(visitorId) })
       .populate('exhibitionId')
       .sort({ registrationDate: -1 })
+      .limit(100) // ✅ FIX: Limit to last 100 registrations (reasonable for any visitor)
+      .lean() // ✅ FIX: Use lean() for better memory efficiency
       .exec();
   }
 

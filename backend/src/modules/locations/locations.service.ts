@@ -73,7 +73,12 @@ export class LocationsService {
       query.name = { $regex: filters.search, $options: 'i' };
     }
 
-    return this.countryModel.find(query).sort({ name: 1 }).exec();
+    return this.countryModel
+      .find(query)
+      .sort({ name: 1 })
+      .limit(250) // ✅ FIX: Limit to 250 countries (world has ~195 countries)
+      .lean() // ✅ FIX: Use lean() for better performance
+      .exec();
   }
 
   async findCountryById(id: string): Promise<Country> {
@@ -207,6 +212,8 @@ export class LocationsService {
       .find(query)
       .populate('countryId', 'name code')
       .sort({ name: 1 })
+      .limit(100) // ✅ FIX: Limit to 100 states (reasonable for any country)
+      .lean() // ✅ FIX: Use lean() for better performance
       .exec();
   }
 
@@ -370,6 +377,8 @@ export class LocationsService {
         },
       })
       .sort({ name: 1 })
+      .limit(1000) // ✅ FIX: Limit to 1000 cities to prevent memory overload
+      .lean() // ✅ FIX: Use lean() for better performance
       .exec();
   }
 
@@ -539,6 +548,8 @@ export class LocationsService {
         },
       })
       .sort({ pincode: 1 })
+      .limit(1000) // ✅ CRITICAL FIX: India has 19,000+ pincodes! Limit to 1000 to prevent memory overload
+      .lean() // ✅ FIX: Use lean() for better performance
       .exec();
   }
 

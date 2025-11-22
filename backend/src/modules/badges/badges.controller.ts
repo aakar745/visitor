@@ -13,6 +13,7 @@ import * as QRCode from 'qrcode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { ConfigService } from '@nestjs/config';
+import { generateRegistrationQR } from '../../common/utils/sanitize.util';
 
 /**
  * Badges Controller
@@ -96,16 +97,8 @@ export class BadgesController {
       const visitor = registration.visitorId as any;
       const exhibition = registration.exhibitionId as any;
 
-      // Generate QR code for the badge
-      const qrCodeUrl = await QRCode.toDataURL(registration.registrationNumber, {
-        errorCorrectionLevel: 'H',
-        width: 512,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF',
-        },
-      });
+      // ✅ Generate QR code for the badge (using shared utility)
+      const qrCodeUrl = await generateRegistrationQR(registration.registrationNumber);
 
       // Generate the badge
       this.logger.log(`[Badge] 🎨 Generating badge for: ${visitor.name}`);

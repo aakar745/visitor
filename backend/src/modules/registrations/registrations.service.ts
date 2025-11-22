@@ -26,6 +26,7 @@ import * as QRCode from 'qrcode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { ConfigService } from '@nestjs/config';
+import { generateRegistrationQR, generateDetailedQR, normalizePhoneNumber } from '../../common/utils/sanitize.util';
 
 @Injectable()
 export class RegistrationsService {
@@ -48,36 +49,7 @@ export class RegistrationsService {
     private meilisearchService: MeilisearchService,
   ) {}
 
-  /**
-   * Normalize phone number to consistent format
-   * Removes country code, spaces, dashes, and stores only 10 digits
-   * 
-   * Examples:
-   * +919876543210 -> 9876543210
-   * 919876543210 -> 9876543210
-   * +91 98765 43210 -> 9876543210
-   * 9876543210 -> 9876543210
-   */
-  private normalizePhoneNumber(phone: string): string {
-    if (!phone) return '';
-    
-    // Remove all non-digit characters (spaces, dashes, parentheses, etc.)
-    let cleaned = phone.replace(/\D/g, '');
-    
-    // Remove country code if present
-    // India: +91 (2 digits)
-    if (cleaned.startsWith('91') && cleaned.length > 10) {
-      cleaned = cleaned.substring(2);
-    }
-    
-    // Ensure we have exactly 10 digits
-    if (cleaned.length === 10) {
-      return cleaned;
-    }
-    
-    // If length is not 10, return as-is and let validation catch it
-    return cleaned;
-  }
+  // ✅ Phone normalization is now handled by shared utility (common/utils/sanitize.util.ts)
 
   /**
    * Create a new registration (Public - for visitor frontend)
@@ -168,7 +140,7 @@ export class RegistrationsService {
     // IMPORTANT: Normalize phone number for consistent lookup/storage
     let normalizedPhone = '';
     if (dto.phone && dto.phone.trim()) {
-      normalizedPhone = this.normalizePhoneNumber(dto.phone.trim());
+      normalizedPhone = normalizePhoneNumber(dto.phone.trim()); // ✅ Using shared utility
       this.logger.debug(`Phone normalization: ${dto.phone} -> ${normalizedPhone}`);
       
       visitor = await this.visitorModel.findOne({
@@ -510,18 +482,8 @@ export class RegistrationsService {
 
     let qrCodeUrl: string;
     try {
-      // Optimized for kiosk scanning (2025 best practices)
-      // Simple data + Low EC = fastest scanning, even at low brightness
-      qrCodeUrl = await QRCode.toDataURL(qrData, {
-        errorCorrectionLevel: 'L', // Low EC for simplest QR (7% recovery)
-        width: 512, // Larger for better screen visibility (power of 2)
-        margin: 4, // Standard quiet zone (4x module width)
-        type: 'image/png',
-        color: {
-          dark: '#000000', // Maximum contrast for low brightness
-          light: '#FFFFFF', // Pure white background
-        },
-      });
+      // ✅ Using shared utility (optimized for kiosk scanning)
+      qrCodeUrl = await generateRegistrationQR(qrData);
     } catch (error) {
       this.logger.error('Failed to generate QR code', error);
       qrCodeUrl = '';
@@ -655,17 +617,8 @@ export class RegistrationsService {
 
     let qrCodeUrl: string;
     try {
-      // High-quality QR code for fast kiosk scanning
-      qrCodeUrl = await QRCode.toDataURL(qrData, {
-        errorCorrectionLevel: 'H', // High error correction (30% recovery)
-        width: 400, // Larger size for better scanning
-        margin: 4, // Adequate quiet zone for scanners
-        type: 'image/png',
-        color: {
-          dark: '#000000', // Black dots for maximum contrast
-          light: '#FFFFFF', // White background
-        },
-      });
+      // ✅ Using shared utility (high reliability for complex data)
+      qrCodeUrl = await generateDetailedQR(qrData);
     } catch (error) {
       this.logger.error('Failed to generate QR code', error);
       qrCodeUrl = '';
@@ -762,7 +715,7 @@ export class RegistrationsService {
    */
   async lookupVisitorByPhone(phone: string) {
     // Normalize phone number for consistent lookup
-    const normalizedPhone = this.normalizePhoneNumber(phone.trim());
+    const normalizedPhone = normalizePhoneNumber(phone.trim()); // ✅ Using shared utility
     this.logger.log(`[LOOKUP] Original phone: ${phone} -> Normalized: ${normalizedPhone}`);
     
     const visitor = await this.visitorModel.findOne({
@@ -1247,16 +1200,8 @@ export class RegistrationsService {
             name: visitor.name,
           });
           
-          const qrCodeDataUrl = await QRCode.toDataURL(qrData, {
-            errorCorrectionLevel: 'H',
-            width: 400,
-            margin: 4,
-            type: 'image/png',
-            color: {
-              dark: '#000000',
-              light: '#FFFFFF',
-            },
-          });
+          // ✅ Using shared utility
+          const qrCodeDataUrl = await generateDetailedQR(qrData);
           
           // Generate badge on-demand using BadgesService
           this.logger.log(`📝 Regenerating badge for ${visitor.name || 'visitor'} (${registrationId})...`);
@@ -1436,16 +1381,8 @@ export class RegistrationsService {
       throw new BadRequestException('Invalid registration');
     }
 
-    // Generate QR code for printing
-    const qrCodeDataURL = await QRCode.toDataURL(registrationNumber, {
-      errorCorrectionLevel: 'L', // Simple for fastest scanning
-      width: 512, // Larger for better visibility
-      margin: 4, // Standard quiet zone
-      color: {
-        dark: '#000000',
-        light: '#FFFFFF',
-      },
-    });
+    // ✅ Generate QR code for printing (using shared utility)
+    const qrCodeDataURL = await generateRegistrationQR(registrationNumber);
 
     // Extract location
     const cityValue = validationResult.visitor.city && validationResult.visitor.city !== '-' 
@@ -1688,12 +1625,8 @@ export class RegistrationsService {
     const oldBadgeUrl = await this.getBadgeUrl(registrationId);
 
     try {
-      // 2. Regenerate QR code (same as original)
-      const qrCodeUrl = await QRCode.toDataURL(registration.registrationNumber, {
-        width: 512,
-        margin: 4,
-        errorCorrectionLevel: 'H',
-      });
+      // ✅ 2. Regenerate QR code (using shared utility)
+      const qrCodeUrl = await generateRegistrationQR(registration.registrationNumber);
 
       // 3. Generate NEW badge with CURRENT exhibition logo
       // Key point: Uses exhibition.badgeLogo which may have been updated!

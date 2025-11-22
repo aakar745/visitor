@@ -8,30 +8,9 @@ const sharp = require('sharp');
 const { PDFDocument } = require('pdf-lib');
 const ptp = require('pdf-to-printer');
 
-// Load environment variables from user data directory (writable location)
-let envPath = null;
-
-// 1. User data path (set by Electron when running from GUI)
-if (process.env.USER_DATA_PATH) {
-  const userEnvPath = path.join(process.env.USER_DATA_PATH, '.env');
-  if (fs.existsSync(userEnvPath)) {
-    envPath = userEnvPath;
-  }
-}
-
-// 2. Current directory (for development/manual runs)
-if (!envPath && fs.existsSync(path.join(__dirname, '.env'))) {
-  envPath = path.join(__dirname, '.env');
-}
-
-// Load environment variables
-if (envPath) {
-  require('dotenv').config({ path: envPath });
-  console.log(`📁 Loaded config from: ${envPath}`);
-} else {
-  require('dotenv').config(); // Try default location
-  console.log('⚠️ No .env file found, using environment variables');
-}
+// ✅ Load environment variables using shared loader (Electron-aware)
+const { loadEnv } = require('./lib/env-loader');
+loadEnv();
 
 const app = express();
 const PORT = process.env.PORT || 9100;
@@ -819,6 +798,17 @@ async function performManualCleanup() {
 }
 
 
+// =============================================================================
+// 📦 EXPORTS FOR PRINT-WORKER.JS
+// =============================================================================
+// Export shared functions so print-worker.js can use them (avoids duplication)
+module.exports = {
+  generateLabelImage,
+  printImageDirectly,
+};
+
+// ✅ Only start server if run directly (not when imported by print-worker.js)
+if (require.main === module) {
 // Start server
 app.listen(PORT, () => {
   console.log(`
@@ -857,3 +847,4 @@ app.listen(PORT, () => {
   }
 });
 
+} // ✅ End of require.main === module guard
