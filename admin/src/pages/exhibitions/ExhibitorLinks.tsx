@@ -27,7 +27,6 @@ import {
   Spin,
 } from 'antd';
 import { useMessage } from '../../hooks/useMessage';
-import { useFormCleanup } from '../../hooks/useFormCleanup';
 import { convertImageToBase64, downloadQRCode, generateQRFilename, QR_CONFIG } from '../../utils/qrCodeUtils';
 import { useExhibitions } from '../../hooks/useExhibitions';
 import { useExhibitorsByExhibition, useExhibitorMutations } from '../../hooks/useExhibitors';
@@ -57,7 +56,6 @@ import './ExhibitorLinks.css';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
-const { Search } = Input;
 
 // Get backend URL from API_BASE_URL (remove /api/v1 suffix)
 const BACKEND_URL = API_BASE_URL.replace(/\/api\/v\d+$/, '');
@@ -74,9 +72,6 @@ const ExhibitorLinks: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [qrLogoBase64, setQrLogoBase64] = useState<string | undefined>();
   const [form] = Form.useForm();
-  
-  // SECURITY FIX (BUG-019): Cleanup form on unmount
-  useFormCleanup(form);
 
   // Get exhibitor mutations
   const { 
@@ -226,7 +221,10 @@ const ExhibitorLinks: React.FC = () => {
   };
 
   const handleCopyLink = (exhibitor: Exhibitor) => {
-    const exhibition = exhibitions.find(e => e.id === exhibitor.exhibitionId);
+    const exhibition = exhibitions.find(e => {
+      const exhibitionId = e.id || (e as any)._id;
+      return exhibitionId === exhibitor.exhibitionId;
+    });
     if (exhibition) {
       const link = `${FRONTEND_URL}/${exhibition.slug}?ref=${exhibitor.slug}`;
       navigator.clipboard.writeText(link);
@@ -296,8 +294,9 @@ const ExhibitorLinks: React.FC = () => {
 
   const toggleExhibitorStatus = async (exhibitor: Exhibitor) => {
     try {
+      const exhibitorId = exhibitor.id || (exhibitor as any)._id;
       await updateExhibitor.mutateAsync({
-        id: exhibitor.id,
+        id: exhibitorId,
         data: { isActive: !exhibitor.isActive },
       });
       message.success(`Exhibitor ${exhibitor.isActive ? 'deactivated' : 'activated'} successfully`);
@@ -335,13 +334,14 @@ const ExhibitorLinks: React.FC = () => {
         label: 'Delete',
         danger: true,
         onClick: () => {
+          const exhibitorId = exhibitor.id || (exhibitor as any)._id;
           Modal.confirm({
             title: 'Delete Exhibitor',
             content: `Are you sure you want to delete "${exhibitor.name}"? This action cannot be undone.`,
             okText: 'Delete',
             okType: 'danger',
             cancelText: 'Cancel',
-            onOk: () => handleDeleteExhibitor(exhibitor.id),
+            onOk: () => handleDeleteExhibitor(exhibitorId),
           });
         },
       },
@@ -392,7 +392,10 @@ const ExhibitorLinks: React.FC = () => {
       key: 'link',
       width: 350,
       render: (_, record) => {
-        const exhibition = exhibitions.find(e => e.id === record.exhibitionId);
+        const exhibition = exhibitions.find(e => {
+          const exhibitionId = e.id || (e as any)._id;
+          return exhibitionId === record.exhibitionId;
+        });
         const link = exhibition ? `/register/${exhibition.slug}?ref=${record.slug}` : '';
         return (
           <Space direction="vertical" size="small" style={{ width: '100%' }}>
@@ -499,7 +502,10 @@ const ExhibitorLinks: React.FC = () => {
   ];
 
   const getRegistrationLink = (exhibitor: Exhibitor) => {
-    const exhibition = exhibitions.find(e => e.id === exhibitor.exhibitionId);
+    const exhibition = exhibitions.find(e => {
+      const exhibitionId = e.id || (e as any)._id;
+      return exhibitionId === exhibitor.exhibitionId;
+    });
     if (!exhibition) return '';
     return `${FRONTEND_URL}/${exhibition.slug}?ref=${exhibitor.slug}`;
   };
@@ -549,11 +555,14 @@ const ExhibitorLinks: React.FC = () => {
                 }}
                 allowClear
               >
-                {exhibitions.map((exhibition) => (
-                  <Option key={exhibition.id} value={exhibition.id}>
-                    {exhibition.name}
-                  </Option>
-                ))}
+                {exhibitions.map((exhibition) => {
+                  const exhibitionId = exhibition.id || (exhibition as any)._id;
+                  return (
+                    <Option key={exhibitionId} value={exhibitionId}>
+                      {exhibition.name}
+                    </Option>
+                  );
+                })}
               </Select>
             </Space>
           </Col>
@@ -657,10 +666,10 @@ const ExhibitorLinks: React.FC = () => {
             <div className="search-filter-bar" style={{ marginBottom: '16px' }}>
               <Row gutter={[16, 16]} align="middle">
                 <Col xs={24} md={12}>
-                  <Search
+                  <Input
                     placeholder="Search by name, company, slug, or booth number..."
                     size="large"
-                    prefix={<SearchOutlined />}
+                    prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
                     value={searchText}
                     onChange={(e) => setSearchText(e.target.value)}
                     allowClear
@@ -688,7 +697,7 @@ const ExhibitorLinks: React.FC = () => {
             className="exhibitor-table"
             columns={columns}
             dataSource={filteredExhibitors}
-            rowKey="id"
+            rowKey={(record) => record.id || (record as any)._id}
             loading={isDeleting || isLoadingExhibitors}
             pagination={{
               pageSize: 10,
@@ -874,7 +883,7 @@ const ExhibitorLinks: React.FC = () => {
                     iconSize={QR_CONFIG.DISPLAY_ICON_SIZE}
                     style={{ margin: '0 auto' }}
                     errorLevel={QR_CONFIG.ERROR_LEVEL}
-                    bgColor="#ffffff"
+                    bgColor="transparent"
                     boostLevel={true}
                     bordered={false}
                     imageSettings={{
@@ -905,7 +914,7 @@ const ExhibitorLinks: React.FC = () => {
                     icon={qrLogoBase64 || undefined}
                     iconSize={QR_CONFIG.DOWNLOAD_ICON_SIZE}
                     errorLevel={QR_CONFIG.ERROR_LEVEL}
-                    bgColor="#ffffff"
+                    bgColor="transparent"
                     boostLevel={true}
                     bordered={false}
                     imageSettings={{

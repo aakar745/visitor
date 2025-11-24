@@ -574,6 +574,7 @@ const EditExhibition: React.FC = () => {
                         <Option value="exhibitor">Exhibitor</Option>
                         <Option value="speaker">Speaker</Option>
                         <Option value="guest">Guest</Option>
+                        <Option value="visitor">Visitor</Option>
                       </Select>
                     </Form.Item>
                   </Col>

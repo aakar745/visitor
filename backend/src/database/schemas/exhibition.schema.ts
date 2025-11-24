@@ -19,6 +19,7 @@ export enum RegistrationCategory {
   EXHIBITOR = 'exhibitor',
   SPEAKER = 'speaker',
   GUEST = 'guest',
+  VISITOR = 'visitor',
 }
 
 @Schema({ _id: true }) // Ensure MongoDB generates _id for subdocuments
@@ -263,6 +264,14 @@ ExhibitionSchema.set('toJSON', {
   virtuals: true,
   transform: (doc: any, ret: any) => {
     ret.id = ret._id.toString();
+    
+    // Transform image field names for frontend compatibility
+    if (ret.exhibitionLogo) {
+      ret.logoUrl = ret.exhibitionLogo;
+    }
+    if (ret.bannerImage) {
+      ret.bannerImageUrl = ret.bannerImage;
+    }
     
     // Transform subdocument _id to id for pricing tiers
     if (ret.pricingTiers && Array.isArray(ret.pricingTiers)) {

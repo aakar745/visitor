@@ -114,6 +114,7 @@ export function RegistrationForm({ exhibition, exhibitor }: RegistrationFormProp
         company: visitorData.company,
       });
       console.log('[FORM] Authenticated phone number:', phoneNumber);
+      console.log('[FORM] Full visitor data object (all fields):', visitorData);
       
       // Create a mapping of all possible field name variations to visitor data
       const fieldMapping: Record<string, any> = {};
@@ -212,6 +213,28 @@ export function RegistrationForm({ exhibition, exhibitor }: RegistrationFormProp
         fieldMapping['street address'] = visitorData.address;
       }
       
+      // Country variations
+      // Note: Country can be stored as a dynamic field on the visitor object (schema has strict: false)
+      if ((visitorData as any).country || (visitorData as any).Country) {
+        const countryValue = (visitorData as any).country || (visitorData as any).Country;
+        fieldMapping['country'] = countryValue;
+        fieldMapping['country_name'] = countryValue;
+        fieldMapping['countryname'] = countryValue;
+        fieldMapping['nation'] = countryValue;
+        fieldMapping['country name'] = countryValue;
+      }
+      
+      // Generic fallback: Add any other dynamic fields from visitor data
+      // (e.g., custom fields like "hobby", "blood_group", "Country", etc.)
+      Object.keys(visitorData).forEach((key) => {
+        const value = (visitorData as any)[key];
+        // Skip standard fields (already handled above) and system fields
+        const skipFields = ['_id', 'id', 'createdAt', 'updatedAt', 'totalRegistrations', 'lastRegistrationDate', 'registeredExhibitions'];
+        if (value && !skipFields.includes(key)) {
+          fieldMapping[key.toLowerCase()] = value;
+        }
+      });
+      
       // Auto-fill matching custom fields
       exhibition.customFields.forEach((field) => {
         // Normalize field name for matching (lowercase, remove spaces/underscores)
@@ -261,6 +284,33 @@ export function RegistrationForm({ exhibition, exhibitor }: RegistrationFormProp
           console.log(`Auto-filled phone field "${field.name}" with:`, phoneNumber);
         }
       });
+    }
+  }, [phoneNumber, visitorData, exhibition.customFields, form]);
+
+  // Auto-detect and fill country based on phone number (for Indian numbers)
+  useEffect(() => {
+    if (phoneNumber && !visitorData && exhibition.customFields) {
+      // Detect if phone number is Indian (+91 or starts with 91)
+      const isIndianNumber = phoneNumber.startsWith('+91') || phoneNumber.startsWith('91');
+      
+      if (isIndianNumber) {
+        console.log('Indian phone number detected, auto-filling country as India');
+        
+        // Find country field in custom fields
+        exhibition.customFields.forEach((field) => {
+          const normalizedFieldName = field.name.toLowerCase().replace(/[_\s-]/g, '');
+          const countryKeywords = ['country', 'nation', 'countryname'];
+          
+          // Check if this field is a country field
+          const isCountryField = countryKeywords.some(keyword => normalizedFieldName.includes(keyword));
+          
+          if (isCountryField && field.type === 'select') {
+            // Auto-fill with "India" for Indian phone numbers
+            form.setValue(`customFieldData.${field.name}`, 'India', { shouldValidate: true });
+            console.log(`Auto-filled country field "${field.name}" with: India`);
+          }
+        });
+      }
     }
   }, [phoneNumber, visitorData, exhibition.customFields, form]);
 

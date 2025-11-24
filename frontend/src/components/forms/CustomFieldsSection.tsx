@@ -38,6 +38,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   exhibitor: 'Exhibitor',
   speaker: 'Speaker',
   guest: 'Guest',
+  visitor: 'Visitor',
 };
 
 export function CustomFieldsSection({ 
@@ -842,6 +843,7 @@ export function CustomFieldsSection({
                 {field.required && <span className="text-red-500 ml-1">*</span>}
               </Label>
               <Select
+                key={isCountry ? `country-${countries.length}-${fieldValue}` : undefined}
                 value={fieldValue || ''}
                 onValueChange={(value) => setValue(fieldName, value, { shouldValidate: true })}
                 disabled={isCountry && loadingCountries}

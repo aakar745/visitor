@@ -132,7 +132,8 @@ const ExhibitionList: React.FC = () => {
 
   const handleDuplicate = async (exhibition: Exhibition) => {
     try {
-      await exhibitionService.duplicateExhibition(exhibition.id, `${exhibition.name} (Copy)`);
+      const exhibitionId = exhibition.id || (exhibition as any)._id;
+      await exhibitionService.duplicateExhibition(exhibitionId, `${exhibition.name} (Copy)`);
       message.success('Exhibition duplicated successfully');
       loadExhibitions();
     } catch (error) {
@@ -148,7 +149,8 @@ const ExhibitionList: React.FC = () => {
       okType: 'danger',
       onOk: async () => {
         try {
-          await exhibitionService.deleteExhibition(exhibition.id);
+          const exhibitionId = exhibition.id || (exhibition as any)._id;
+          await exhibitionService.deleteExhibition(exhibitionId);
           message.success('Exhibition deleted successfully');
           loadExhibitions();
         } catch (error) {
@@ -246,19 +248,21 @@ const ExhibitionList: React.FC = () => {
   // Action menu for each exhibition
   const getActionMenu = (exhibition: Exhibition) => {
     const isDraft = exhibition.status === 'draft';
+    // Handle both id and _id (backend returns _id, frontend type uses id)
+    const exhibitionId = exhibition.id || (exhibition as any)._id;
     
     const items = [
       {
         key: 'view',
         icon: <EyeOutlined />,
         label: 'View Details',
-        onClick: () => navigate(`/exhibitions/${exhibition.id}`)
+        onClick: () => navigate(`/exhibitions/${exhibitionId}`)
       },
       {
         key: 'edit',
         icon: <EditOutlined />,
         label: 'Edit Exhibition',
-        onClick: () => navigate(`/exhibitions/edit/${exhibition.id}`)
+        onClick: () => navigate(`/exhibitions/edit/${exhibitionId}`)
       },
       {
         key: 'duplicate',
@@ -294,14 +298,14 @@ const ExhibitionList: React.FC = () => {
         key: 'publish',
         icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
         label: 'Publish Exhibition',
-        onClick: () => handleStatusUpdate(exhibition.id, 'active'),
+        onClick: () => handleStatusUpdate(exhibitionId, 'active'),
       });
     } else {
       items.push({
         key: 'unpublish',
         icon: <ClockCircleOutlined />,
         label: 'Unpublish (Move to Draft)',
-        onClick: () => handleStatusUpdate(exhibition.id, 'draft'),
+        onClick: () => handleStatusUpdate(exhibitionId, 'draft'),
       });
     }
 
@@ -652,7 +656,7 @@ const ExhibitionList: React.FC = () => {
         <Table
           columns={columns}
           dataSource={paginatedExhibitions}
-          rowKey="id"
+          rowKey={(record) => record.id || (record as any)._id}
           loading={loading}
           pagination={{
             current: currentPage,
@@ -730,7 +734,7 @@ const ExhibitionList: React.FC = () => {
                     iconSize={QR_CONFIG.DISPLAY_ICON_SIZE}
                     style={{ margin: '0 auto' }}
                     errorLevel={QR_CONFIG.ERROR_LEVEL}
-                    bgColor="#ffffff"
+                    bgColor="transparent"
                     boostLevel={true}
                     bordered={false}
                     imageSettings={{
@@ -761,7 +765,7 @@ const ExhibitionList: React.FC = () => {
                     icon={qrLogoBase64 || undefined}
                     iconSize={QR_CONFIG.DOWNLOAD_ICON_SIZE}
                     errorLevel={QR_CONFIG.ERROR_LEVEL}
-                    bgColor="#ffffff"
+                    bgColor="transparent"
                     boostLevel={true}
                     bordered={false}
                     imageSettings={{

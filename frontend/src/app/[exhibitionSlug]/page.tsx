@@ -91,76 +91,102 @@ export default function ExhibitionPage({ params: paramsPromise }: PageProps) {
 
   const isRegistrationOpen = exhibitionsApi.isRegistrationOpen(exhibition);
 
+  // Helper function to get full image URL
+  const getImageUrl = (url: string | undefined): string | undefined => {
+    if (!url) return undefined;
+    // If already a full URL, return as is
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    // Otherwise, prepend API base URL (remove /api/v1 suffix)
+    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api/v1', '') || 'http://localhost:3000';
+    return `${baseUrl}${url.startsWith('/') ? url : `/${url}`}`;
+  };
+
+  const bannerUrl = getImageUrl(exhibition.bannerImageUrl);
+  const logoUrl = getImageUrl(exhibition.logoUrl);
+
+  // Debug logging
+  console.log('[Exhibition Page] Exhibition data:', {
+    name: exhibition.name,
+    bannerImageUrl: exhibition.bannerImageUrl,
+    logoUrl: exhibition.logoUrl,
+    processedBannerUrl: bannerUrl,
+    processedLogoUrl: logoUrl,
+  });
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/20">
       <Header />
 
       {/* Hero Section with Exhibition Banner */}
-      <section className="relative h-[400px] overflow-hidden bg-gradient-to-br from-primary/10 via-purple-50/50 to-pink-50/30">
-        {exhibition.bannerImageUrl || exhibition.logoUrl ? (
+      <section className="relative h-[400px] overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-indigo-900">
+        {bannerUrl || logoUrl ? (
           <>
             <Image
-              src={exhibition.bannerImageUrl || exhibition.logoUrl!}
+              src={bannerUrl || logoUrl!}
               alt={exhibition.name}
               fill
               className="object-cover"
               priority
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/30" />
           </>
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-purple-100/50 to-pink-100/30" />
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-purple-600/40 to-pink-600/30" />
         )}
 
         {/* Hero Content */}
-        <div className="container relative z-10 mx-auto max-w-7xl px-4 h-full flex items-end pb-12">
-          <div className="space-y-4 text-white max-w-4xl">
+        <div className="container relative z-10 mx-auto max-w-7xl px-4 h-full flex flex-col justify-end pb-12">
+          <div className="text-white max-w-4xl space-y-8">
+            {/* Back Button */}
             <Link 
               href="/" 
-              className="inline-flex items-center gap-2 text-white/80 hover:text-white transition-colors mb-4"
+              className="inline-flex items-center gap-2 text-white/90 hover:text-white transition-all bg-white/10 backdrop-blur-sm px-4 py-2 rounded-lg hover:bg-white/20 border border-white/20 shadow-lg font-medium w-fit"
             >
               <ArrowLeft className="h-4 w-4" />
               Back to Exhibitions
             </Link>
 
-            {isRegistrationOpen && (
-              <Badge className="bg-green-500 hover:bg-green-600 text-white border-0 shadow-lg">
-                <div className="flex items-center gap-1.5">
-                  <div className="h-2 w-2 rounded-full bg-white animate-pulse" />
-                  Registration Open
+            {/* Title Section */}
+            <div className="space-y-4">
+              {/* Exhibition Logo */}
+              {logoUrl && (
+                <div className="relative h-24 w-24 overflow-hidden rounded-xl bg-white/95 backdrop-blur-sm p-3 shadow-2xl border-2 border-white/20">
+                  <div className="relative w-full h-full">
+                    <Image
+                      src={logoUrl}
+                      alt={`${exhibition.name} logo`}
+                      fill
+                      sizes="96px"
+                      className="object-contain"
+                      priority
+                      unoptimized
+                    />
+                  </div>
                 </div>
-              </Badge>
-            )}
+              )}
 
-            <h1 className="text-4xl md:text-5xl font-bold drop-shadow-lg">
-              {exhibition.name}
-            </h1>
-
-            {exhibition.tagline && (
-              <p className="text-xl text-white/90 drop-shadow">
-                {exhibition.tagline}
-              </p>
-            )}
-
-            {/* Quick Info Pills */}
-            <div className="flex flex-wrap gap-3 pt-2">
-              <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
-                <Calendar className="h-4 w-4" />
-                <span className="text-sm font-medium">
-                  {formatDateRangeShort(exhibition.onsiteStartDate, exhibition.onsiteEndDate)}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
-                <MapPin className="h-4 w-4" />
-                <span className="text-sm font-medium line-clamp-1">
-                  {exhibition.venue}
-                </span>
-              </div>
-              {exhibition.isPaid && (
-                <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
-                  <DollarSign className="h-4 w-4" />
-                  <span className="text-sm font-medium">Paid Event</span>
+              {/* Registration Badge */}
+              {isRegistrationOpen && (
+                <div>
+                  <Badge className="bg-green-500 hover:bg-green-600 text-white border-0 shadow-2xl text-sm font-semibold px-5 py-2.5 rounded-full inline-flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-white animate-pulse" />
+                    Registration Open
+                  </Badge>
                 </div>
+              )}
+
+              {/* Exhibition Title */}
+              <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold drop-shadow-2xl tracking-tight leading-tight">
+                {exhibition.name}
+              </h1>
+
+              {/* Tagline */}
+              {exhibition.tagline && (
+                <p className="text-xl md:text-2xl text-white/95 drop-shadow-lg font-medium max-w-3xl">
+                  {exhibition.tagline}
+                </p>
               )}
             </div>
           </div>

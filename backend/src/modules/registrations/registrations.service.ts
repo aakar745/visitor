@@ -169,71 +169,140 @@ export class RegistrationsService {
     // Extract GLOBAL dynamic fields from customFieldData (these go to GlobalVisitor)
     const globalDynamicFields: Record<string, any> = {};
     if (dto.customFieldData && typeof dto.customFieldData === 'object') {
+      this.logger.log(`[Registration] Received customFieldData with ${Object.keys(dto.customFieldData).length} fields:`, Object.keys(dto.customFieldData));
+      
       Object.keys(dto.customFieldData).forEach(key => {
         const normalizedKey = key.toLowerCase().replace(/\s/g, '_');
+        const value = dto.customFieldData![key];
+        
         // If it's NOT a standard field, it's a dynamic global field
         if (!STANDARD_VISITOR_FIELDS.includes(normalizedKey)) {
-          globalDynamicFields[key] = dto.customFieldData![key];
+          globalDynamicFields[key] = value;
+          this.logger.log(`[Dynamic Field] "${key}": "${value}" (normalized: ${normalizedKey})`);
+        } else {
+          this.logger.log(`[Standard Field] Skipping "${key}": "${value}" (is standard field)`);
         }
       });
+      
+      if (Object.keys(globalDynamicFields).length > 0) {
+        this.logger.log(`[Dynamic Fields] Final extracted ${Object.keys(globalDynamicFields).length} dynamic fields:`, globalDynamicFields);
+      }
     }
 
     if (visitor) {
-      // ✅ FIXED: Only update fields that are EMPTY (null/undefined/empty string)
-      // This prevents overwriting existing visitor data when they register for a new exhibition
+      // ✅ ALWAYS UPDATE visitor profile with latest form data
+      // This allows users to update their information (e.g., moved to new city, changed company, etc.)
+      // The form auto-fills existing data, so if user changes anything, we respect that update
       // Phone is the PRIMARY identifier and should NEVER be updated
       
-      let updatedFields = 0;
+      let hasChanges = false;
       
-      // Only update if field is currently empty/missing
-      if (dto.email && dto.email.trim() && !visitor.email) {
-        visitor.email = dto.email.toLowerCase().trim();
-        updatedFields++;
+      // Update all fields with new data (if provided)
+      // Phone is NEVER updated (it's the primary identifier)
+      // Using .set() method for consistent persistence across all fields
+      if (dto.email && dto.email.trim() && visitor.email !== dto.email.toLowerCase().trim()) {
+        visitor.set('email', dto.email.toLowerCase().trim());
+        hasChanges = true;
       }
-      if (dto.name && !visitor.name) {
-        visitor.name = dto.name;
-        updatedFields++;
+      if (dto.name && visitor.name !== dto.name) {
+        visitor.set('name', dto.name);
+        hasChanges = true;
       }
-      if (dto.company && !visitor.company) {
-        visitor.company = dto.company;
-        updatedFields++;
+      if (dto.company && visitor.company !== dto.company) {
+        visitor.set('company', dto.company);
+        hasChanges = true;
       }
-      if (dto.designation && !visitor.designation) {
-        visitor.designation = dto.designation;
-        updatedFields++;
+      if (dto.designation && visitor.designation !== dto.designation) {
+        visitor.set('designation', dto.designation);
+        hasChanges = true;
       }
-      if (dto.state && !visitor.state) {
-        visitor.state = dto.state;
-        updatedFields++;
+      if (dto.state && visitor.state !== dto.state) {
+        visitor.set('state', dto.state);
+        hasChanges = true;
       }
-      if (dto.city && !visitor.city) {
-        visitor.city = dto.city;
-        updatedFields++;
+      if (dto.city && visitor.city !== dto.city) {
+        visitor.set('city', dto.city);
+        hasChanges = true;
       }
-      if (dto.pincode && !visitor.pincode) {
-        visitor.pincode = dto.pincode;
-        updatedFields++;
+      if (dto.pincode && visitor.pincode !== dto.pincode) {
+        visitor.set('pincode', dto.pincode);
+        hasChanges = true;
       }
-      if (dto.address && !visitor.address) {
-        visitor.address = dto.address;
-        updatedFields++;
+      if (dto.address && visitor.address !== dto.address) {
+        visitor.set('address', dto.address);
+        hasChanges = true;
       }
       
-      // Save dynamic fields to GlobalVisitor (only if not already set)
+      // Update dynamic fields (e.g., Country, hobby, blood_group, etc.)
       // Cast to any because schema has strict: false which allows dynamic fields
+      this.logger.log(`[Update] Processing ${Object.keys(globalDynamicFields).length} dynamic fields for visitor ${visitor._id}`);
+      
+      // Log all fields currently in visitor document (for debugging)
+      const currentVisitorFields = Object.keys(visitor.toObject());
+      this.logger.log(`[Update] Current visitor document has ${currentVisitorFields.length} fields:`, currentVisitorFields);
+      
       Object.keys(globalDynamicFields).forEach(key => {
-        if (!(visitor as any)[key]) {
-          (visitor as any)[key] = globalDynamicFields[key];
-          updatedFields++;
+        const newValue = globalDynamicFields[key];
+        
+        // Try to find the field with exact key first
+        let currentValue = (visitor as any)[key];
+        let fieldKey = key;
+        
+        this.logger.log(`[Update Dynamic Field] Processing "${key}":`);
+        this.logger.log(`  - New value: "${newValue}"`);
+        this.logger.log(`  - Current value (exact key): "${currentValue}"`);
+        
+        // If field doesn't exist with exact key, try case-insensitive search
+        // (e.g., form might have "Country" but DB has "country" or vice versa)
+        if (currentValue === undefined && visitor) {
+          const visitorObj = visitor.toObject();
+          const visitorKeys = Object.keys(visitorObj);
+          const matchingKey = visitorKeys.find(k => k.toLowerCase() === key.toLowerCase());
+          if (matchingKey) {
+            currentValue = (visitor as any)[matchingKey];
+            fieldKey = matchingKey;
+            this.logger.log(`  - Found case-insensitive match: "${matchingKey}" = "${currentValue}"`);
+          }
+        }
+        
+        // Update if value is different
+        const isDifferent = currentValue !== newValue;
+        this.logger.log(`  - Is different? ${isDifferent} (current: "${currentValue}" vs new: "${newValue}")`);
+        
+        if (isDifferent && newValue) { // Only update if new value is not empty
+          this.logger.log(`  ✅ UPDATING "${fieldKey}": "${currentValue}" → "${newValue}"`);
+          
+          // ✅ CRITICAL: Use .set() method for dynamic fields (strict: false schema)
+          // This is the PROPER way to update dynamic fields in Mongoose
+          visitor!.set(key, newValue);
+          this.logger.log(`  - Used .set('${key}', '${newValue}') for proper Mongoose persistence`);
+          
+          // If there was an old field with different casing, remove it
+          if (fieldKey !== key) {
+            this.logger.log(`  - Removing old field with different casing: "${fieldKey}"`);
+            visitor!.set(fieldKey, undefined); // Use .set() to properly remove
+          }
+          
+          hasChanges = true;
+        } else if (!newValue) {
+          this.logger.log(`  ⚠️ SKIPPING - new value is empty`);
+        } else {
+          this.logger.log(`  ℹ️ SKIPPING - values are the same`);
         }
       });
       
-      if (updatedFields > 0) {
+      if (hasChanges) {
+        this.logger.log(`[Save] Saving visitor ${visitor._id} with changes...`);
         await visitor.save();
-        this.logger.log(`Updated ${updatedFields} empty fields for visitor ${visitor._id}`);
+        this.logger.log(`✅ Updated visitor profile ${visitor._id} with latest data`);
+        
+        // Log the updated visitor to verify changes were saved
+        const updatedVisitor = await this.visitorModel.findById(visitor._id).lean();
+        this.logger.log(`[Save] Verified saved visitor:`, updatedVisitor);
+        
         // Note: MeiliSearch sync happens later after registeredExhibitions is updated
       } else {
-        this.logger.log(`No updates needed - visitor ${visitor._id} already has complete data`);
+        this.logger.log(`ℹ️ No changes detected for visitor ${visitor._id}`);
       }
     } else {
       // Create new visitor (handle optional fields from dynamic forms)
@@ -720,7 +789,7 @@ export class RegistrationsService {
     
     const visitor = await this.visitorModel.findOne({
       phone: normalizedPhone,
-    });
+    }).lean(); // Use lean() to get ALL fields including dynamic fields
 
     if (!visitor) {
       this.logger.log(`[LOOKUP] No visitor found for phone: ${normalizedPhone}`);
@@ -737,20 +806,10 @@ export class RegistrationsService {
       .limit(10)
       .exec();
 
+    // Return ALL visitor fields (including dynamic fields like "Country", "hobby", etc.)
+    // This ensures form auto-fill works for ALL previously entered data
     return {
-      visitor: {
-        _id: visitor._id,
-        name: visitor.name,
-        email: visitor.email,
-        phone: visitor.phone,
-        company: visitor.company,
-        designation: visitor.designation,
-        state: visitor.state,
-        city: visitor.city,
-        pincode: visitor.pincode,
-        address: visitor.address,
-        totalRegistrations: visitor.totalRegistrations,
-      },
+      visitor: visitor, // Return the entire visitor object with all dynamic fields
       registrations: registrations.map((reg: any) => ({
         _id: reg._id.toString(), // Registration ID for redirect
         registrationId: reg._id.toString(), // Alias for clarity
@@ -956,14 +1015,17 @@ export class RegistrationsService {
     const visitor = await this.visitorModel.findById(visitorId).exec();
     
     if (visitor) {
+      // Always keep the visitor in the global database for future registrations
+      // Update visitor's registration count and metadata
+      visitor.totalRegistrations = remainingRegistrations;
+      
       if (remainingRegistrations === 0) {
-        // No more registrations - delete the visitor profile (cascade delete)
-        await this.visitorModel.findByIdAndDelete(visitorId).exec();
-        this.logger.log(`Visitor ${visitorId} deleted (no remaining registrations)`);
+        // No more registrations - clear exhibition data but KEEP the visitor profile
+        visitor.registeredExhibitions = [];
+        visitor.lastRegistrationDate = undefined;
+        await visitor.save();
+        this.logger.log(`Visitor ${visitorId} updated (no active registrations, profile retained for future use)`);
       } else {
-        // Update visitor's registration count and metadata
-        visitor.totalRegistrations = remainingRegistrations;
-        
         // Update last registration date
         const lastReg = await this.registrationModel
           .findOne({ visitorId })

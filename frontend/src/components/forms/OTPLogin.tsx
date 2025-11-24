@@ -44,8 +44,18 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const [showOTPModal, setShowOTPModal] = useState(false);
   
+  // NEW: reCAPTCHA solve state tracking
+  const [isRecaptchaSolved, setIsRecaptchaSolved] = useState(false);
+  
+  // NEW: Rate limiting and retry state
+  const [retryCount, setRetryCount] = useState(0);
+  const [attemptsRemaining, setAttemptsRemaining] = useState(3);
+  const [lockoutTime, setLockoutTime] = useState<Date | null>(null);
+  
   const { setAuthenticated, setExistingRegistration, clearAuthentication } = useVisitorAuthStore();
   const { clearDraft } = useRegistrationStore();
+  
+  const MAX_RETRIES = 2;
 
   // Initialize reCAPTCHA on component mount and clear old auth data
   useEffect(() => {
@@ -66,27 +76,50 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
 
   // Initialize reCAPTCHA when SMS method is selected
   useEffect(() => {
+    let isMounted = true; // FIX: Track mount state to prevent race conditions
+    
     if (typeof window !== 'undefined' && otpMethod === 'sms') {
       // Small delay to ensure DOM is ready
       const timer = setTimeout(async () => {
         try {
-          await initializeRecaptcha('recaptcha-container');
-          console.log('[OTP] reCAPTCHA initialized for SMS');
+          await initializeRecaptcha(
+            'recaptcha-container',
+            () => {
+              if (isMounted) {
+                setIsRecaptchaSolved(true);
+                console.log('[OTP] reCAPTCHA solved successfully');
+              }
+            },
+            () => {
+              if (isMounted) {
+                setIsRecaptchaSolved(false);
+                console.log('[OTP] reCAPTCHA expired or failed');
+              }
+            }
+          );
+          if (isMounted) {
+            console.log('[OTP] reCAPTCHA initialized for SMS');
+          }
         } catch (error) {
           console.error('Failed to initialize reCAPTCHA:', error);
-          toast.error('Security verification failed to load', {
-            description: 'Please refresh the page and try again',
-          });
+          if (isMounted) {
+            toast.error('Security verification failed to load', {
+              description: 'Please refresh the page and try again',
+            });
+          }
         }
       }, 100);
       
       return () => {
+        isMounted = false; // FIX: Set flag on cleanup
         clearTimeout(timer);
         cleanupRecaptcha();
+        setIsRecaptchaSolved(false); // Reset solve state
       };
     } else {
       // Clean up reCAPTCHA when switching to WhatsApp
       cleanupRecaptcha();
+      setIsRecaptchaSolved(false);
     }
   }, [otpMethod]);
 
@@ -95,7 +128,34 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
     return phoneNumber ? isValidPhoneNumber(phoneNumber) : false;
   };
 
-  // Handle phone number submission
+  // FIX: Extract duplicate registration check logic into helper
+  const checkExistingRegistration = async (phone: E164Number) => {
+    try {
+      const lookupResult = await registrationsApi.lookupVisitorByPhone(phone);
+      
+      if (lookupResult && lookupResult.visitor) {
+        const existingReg = lookupResult.registrations?.find(
+          (reg: any) => reg.exhibitionId === exhibitionId || 
+                       reg.exhibitionId.toString() === exhibitionId
+        );
+        
+        return {
+          visitor: lookupResult.visitor,
+          registrations: lookupResult.registrations,
+          existingRegistration: existingReg || null
+        };
+      }
+      
+      return null;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return null; // New visitor
+      }
+      throw error; // Re-throw other errors
+    }
+  };
+
+  // Handle phone number submission with retry and fallback
   const handleSendOTP = async () => {
     if (!isValidPhone()) {
       toast.error('Invalid phone number', {
@@ -105,45 +165,37 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
     }
 
     if (!phoneNumber) return;
+    
+    // Check lockout
+    if (lockoutTime && new Date() < lockoutTime) {
+      toast.error('Too many attempts', {
+        description: `Please wait until ${lockoutTime.toLocaleTimeString()}`,
+      });
+      return;
+    }
 
     setIsLoading(true);
 
     try {
-      // FIRST: Check if user is already registered for THIS exhibition
+      // FIRST: Check if user is already registered for THIS exhibition (using helper)
       console.log('[OTP] Checking if user already registered...');
       
-      try {
-        const lookupResult = await registrationsApi.lookupVisitorByPhone(phoneNumber);
+      const existing = await checkExistingRegistration(phoneNumber);
+      
+      if (existing?.existingRegistration) {
+        // ✅ ALREADY REGISTERED - Skip OTP, go directly to success page
+        console.log('[OTP] User already registered - skipping OTP verification');
         
-        if (lookupResult && lookupResult.visitor) {
-          // Check if they have registration for THIS exhibition
-          const existingReg = lookupResult.registrations?.find(
-            (reg: any) => reg.exhibitionId === exhibitionId || reg.exhibitionId.toString() === exhibitionId
-          );
+        setAuthenticated(phoneNumber, existing.visitor, existing.registrations);
+        setExistingRegistration(existing.existingRegistration._id || existing.existingRegistration.registrationId);
+        
+        toast.success('Welcome back!', {
+          description: 'You are already registered. Redirecting to your badge...',
+        });
 
-          if (existingReg) {
-            // ✅ ALREADY REGISTERED - Skip OTP, go directly to success page
-            console.log('[OTP] User already registered - skipping OTP verification');
-            
-            // Store authentication
-            setAuthenticated(phoneNumber, lookupResult.visitor, lookupResult.registrations);
-            setExistingRegistration(existingReg._id || existingReg.registrationId);
-            
-            toast.success('Welcome back!', {
-              description: 'You are already registered. Redirecting to your badge...',
-            });
-
-            // Redirect directly to success page
-            onAuthSuccess(true, existingReg._id || existingReg.registrationId);
-            setIsLoading(false);
-            return; // Exit early - no OTP needed!
-          }
-        }
-      } catch (lookupError: any) {
-        // If 404 or error, user is not registered yet - continue with OTP
-        if (lookupError.response?.status !== 404) {
-          console.warn('[OTP] Lookup warning:', lookupError.message);
-        }
+        onAuthSuccess(true, existing.existingRegistration._id || existing.existingRegistration.registrationId);
+        setIsLoading(false);
+        return;
       }
 
       // User is NOT registered yet - proceed with OTP verification
@@ -154,17 +206,27 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
         await sendWhatsAppOTP(phoneNumber);
         setShowOTPModal(true);
         setStep('otp');
+        setRetryCount(0); // Reset retry count on success
         
         toast.success('🎪 Aakar Exhibition - WhatsApp OTP Sent!', {
           description: 'Check WhatsApp for your verification code (expires in 10 minutes)',
         });
       } else {
         // Send OTP via SMS (Firebase)
-        // Ensure reCAPTCHA is initialized and solved
+        // FIX: Check if reCAPTCHA is initialized AND solved
         if (!window.recaptchaVerifier) {
           toast.error('Security verification required', {
             description: 'Please complete the reCAPTCHA verification',
           });
+          setIsLoading(false);
+          return;
+        }
+        
+        if (!isRecaptchaSolved) {
+          toast.error('Please solve the reCAPTCHA puzzle', {
+            description: 'Complete the security check before sending OTP',
+          });
+          setIsLoading(false);
           return;
         }
         
@@ -172,6 +234,7 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
         setConfirmationResult(result);
         setShowOTPModal(true);
         setStep('otp');
+        setRetryCount(0); // Reset retry count on success
         
         toast.success('🎪 Aakar Exhibition - SMS OTP Sent!', {
           description: 'Check your phone for the verification code',
@@ -179,6 +242,41 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
       }
     } catch (error: any) {
       console.error('Send OTP error:', error);
+      
+      // Handle rate limiting
+      if (error.code === 'auth/too-many-requests') {
+        const lockout = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+        setLockoutTime(lockout);
+        setAttemptsRemaining(0);
+        toast.error('Too many attempts', {
+          description: `Please wait 15 minutes before trying again`,
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      // FIX: Automatic retry with fallback
+      if (retryCount < MAX_RETRIES && error.code !== 'auth/too-many-requests') {
+        setRetryCount(prev => prev + 1);
+        setAttemptsRemaining(prev => prev - 1);
+        toast.error(`Send failed, retrying...`, {
+          description: `Attempt ${retryCount + 1}/${MAX_RETRIES}`,
+        });
+        setIsLoading(false);
+        setTimeout(() => handleSendOTP(), 2000);
+        return;
+      } else if (otpMethod === 'sms' && retryCount >= MAX_RETRIES) {
+        // Automatic fallback to WhatsApp after SMS fails
+        toast.error('SMS delivery failed', {
+          description: 'Switching to WhatsApp for better delivery...',
+        });
+        setOtpMethod('whatsapp');
+        setRetryCount(0);
+        setIsLoading(false);
+        setTimeout(() => handleSendOTP(), 1000);
+        return;
+      }
+      
       const method = otpMethod === 'whatsapp' ? 'WhatsApp' : 'SMS';
       toast.error(`Failed to send ${method} OTP`, {
         description: error.message || 'Please try again or contact support',
@@ -188,55 +286,43 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
     }
   };
 
-  // Handle OTP verification success
+  // Handle OTP verification success (using helper)
   const handleVerificationSuccess = async () => {
     if (!phoneNumber) return;
 
     setIsLoading(true);
 
     try {
-      // Lookup visitor by phone number
-      console.log('[OTP] Looking up visitor for phone:', phoneNumber);
-      const lookupResult = await registrationsApi.lookupVisitorByPhone(phoneNumber);
-      console.log('[OTP] Lookup result:', lookupResult);
+      // FIX: Use helper function instead of duplicate logic
+      const existing = await checkExistingRegistration(phoneNumber);
 
-      if (lookupResult && lookupResult.visitor) {
+      if (existing) {
         console.log('[OTP] Visitor found:', {
-          name: lookupResult.visitor.name,
-          phone: lookupResult.visitor.phone,
-          email: lookupResult.visitor.email,
+          name: existing.visitor.name,
+          phone: existing.visitor.phone,
+          email: existing.visitor.email,
         });
 
-        // Visitor exists - check if they have registration for THIS exhibition
-        const existingReg = lookupResult.registrations?.find(
-          (reg: any) => reg.exhibitionId === exhibitionId || reg.exhibitionId.toString() === exhibitionId
-        );
-
-        if (existingReg) {
+        if (existing.existingRegistration) {
           // ✅ HAS EXISTING REGISTRATION - Redirect directly to success page
           console.log('[OTP] User already registered:', {
-            registrationId: existingReg._id || existingReg.registrationId,
-            exhibitionId: existingReg.exhibitionId,
+            registrationId: existing.existingRegistration._id || existing.existingRegistration.registrationId,
+            exhibitionId: existing.existingRegistration.exhibitionId,
           });
 
-          // Store authentication
-          console.log('[OTP] Storing authenticated visitor data:', lookupResult.visitor);
-          setAuthenticated(phoneNumber, lookupResult.visitor, lookupResult.registrations);
-          setExistingRegistration(existingReg._id || existingReg.registrationId);
+          setAuthenticated(phoneNumber, existing.visitor, existing.registrations);
+          setExistingRegistration(existing.existingRegistration._id || existing.existingRegistration.registrationId);
           
           toast.success('Welcome back!', {
             description: 'You are already registered for this exhibition. Redirecting to your badge...',
           });
 
-          // Pass registration ID for redirect
-          onAuthSuccess(true, existingReg._id || existingReg.registrationId);
+          onAuthSuccess(true, existing.existingRegistration._id || existing.existingRegistration.registrationId);
         } else {
           // ✅ NEW REGISTRATION NEEDED - Show form
           console.log('[OTP] Returning visitor, no registration for this exhibition');
           
-          // Store authentication
-          console.log('[OTP] Storing authenticated visitor data:', lookupResult.visitor);
-          setAuthenticated(phoneNumber, lookupResult.visitor, lookupResult.registrations);
+          setAuthenticated(phoneNumber, existing.visitor, existing.registrations);
           
           toast.success('Authentication successful!', {
             description: 'Please complete the registration form',
@@ -248,7 +334,6 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
         // ✅ NEW VISITOR - Show form
         console.log('[OTP] New visitor, never registered before');
         
-        console.log('[OTP] Storing new visitor with phone only:', phoneNumber);
         setAuthenticated(phoneNumber, null, []);
         
         toast.success('Welcome!', {
@@ -258,21 +343,10 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
         onAuthSuccess(false);
       }
     } catch (error: any) {
-      // If 404, it's a new visitor (not an error)
-      if (error.response?.status === 404) {
-        console.log('[OTP] Visitor not found (404), treating as new visitor');
-        setAuthenticated(phoneNumber, null, []);
-        
-        toast.success('Welcome!', {
-          description: 'Please fill in your details to complete registration',
-        });
-
-        onAuthSuccess(false);
-      } else {
-        toast.error('Verification failed', {
-          description: 'Please try again or contact support',
-        });
-      }
+      console.error('[OTP] Verification error:', error);
+      toast.error('Verification failed', {
+        description: 'Please try again or contact support',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -352,6 +426,26 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
             </p>
           </div>
 
+          {/* Rate Limit Warning */}
+          {lockoutTime && new Date() < lockoutTime && (
+            <Alert variant="destructive">
+              <Lock className="h-4 w-4" />
+              <AlertDescription className="text-sm">
+                <strong>Too many attempts</strong> - Please wait until {lockoutTime.toLocaleTimeString()} before trying again.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {/* Attempts Remaining */}
+          {!lockoutTime && attemptsRemaining < 3 && attemptsRemaining > 0 && (
+            <Alert>
+              <Shield className="h-4 w-4" />
+              <AlertDescription className="text-sm">
+                <strong>Attempts remaining:</strong> {attemptsRemaining}/3
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Info Alert */}
           <Alert>
             <Lock className="h-4 w-4" />
@@ -364,7 +458,7 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
           {/* Send OTP Button */}
           <Button
             onClick={handleSendOTP}
-            disabled={!isValidPhone() || isLoading}
+            disabled={!isValidPhone() || isLoading || (otpMethod === 'sms' && !isRecaptchaSolved) || (lockoutTime !== null && new Date() < lockoutTime)}
             className="w-full h-12 text-base"
             size="lg"
           >

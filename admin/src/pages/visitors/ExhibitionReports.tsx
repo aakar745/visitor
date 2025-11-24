@@ -19,7 +19,8 @@ import {
   message,
   Badge,
   Empty,
-  Spin
+  Spin,
+  Popconfirm
 } from 'antd';
 import {
   UserOutlined,
@@ -38,7 +39,9 @@ import {
   FileExcelOutlined,
   EnvironmentOutlined,
   CheckCircleOutlined,
-  ClockCircleOutlined
+  ClockCircleOutlined,
+  DeleteOutlined,
+  ExclamationCircleOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { formatDate, formatTime, formatDateRangeShort } from '../../utils/dateFormatter';
@@ -270,8 +273,11 @@ const ExhibitionReports: React.FC = () => {
         limit: 100,
         filters: { status: ['active', 'registration_open', 'live_event', 'completed'] }
       });
+      console.log('[Exhibition Reports] Loaded exhibitions:', response.data?.length || 0);
+      console.log('[Exhibition Reports] Sample exhibition:', response.data?.[0]);
       setExhibitions(response.data || []);
     } catch (error) {
+      console.error('[Exhibition Reports] Failed to load exhibitions:', error);
       message.error('Failed to load exhibitions');
       setExhibitions([]); // Ensure array is set even on error
     }
@@ -406,6 +412,7 @@ const ExhibitionReports: React.FC = () => {
           exhibitor: 0,
           speaker: 0,
           guest: 0,
+          visitor: 0,
         },
         registrationTrend: response?.registrationTrend || [],
       });
@@ -430,6 +437,7 @@ const ExhibitionReports: React.FC = () => {
           exhibitor: 0,
           speaker: 0,
           guest: 0,
+          visitor: 0,
         },
         registrationTrend: [],
       });
@@ -536,8 +544,43 @@ const ExhibitionReports: React.FC = () => {
     }
   };
 
-  // Get selected exhibition data
-  const selectedExhibitionData = exhibitions?.find(e => e.id === selectedExhibition);
+  /**
+   * Delete registration from exhibition
+   * Removes only this exhibition registration, keeps visitor in global database
+   */
+  const handleDeleteRegistration = async (record: VisitorWithRegistration) => {
+    try {
+      // Access registration ID (backend returns _id, type may use id)
+      const registrationId = (record.registration as any)._id || record.registration.id;
+      
+      if (!registrationId) {
+        message.error('Registration ID not found');
+        return;
+      }
+
+      console.log('[Delete Registration] Deleting registration:', registrationId);
+      
+      await globalVisitorService.deleteRegistration(registrationId);
+      
+      message.success('Visitor removed from this exhibition');
+      
+      // Reload data to reflect changes
+      await loadVisitorData();
+      await loadExhibitionStats();
+      
+      console.log('[Delete Registration] Successfully deleted and reloaded data');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Delete Registration] Error:', error);
+      message.error('Failed to remove visitor: ' + errorMessage);
+    }
+  };
+
+  // Get selected exhibition data (handle both id and _id from backend)
+  const selectedExhibitionData = exhibitions?.find(e => {
+    const exhibitionId = (e as any).id || (e as any)._id;
+    return exhibitionId === selectedExhibition;
+  });
 
   // Check if exhibition is paid
   const isPaidExhibition = selectedExhibitionData?.isPaid;
@@ -896,7 +939,7 @@ const ExhibitionReports: React.FC = () => {
     cols.push({
       title: 'Actions',
       key: 'actions',
-      width: 100,
+      width: 140,
       align: 'center',
       fixed: 'right',
       render: (_: any, record: VisitorWithRegistration) => (
@@ -919,6 +962,35 @@ const ExhibitionReports: React.FC = () => {
               style={{ color: '#52c41a' }}
             />
           </Tooltip>
+          <Popconfirm
+            title="Remove from Exhibition"
+            description={
+              <div style={{ maxWidth: '280px' }}>
+                <p style={{ marginBottom: '8px' }}>
+                  Remove <strong>{record.name}</strong> from this exhibition?
+                </p>
+                <p style={{ fontSize: '12px', color: '#8c8c8c', marginBottom: 0 }}>
+                  • Visitor stays in global database<br />
+                  • Can re-register for this exhibition<br />
+                  • Other exhibition registrations unaffected
+                </p>
+              </div>
+            }
+            onConfirm={() => handleDeleteRegistration(record)}
+            okText="Yes, Remove"
+            cancelText="Cancel"
+            okButtonProps={{ danger: true }}
+            icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
+          >
+            <Tooltip title="Remove from Exhibition">
+              <Button
+                type="text"
+                size="small"
+                icon={<DeleteOutlined />}
+                style={{ color: '#ff4d4f' }}
+              />
+            </Tooltip>
+          </Popconfirm>
         </Space>
       ),
     });
@@ -1050,7 +1122,7 @@ const ExhibitionReports: React.FC = () => {
                   placeholder="Choose an exhibition to view reports..."
                   style={{ width: '100%' }}
                   size="large"
-                  value={selectedExhibition}
+                  value={selectedExhibition || undefined}
                   onChange={setSelectedExhibition}
                   showSearch
                   optionLabelProp="label"
@@ -1058,22 +1130,34 @@ const ExhibitionReports: React.FC = () => {
                     String(option?.label || '').toLowerCase().includes(input.toLowerCase())
                   }
                   popupMatchSelectWidth={false}
-                  dropdownStyle={{ borderRadius: '8px' }}
+                  styles={{
+                    popup: {
+                      root: {
+                        borderRadius: '8px'
+                      }
+                    }
+                  }}
                 >
-                  {exhibitions?.map(exhibition => (
-                    <Option 
-                      key={exhibition.id} 
-                      value={exhibition.id}
-                      label={exhibition.name}
-                    >
-                      <div style={{ padding: '4px 0' }}>
-                        <div style={{ fontWeight: 500, marginBottom: '4px' }}>{exhibition.name}</div>
-                        <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
-                          📅 {formatDateRangeShort(exhibition.onsiteStartDate, exhibition.onsiteEndDate)} • 📍 {exhibition.venue || 'N/A'}
+                  {exhibitions?.map(exhibition => {
+                    // Handle both id and _id from backend
+                    const exhibitionId = (exhibition as any).id || (exhibition as any)._id;
+                    if (!exhibitionId) return null;
+                    
+                    return (
+                      <Option 
+                        key={exhibitionId} 
+                        value={exhibitionId}
+                        label={exhibition.name}
+                      >
+                        <div style={{ padding: '4px 0' }}>
+                          <div style={{ fontWeight: 500, marginBottom: '4px' }}>{exhibition.name}</div>
+                          <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
+                            📅 {formatDateRangeShort(exhibition.onsiteStartDate, exhibition.onsiteEndDate)} • 📍 {exhibition.venue || 'N/A'}
+                          </div>
                         </div>
-                      </div>
-                    </Option>
-                  ))}
+                      </Option>
+                    );
+                  })}
                 </Select>
               </div>
             </Col>
@@ -1362,16 +1446,23 @@ const ExhibitionReports: React.FC = () => {
                     }
                   }}
                   style={{ width: '100%' }}
-                  size="middle"
                   allowClear
-                  dropdownStyle={{ 
-                    maxHeight: '320px', 
-                    overflowY: 'auto',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                    borderRadius: '8px',
-                    padding: '4px 0'
+                  styles={{
+                    popup: {
+                      root: {
+                        maxHeight: '320px',
+                        overflowY: 'auto',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                        borderRadius: '8px',
+                        padding: '4px 0'
+                      }
+                    }
                   }}
-                  popupClassName="visitor-autocomplete-dropdown"
+                  classNames={{
+                    popup: {
+                      root: 'visitor-autocomplete-dropdown'
+                    }
+                  }}
                   notFoundContent={
                     isAutocompleteLoading ? (
                       <div style={{ textAlign: 'center', padding: '12px' }}>
@@ -1385,6 +1476,7 @@ const ExhibitionReports: React.FC = () => {
                   }
                 >
                   <Input
+                    size="middle"
                     prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
                     suffix={
                       isAutocompleteLoading && (

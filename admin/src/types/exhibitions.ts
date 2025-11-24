@@ -45,6 +45,7 @@ export const RegistrationCategory = {
   EXHIBITOR: 'exhibitor',
   SPEAKER: 'speaker',
   GUEST: 'guest',
+  VISITOR: 'visitor',
 } as const;
 
 export type RegistrationCategory = typeof RegistrationCategory[keyof typeof RegistrationCategory];

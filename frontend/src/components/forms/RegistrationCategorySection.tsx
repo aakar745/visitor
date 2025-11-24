@@ -23,6 +23,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   exhibitor: 'Exhibitor',
   speaker: 'Speaker',
   guest: 'Guest',
+  visitor: 'Visitor',
 };
 
 export function RegistrationCategorySection({

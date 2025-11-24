@@ -424,6 +424,7 @@ export class BadgesService {
       exhibitor: '#722ed1',  // Purple
       speaker: '#fa8c16',    // Orange
       guest: '#13c2c2',      // Cyan
+      visitor: '#2f54eb',    // Indigo/Royal Blue
     };
 
     const backgroundColor = categoryColors[category.toLowerCase()] || '#1890ff';
