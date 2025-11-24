@@ -30,7 +30,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.19",
-    "firebase": "^12.5.0",
+    "firebase": "9.23.0",
     "html5-qrcode": "^2.3.8",
     "js-cookie": "^3.0.5",
     "libphonenumber-js": "^1.12.26",

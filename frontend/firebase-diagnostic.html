@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Phone Auth Diagnostic Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js';
+        import { 
+            getAuth, 
+            RecaptchaVerifier,
+            signInWithPhoneNumber
+        } from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js';
+
+        // WORKING WORDPRESS PROJECT - rajcooling-a4dc1
+        const firebaseConfig = {
+            apiKey: "AIzaSyCvL3yYIv86dFKQd1W5KTW7L5qHK7_uMYs",
+            authDomain: "rajcooling-a4dc1.firebaseapp.com",
+            projectId: "rajcooling-a4dc1",
+            storageBucket: "rajcooling-a4dc1.firebasestorage.app",
+            messagingSenderId: "218847565902",
+            appId: "1:218847565902:web:80f5a45c9b363224b90b1f",
+            measurementId: "G-X6BVK204MC"
+        };
+
+        let app, auth, recaptchaVerifier;
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logContainer = document.getElementById('logs');
+            const logEntry = document.createElement('div');
+            
+            const colors = {
+                success: 'text-green-700 bg-green-50 border-green-300',
+                error: 'text-red-700 bg-red-50 border-red-300',
+                warning: 'text-yellow-700 bg-yellow-50 border-yellow-300',
+                info: 'text-blue-700 bg-blue-50 border-blue-300'
+            };
+
+            logEntry.className = `p-3 mb-2 border-l-4 rounded ${colors[type] || colors.info}`;
+            logEntry.innerHTML = `
+                <span class="text-xs opacity-70">[${timestamp}]</span>
+                <span class="ml-2">${message}</span>
+            `;
+            
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            log('🔍 Firebase Phone Auth Diagnostic Tool Started', 'info');
+            log('', 'info');
+            
+            try {
+                // Initialize Firebase
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                auth.languageCode = 'en';
+                
+                log('✅ Firebase initialized successfully', 'success');
+                log(`   Project ID: ${firebaseConfig.projectId}`, 'info');
+                log(`   Auth Domain: ${firebaseConfig.authDomain}`, 'info');
+                log('', 'info');
+                
+                // Check configuration
+                log('📋 Configuration Check:', 'info');
+                log(`   ✓ API Key: ${firebaseConfig.apiKey ? 'Present' : '❌ Missing'}`, firebaseConfig.apiKey ? 'success' : 'error');
+                log(`   ✓ Auth Domain: ${firebaseConfig.authDomain ? 'Present' : '❌ Missing'}`, firebaseConfig.authDomain ? 'success' : 'error');
+                log(`   ✓ Project ID: ${firebaseConfig.projectId ? 'Present' : '❌ Missing'}`, firebaseConfig.projectId ? 'success' : 'error');
+                log('', 'info');
+                
+                log('📱 Ready to test Phone Authentication', 'success');
+                log('👉 Click "Initialize reCAPTCHA" to begin', 'info');
+                
+            } catch (error) {
+                log(`❌ Firebase initialization failed: ${error.message}`, 'error');
+            }
+        });
+
+        window.initRecaptcha = async function() {
+            try {
+                log('🔄 Initializing reCAPTCHA for Phone Auth...', 'info');
+                log('', 'info');
+                log('⚠️ IMPORTANT: This uses Firebase Phone Auth reCAPTCHA', 'warning');
+                log('   This is DIFFERENT from App Check reCAPTCHA!', 'warning');
+                log('', 'info');
+                
+                // Clear existing
+                if (recaptchaVerifier) {
+                    recaptchaVerifier.clear();
+                    log('🧹 Cleared existing reCAPTCHA', 'info');
+                }
+
+                // Create verifier - NO SITE KEY PROVIDED
+                // Firebase will use its auto-provisioned reCAPTCHA key
+                log('🔒 Creating RecaptchaVerifier (no site key - Firebase auto-config)...', 'info');
+                
+                recaptchaVerifier = new RecaptchaVerifier('recaptcha-container', {
+                    size: 'normal',
+                    callback: (response) => {
+                        log('✅ reCAPTCHA solved successfully!', 'success');
+                        log(`   Response token: ${response.substring(0, 30)}...`, 'info');
+                        document.getElementById('sendOtpBtn').disabled = false;
+                    },
+                    'expired-callback': () => {
+                        log('⏰ reCAPTCHA expired', 'warning');
+                        document.getElementById('sendOtpBtn').disabled = true;
+                    },
+                    'error-callback': (error) => {
+                        log(`❌ reCAPTCHA error: ${error}`, 'error');
+                        document.getElementById('sendOtpBtn').disabled = true;
+                    }
+                }, auth);
+
+                log('📦 RecaptchaVerifier created, rendering widget...', 'info');
+                
+                // Render
+                await recaptchaVerifier.render();
+                
+                log('', 'info');
+                log('✅ SUCCESS! reCAPTCHA widget rendered!', 'success');
+                log('', 'info');
+                log('📝 What this means:', 'info');
+                log('   ✓ Firebase Phone Auth reCAPTCHA is configured correctly', 'success');
+                log('   ✓ Your Firebase Console settings are correct', 'success');
+                log('   ✓ You can now send SMS OTP', 'success');
+                log('', 'info');
+                log('👉 Solve the reCAPTCHA above, then enter a phone number to test', 'info');
+                
+            } catch (error) {
+                log('', 'info');
+                log('❌ FAILED to initialize reCAPTCHA!', 'error');
+                log(`   Error: ${error.message}`, 'error');
+                log(`   Code: ${error.code || 'N/A'}`, 'error');
+                log('', 'info');
+                
+                if (error.message?.includes('Invalid site key')) {
+                    log('🔴 ROOT CAUSE: Invalid Site Key', 'error');
+                    log('', 'info');
+                    log('This means:', 'warning');
+                    log('1. Firebase Phone Auth reCAPTCHA is NOT configured in Firebase Console', 'warning');
+                    log('2. Or: The configuration hasn\'t propagated yet (wait 5-10 min)', 'warning');
+                    log('3. Or: localhost is not in Authorized Domains', 'warning');
+                    log('', 'info');
+                    log('✅ HOW TO FIX:', 'info');
+                    log('', 'info');
+                    log('Step 1: Go to Firebase Console', 'info');
+                    log('   → https://console.firebase.google.com/', 'info');
+                    log('', 'info');
+                    log('Step 2: Select your project', 'info');
+                    log(`   → ${firebaseConfig.projectId}`, 'info');
+                    log('', 'info');
+                    log('Step 3: Navigate to Authentication', 'info');
+                    log('   → Authentication → Settings', 'info');
+                    log('', 'info');
+                    log('Step 4: Check Phone Number Sign-in', 'info');
+                    log('   → Make sure Phone sign-in method is ENABLED', 'info');
+                    log('   → Make sure reCAPTCHA Enforcement is ENABLED', 'info');
+                    log('', 'info');
+                    log('Step 5: Check Authorized Domains', 'info');
+                    log('   → Authentication → Settings → Authorized domains', 'info');
+                    log('   → Make sure "localhost" is in the list', 'info');
+                    log('', 'info');
+                    log('Step 6: Wait and Retry', 'info');
+                    log('   → Wait 5-10 minutes for changes to propagate', 'info');
+                    log('   → Clear browser cache (Ctrl+Shift+Delete)', 'info');
+                    log('   → Refresh this page and try again', 'info');
+                    log('', 'info');
+                    log('💡 IMPORTANT NOTE:', 'warning');
+                    log('   The App Check reCAPTCHA key (6LdH2hQsAAAAALtjjlCCZA2Dmrw97WE0FwinST7w)', 'warning');
+                    log('   is DIFFERENT from Phone Auth reCAPTCHA!', 'warning');
+                    log('   Firebase auto-provisions Phone Auth reCAPTCHA separately.', 'warning');
+                } else {
+                    log('💡 Check browser console for more details', 'warning');
+                }
+            }
+        }
+
+        window.testPhoneAuth = async function() {
+            const phoneInput = document.getElementById('phoneNumber').value;
+            
+            if (!phoneInput) {
+                log('❌ Please enter a phone number', 'error');
+                return;
+            }
+
+            let phoneNumber = phoneInput.trim();
+            if (!phoneNumber.startsWith('+')) {
+                phoneNumber = '+' + phoneNumber;
+            }
+
+            log('', 'info');
+            log(`📞 Testing SMS OTP to: ${phoneNumber}`, 'info');
+            
+            if (!recaptchaVerifier) {
+                log('❌ reCAPTCHA not initialized', 'error');
+                return;
+            }
+
+            try {
+                document.getElementById('sendOtpBtn').disabled = true;
+                
+                const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+                
+                log('', 'info');
+                log('🎉 SUCCESS! SMS OTP sent!', 'success');
+                log(`   Verification ID: ${confirmationResult.verificationId}`, 'success');
+                log('', 'info');
+                log('✅ CONCLUSION:', 'success');
+                log('   Your Firebase Phone Auth is working perfectly!', 'success');
+                log('   The reCAPTCHA configuration is correct!', 'success');
+                log('   You can now use SMS OTP in your app!', 'success');
+                
+            } catch (error) {
+                log('', 'info');
+                log('❌ Failed to send SMS OTP', 'error');
+                log(`   Error: ${error.message}`, 'error');
+                log(`   Code: ${error.code}`, 'error');
+                
+                if (error.code === 'auth/invalid-phone-number') {
+                    log('💡 Phone format should be: +[country][number] (e.g., +919876543210)', 'warning');
+                } else if (error.code === 'auth/too-many-requests') {
+                    log('💡 Too many requests. Wait a few minutes and try again.', 'warning');
+                }
+            } finally {
+                document.getElementById('sendOtpBtn').disabled = false;
+            }
+        }
+
+        window.clearLogs = function() {
+            document.getElementById('logs').innerHTML = '';
+            log('📝 Logs cleared', 'info');
+        }
+    </script>
+</head>
+<body class="bg-gray-50 min-h-screen p-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-8 rounded-t-lg shadow-xl">
+            <h1 class="text-4xl font-bold mb-2">🔍 Firebase Phone Auth Diagnostic</h1>
+            <p class="text-purple-100">Check if your reCAPTCHA configuration is correct</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <!-- Left: Testing -->
+            <div class="space-y-6">
+                <!-- Info -->
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-6 rounded-lg">
+                    <h3 class="font-bold text-blue-900 mb-2">ℹ️ What This Tool Does</h3>
+                    <ul class="text-sm text-blue-800 space-y-1 list-disc list-inside">
+                        <li>Tests Firebase Phone Auth reCAPTCHA configuration</li>
+                        <li>Diagnoses "Invalid site key" errors</li>
+                        <li>Provides step-by-step fix instructions</li>
+                        <li>Does NOT use App Check (tests Phone Auth only)</li>
+                    </ul>
+                </div>
+
+                <!-- Step 1 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-bold mb-4 text-gray-800">Step 1: Initialize reCAPTCHA</h2>
+                    <button 
+                        onclick="initRecaptcha()" 
+                        class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition shadow-md"
+                    >
+                        🔒 Initialize Phone Auth reCAPTCHA
+                    </button>
+                    <div id="recaptcha-container" class="mt-4 flex justify-center"></div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-bold mb-4 text-gray-800">Step 2: Test SMS OTP</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Phone Number (with country code)
+                            </label>
+                            <input 
+                                type="tel" 
+                                id="phoneNumber" 
+                                placeholder="+919876543210"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+                        <button 
+                            id="sendOtpBtn"
+                            onclick="testPhoneAuth()" 
+                            disabled
+                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            📱 Send Test SMS OTP
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <button 
+                        onclick="clearLogs()" 
+                        class="w-full bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition"
+                    >
+                        🗑️ Clear Logs
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right: Logs -->
+            <div class="space-y-6">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-bold mb-4 text-gray-800">📝 Diagnostic Logs</h2>
+                    <div 
+                        id="logs" 
+                        class="h-[700px] overflow-y-auto bg-gray-50 rounded-lg p-4 text-sm"
+                    ></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Important Notes -->
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-6 mt-6 rounded-lg">
+            <h3 class="font-bold text-yellow-800 mb-2">⚠️ Key Points:</h3>
+            <ul class="text-sm text-yellow-700 space-y-1 list-disc list-inside">
+                <li><strong>App Check reCAPTCHA ≠ Phone Auth reCAPTCHA</strong> - They are completely separate!</li>
+                <li>App Check key: <code class="bg-yellow-100 px-1">6LdH2hQsAAAAALtjjlCCZA2Dmrw97WE0FwinST7w</code> (for API protection)</li>
+                <li>Phone Auth reCAPTCHA: Auto-provisioned by Firebase (no key needed in code)</li>
+                <li>If you see "Invalid site key", Phone Auth reCAPTCHA is not configured in Firebase Console</li>
+                <li>Make sure <code class="bg-yellow-100 px-1">localhost</code> is in Authorized Domains</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
+

@@ -5,13 +5,14 @@ import {
   PhoneAuthProvider,
   signInWithCredential,
 } from 'firebase/auth';
-import { auth } from './config';
+import { getFirebaseAuth } from './config';
 
 // Declare global for reCAPTCHA
 declare global {
   interface Window {
     recaptchaVerifier: RecaptchaVerifier | undefined;
     recaptchaWidgetId: number | undefined;
+    recaptchaEnterpriseKey: string | undefined;
   }
 }
 
@@ -33,8 +34,16 @@ export const initializeRecaptcha = async (
   }
 
   try {
-    const recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
-      size: 'normal', // Use normal (visible) reCAPTCHA for Enterprise compatibility
+    console.log('🔒 Initializing reCAPTCHA (standard) for phone authentication...');
+    
+    // Get Firebase Auth instance (client-side only)
+    const auth = getFirebaseAuth();
+    
+    // Firebase will automatically use its standard reCAPTCHA
+    // No site key needed - it's auto-provisioned by Firebase
+    // Note: Firebase v9 API - container first, then options, then auth
+    const recaptchaVerifier = new RecaptchaVerifier(containerId, {
+      size: 'normal', // Visible reCAPTCHA for better reliability
       callback: () => {
         console.log('✅ reCAPTCHA solved successfully');
         onSuccess?.();
@@ -48,17 +57,32 @@ export const initializeRecaptcha = async (
         console.error('❌ reCAPTCHA error:', error);
         onError?.(error);
       },
-    });
+    }, auth);
 
     window.recaptchaVerifier = recaptchaVerifier;
     
     // Render the reCAPTCHA widget
     await recaptchaVerifier.render();
     
-    console.log('🔒 reCAPTCHA verifier initialized (visible mode)');
+    console.log('✅ reCAPTCHA initialized and ready');
     return recaptchaVerifier;
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error initializing reCAPTCHA:', error);
+    
+    // Provide helpful debugging info
+    if (error.message?.includes('reCAPTCHA')) {
+      const auth = getFirebaseAuth();
+      console.error('');
+      console.error('📋 FIREBASE CONSOLE SETUP REQUIRED:');
+      console.error('   1. Go to: https://console.firebase.google.com/');
+      console.error('   2. Select project:', auth.app.options.projectId);
+      console.error('   3. Authentication → Settings → Phone Number Sign-in');
+      console.error('   4. Select "reCAPTCHA (Standard)" - NOT Enterprise');
+      console.error('   5. Authorized domains → Add "localhost"');
+      console.error('   6. Wait 5 minutes, clear cache, refresh');
+      console.error('');
+    }
+    
     throw error;
   }
 };
@@ -80,6 +104,9 @@ export const sendOTP = async (phoneNumber: string): Promise<ConfirmationResult> 
     }
 
     console.log('📱 [DEBUG] Calling signInWithPhoneNumber...');
+    
+    // Get Firebase Auth instance (client-side only)
+    const auth = getFirebaseAuth();
     
     // Send OTP via Firebase
     const confirmationResult = await signInWithPhoneNumber(
@@ -135,6 +162,7 @@ export const verifyOTP = async (
       
       // Sign out immediately after verification
       // We only need to verify the phone number, not keep the user signed in
+      const auth = getFirebaseAuth();
       await auth.signOut();
       
       return true;
