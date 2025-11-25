@@ -133,21 +133,41 @@ export class PrintQueueService implements OnModuleInit {
   }
 
   /**
-   * Check worker status
+   * Check worker status for default and kiosk-specific queues
    */
   private async checkWorkerStatus() {
     try {
+      // Check default queue workers
       const workers = await this.printQueue.getWorkers();
       
       if (workers && workers.length > 0) {
-        this.logger.log(`✅ Print Workers: ${workers.length} ACTIVE`);
+        this.logger.log(`✅ Default Queue Workers: ${workers.length} ACTIVE`);
         workers.forEach((worker, index) => {
           this.logger.log(`   Worker ${index + 1}: ${worker.id || 'unknown'}`);
         });
       } else {
-        this.logger.warn('⚠️ Print Workers: NO WORKERS DETECTED');
+        this.logger.warn('⚠️ Default Queue Workers: NO WORKERS DETECTED');
         this.logger.warn('💡 Start print worker: cd print-service && npm run worker');
         this.logger.warn('💡 Or use Print Service Manager GUI');
+      }
+
+      // Check kiosk-specific queue workers (if any exist)
+      if (this.kioskQueues.size > 0) {
+        this.logger.log(`📋 Checking ${this.kioskQueues.size} kiosk-specific queue(s)...`);
+        
+        for (const [kioskId, queue] of this.kioskQueues.entries()) {
+          try {
+            const kioskWorkers = await queue.getWorkers();
+            if (kioskWorkers && kioskWorkers.length > 0) {
+              this.logger.log(`✅ Kiosk "${kioskId}" Workers: ${kioskWorkers.length} ACTIVE`);
+            } else {
+              this.logger.warn(`⚠️ Kiosk "${kioskId}" Workers: NO WORKERS DETECTED`);
+              this.logger.warn(`   Ensure worker is started with KIOSK_ID=${kioskId}`);
+            }
+          } catch (err) {
+            this.logger.warn(`⚠️ Kiosk "${kioskId}": Unable to check worker status`);
+          }
+        }
       }
     } catch (error) {
       this.logger.warn('⚠️ Print Workers: Unable to check status');
@@ -239,6 +259,8 @@ export class PrintQueueService implements OnModuleInit {
   /**
    * Get job status and details
    * 
+   * Searches across all queues (default + kiosk-specific) to find the job
+   * 
    * @param jobId Job ID
    * @returns Job status, progress, and result
    */
@@ -251,7 +273,19 @@ export class PrintQueueService implements OnModuleInit {
     timestamp: string;
   }> {
     try {
-      const job = await this.printQueue.getJob(jobId);
+      // Try default queue first
+      let job = await this.printQueue.getJob(jobId);
+
+      // If not found in default queue, search kiosk-specific queues
+      if (!job && this.kioskQueues.size > 0) {
+        for (const [kioskId, queue] of this.kioskQueues.entries()) {
+          job = await queue.getJob(jobId);
+          if (job) {
+            this.logger.debug(`[Queue] Job ${jobId} found in kiosk queue: ${kioskId}`);
+            break;
+          }
+        }
+      }
 
       if (!job) {
         return {

@@ -540,8 +540,11 @@ async function generateLabelImage(qrPath, name, location, regNumber, company) {
     .toBuffer();
   
   // Determine layout based on which fields are present
-  const hasCompany = company && company.trim() !== '';
-  const hasLocation = location && location.trim() !== '';
+  // Ensure company and location are strings (handle null/undefined)
+  const companyStr = company || '';
+  const locationStr = location || '';
+  const hasCompany = companyStr.trim() !== '';
+  const hasLocation = locationStr.trim() !== '';
   
   // Calculate dynamic Y positions
   let currentY = hasCompany || hasLocation ? 85 : 140; // Start higher if we have more fields
@@ -574,7 +577,7 @@ async function generateLabelImage(qrPath, name, location, regNumber, company) {
       <!-- Company -->
       <text x="340" y="${companyY}" text-anchor="start" 
             font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="#333">
-        ${company.length > 25 ? company.substring(0, 25) + '...' : company}
+        ${companyStr.length > 25 ? companyStr.substring(0, 25) + '...' : companyStr}
       </text>
       ` : ''}
       
@@ -582,7 +585,7 @@ async function generateLabelImage(qrPath, name, location, regNumber, company) {
       <!-- Location -->
       <text x="340" y="${locationY}" text-anchor="start" 
             font-family="Arial, sans-serif" font-size="42" font-weight="normal" fill="#555">
-        ${location.length > 30 ? location.substring(0, 30) + '...' : location}
+        ${locationStr.length > 30 ? locationStr.substring(0, 30) + '...' : locationStr}
       </text>
       ` : ''}
       

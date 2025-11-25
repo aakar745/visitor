@@ -24,7 +24,7 @@ const ptp = require('pdf-to-printer');
 
 // ✅ Load environment variables using shared loader (Electron-aware)
 const { loadEnv } = require('./lib/env-loader');
-loadEnv();
+const envPath = loadEnv();
 
 // ✅ Import shared functions from server.js (avoids duplication)
 const { generateLabelImage, printImageDirectly } = require('./server');

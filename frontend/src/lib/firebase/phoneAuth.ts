@@ -49,10 +49,10 @@ export const getRecaptcha = async (): Promise<firebase.auth.RecaptchaVerifier> =
     },
     auth.app
   );
-
+    
   // Render and return
-  await recaptchaVerifier.render();
-  return recaptchaVerifier;
+    await recaptchaVerifier.render();
+    return recaptchaVerifier;
 };
 
 /**
@@ -80,7 +80,7 @@ export const sendOTP = async (phoneNumber: string): Promise<firebase.auth.Confir
 
     // 🔥 CREATE RECAPTCHA HERE (ON-DEMAND) - This is the key fix!
     const verifier = await getRecaptcha();
-
+    
     // Send OTP with fresh verifier
     const confirmationResult = await auth.signInWithPhoneNumber(phoneNumber, verifier);
 
@@ -90,7 +90,7 @@ export const sendOTP = async (phoneNumber: string): Promise<firebase.auth.Confir
     return confirmationResult;
   } catch (error: any) {
     console.error('❌ OTP error:', error);
-
+    
     // Clear verifier on error for retry
     if (recaptchaVerifier) {
       try {
@@ -126,13 +126,13 @@ export const verifyOTP = async (
     
     if (result.user) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('OTP verified successfully for:', result.user.phoneNumber);
+      console.log('OTP verified successfully for:', result.user.phoneNumber);
       }
       
       // Sign out immediately after verification
       // We only need to verify the phone number, not keep the user signed in
       if (auth) {
-        await auth.signOut();
+      await auth.signOut();
       }
       
       return true;

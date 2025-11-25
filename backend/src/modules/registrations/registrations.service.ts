@@ -1469,12 +1469,26 @@ export class RegistrationsService {
       kioskId,
     };
 
-    // Add to queue
-    const result = await this.printQueueService.addPrintJob(printJobData);
-    
-    this.logger.log(`[Print Queue] ✅ Job queued: ${result.jobId} at position ${result.queuePosition}`);
-    
-    return result;
+    try {
+      // Try to add to Redis queue (primary method)
+      const result = await this.printQueueService.addPrintJob(printJobData);
+      
+      this.logger.log(`[Print Queue] ✅ Job queued: ${result.jobId} at position ${result.queuePosition}`);
+      
+      return result;
+    } catch (error) {
+      // Redis queue failed - log error but don't fail the check-in
+      this.logger.error(`[Print Queue] ❌ Redis queue failed: ${error.message}`);
+      this.logger.warn(`[Print Queue] ⚠️ Check-in will proceed, but printing may be unavailable`);
+      this.logger.warn(`[Print Queue] 💡 Ensure Redis is running and print workers are active`);
+      
+      // Return a fallback response (check-in succeeds, but no print job queued)
+      // Frontend can handle this gracefully by showing a warning
+      return {
+        jobId: `fallback-${registrationNumber}-${Date.now()}`,
+        queuePosition: 0, // Indicates fallback mode
+      };
+    }
   }
 
   /**

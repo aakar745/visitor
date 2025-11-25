@@ -70,40 +70,11 @@ export const OTPModal: React.FC<OTPModalProps> = ({
     }
   }, [isOpen]);
 
-  // 🔥 WebOTP API - Auto-fill OTP from SMS (Chrome/Edge/Safari)
-  useEffect(() => {
-    if (!isOpen || otpMethod !== 'sms') return;
-
-    // Check if WebOTP API is supported
-    if ('OTPCredential' in window) {
-      const abortController = new AbortController();
-
-      navigator.credentials
-        .get({
-          otp: { transport: ['sms'] },
-          signal: abortController.signal,
-        } as any)
-        .then((otpCredential: any) => {
-          if (otpCredential?.code) {
-            console.log('🎉 Auto-filled OTP from SMS:', otpCredential.code);
-            const otpDigits = otpCredential.code.split('').slice(0, 6);
-            setOtp(otpDigits);
-            // Auto-verify
-            if (otpDigits.length === 6) {
-              handleVerify(otpDigits.join(''));
-            }
-          }
-        })
-        .catch((err: any) => {
-          // User cancelled or API not available
-          console.log('WebOTP not available or cancelled:', err);
-        });
-
-      return () => {
-        abortController.abort();
-      };
-    }
-  }, [isOpen, otpMethod]);
+  // ⚠️ WebOTP API - REMOVED
+  // WebOTP API requires SMS messages to end with: @yourdomain.com #123456
+  // Firebase SMS does not support this format, so WebOTP shows a permission
+  // popup but fails to autofill, creating a poor user experience.
+  // We rely on autocomplete="one-time-code" for iOS Safari autofill instead.
 
   // Reset state when modal closes
   useEffect(() => {

@@ -25,6 +25,7 @@ import { isValidPhoneNumber } from 'libphonenumber-js';
 import type { E164Number } from 'libphonenumber-js';
 import type firebase from 'firebase/compat/app';
 import { sendWhatsAppOTP } from '@/lib/api/whatsappOtp';
+import Image from 'next/image';
 
 // 🔥 Lazy load Firebase only when SMS method is selected
 let firebaseLoaded = false;
@@ -45,13 +46,14 @@ const loadFirebase = async () => {
 interface OTPLoginProps {
   exhibitionId: string;
   exhibitionName: string;
+  exhibitionLogo?: string;
   onAuthSuccess: (hasExistingRegistration: boolean, registrationId?: string) => void;
 }
 
 type Step = 'phone' | 'otp';
 type OTPMethod = 'sms' | 'whatsapp';
 
-export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLoginProps) {
+export function OTPLogin({ exhibitionId, exhibitionName, exhibitionLogo, onAuthSuccess }: OTPLoginProps) {
   const [step, setStep] = useState<Step>('phone');
   const [otpMethod, setOtpMethod] = useState<OTPMethod>('whatsapp'); // Default to WhatsApp
   const [phoneNumber, setPhoneNumber] = useState<E164Number | undefined>(undefined);
@@ -332,13 +334,28 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
         {/* Phone Number Entry */}
         <div className="space-y-6">
           <div className="text-center mb-6">
-            <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
-              {otpMethod === 'whatsapp' ? (
-                <MessageCircle className="h-8 w-8 text-green-600" />
-              ) : (
-                <MessageSquare className="h-8 w-8 text-primary" />
-              )}
-            </div>
+            {/* Exhibition Logo */}
+            {exhibitionLogo ? (
+              <div className="inline-flex h-[120px] w-auto max-w-md items-center justify-center rounded-2xl bg-white overflow-hidden mb-4 shadow-lg px-3 py-2">
+                <div className="relative h-full w-auto">
+                  <Image
+                    src={exhibitionLogo}
+                    alt={exhibitionName}
+                    width={300}
+                    height={120}
+                    className="object-contain h-full w-auto"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="inline-flex h-[120px] w-[120px] items-center justify-center rounded-full bg-primary/10 mb-4">
+                {otpMethod === 'whatsapp' ? (
+                  <MessageCircle className="h-16 w-16 text-green-600" />
+                ) : (
+                  <MessageSquare className="h-16 w-16 text-primary" />
+                )}
+              </div>
+            )}
             <h3 className="text-xl font-semibold mb-2">Choose Verification Method</h3>
             <p className="text-sm text-muted-foreground">
               Select how you'd like to receive your one-time password
@@ -403,15 +420,6 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
             </Alert>
           )}
 
-          {/* Info Alert */}
-          <Alert>
-            <Lock className="h-4 w-4" />
-            <AlertDescription className="text-sm">
-              <strong>🎪 Aakar Exhibition</strong> - Your mobile number will be used to verify your identity and send event updates. 
-              We respect your privacy and won't share your information.
-            </AlertDescription>
-          </Alert>
-
           {/* Send OTP Button */}
           <Button
             onClick={handleSendOTP}
@@ -440,6 +448,15 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
               </>
             )}
           </Button>
+
+          {/* Info Alert */}
+          <Alert>
+            <Lock className="h-4 w-4" />
+            <AlertDescription className="text-sm">
+              <strong>🎪 Aakar Exhibition</strong> - Your mobile number will be used to verify your identity and send event updates. 
+              We respect your privacy and won't share your information.
+            </AlertDescription>
+          </Alert>
 
           {/* Loading Progress Indicator */}
           {isLoading && (

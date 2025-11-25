@@ -59,6 +59,7 @@
       "electron-preload.js",
       "server.js",
       "print-worker.js",
+      "lib/**/*",
       "gui/**/*",
       "labels/",
       "node_modules/**/*",

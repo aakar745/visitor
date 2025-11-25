@@ -34,15 +34,15 @@ if (typeof window !== 'undefined' && !firebase.apps.length) {
   }
   
   firebase.initializeApp(firebaseConfig);
-  
-  if (process.env.NODE_ENV === 'development') {
+      
+      if (process.env.NODE_ENV === 'development') {
     console.log('🔥 Firebase initialized (COMPAT MODE):', {
-      hasApiKey: !!firebaseConfig.apiKey,
-      apiKeyPrefix: firebaseConfig.apiKey?.substring(0, 10) + '...',
-      projectId: firebaseConfig.projectId,
-      authDomain: firebaseConfig.authDomain,
-    });
-  }
+          hasApiKey: !!firebaseConfig.apiKey,
+          apiKeyPrefix: firebaseConfig.apiKey?.substring(0, 10) + '...',
+          projectId: firebaseConfig.projectId,
+          authDomain: firebaseConfig.authDomain,
+        });
+      }
 }
 
 // Export auth instance (compat mode)
@@ -50,13 +50,13 @@ export const auth = typeof window !== 'undefined' ? firebase.auth() : null;
 
 // Set language
 if (auth) {
-  auth.languageCode = 'en';
-  
-  if (process.env.NODE_ENV === 'development') {
+    auth.languageCode = 'en';
+    
+    if (process.env.NODE_ENV === 'development') {
     console.log('✅ Firebase Auth initialized (COMPAT MODE)');
     console.log('📱 Phone Auth with invisible reCAPTCHA');
+    }
   }
-}
 
 // Export firebase instance for direct access
 export default firebase;

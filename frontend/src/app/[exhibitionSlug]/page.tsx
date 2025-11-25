@@ -121,21 +121,6 @@ export default function ExhibitionPage({ params: paramsPromise }: PageProps) {
 
       {/* Hero Section with Exhibition Banner */}
       <section className="relative h-[400px] overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-indigo-900">
-        {bannerUrl || logoUrl ? (
-          <>
-            <Image
-              src={bannerUrl || logoUrl!}
-              alt={exhibition.name}
-              fill
-              className="object-cover"
-              priority
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/30" />
-          </>
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-purple-600/40 to-pink-600/30" />
-        )}
-
         {/* Hero Content */}
         <div className="container relative z-10 mx-auto max-w-7xl px-4 h-full flex flex-col justify-end pb-12">
           <div className="text-white max-w-4xl space-y-8">
@@ -150,23 +135,6 @@ export default function ExhibitionPage({ params: paramsPromise }: PageProps) {
 
             {/* Title Section */}
             <div className="space-y-4">
-              {/* Exhibition Logo */}
-              {logoUrl && (
-                <div className="relative h-24 w-24 overflow-hidden rounded-xl bg-white/95 backdrop-blur-sm p-3 shadow-2xl border-2 border-white/20">
-                  <div className="relative w-full h-full">
-                    <Image
-                      src={logoUrl}
-                      alt={`${exhibition.name} logo`}
-                      fill
-                      sizes="96px"
-                      className="object-contain"
-                      priority
-                      unoptimized
-                    />
-                  </div>
-                </div>
-              )}
-
               {/* Registration Badge */}
               {isRegistrationOpen && (
                 <div>
@@ -188,6 +156,16 @@ export default function ExhibitionPage({ params: paramsPromise }: PageProps) {
                   {exhibition.tagline}
                 </p>
               )}
+
+              {/* About This Event */}
+              {exhibition.description && (
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20 max-w-3xl">
+                  <h3 className="text-lg font-semibold mb-3 text-white">About This Event</h3>
+                  <p className="text-white/90 leading-relaxed">
+                    {exhibition.description}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -195,7 +173,7 @@ export default function ExhibitionPage({ params: paramsPromise }: PageProps) {
 
       {/* Main Content */}
       <div className="container mx-auto max-w-7xl px-4 py-12 flex-1">
-        <div className="grid gap-8 lg:grid-cols-3">
+        <div className="grid gap-8 lg:grid-cols-3 mb-8">
           {/* Sidebar - Exhibition Info */}
           <div className="lg:col-span-1 space-y-6">
             {/* Quick Details Card */}
@@ -260,16 +238,6 @@ export default function ExhibitionPage({ params: paramsPromise }: PageProps) {
                 )}
               </div>
             </Card>
-
-            {/* Description Card */}
-            {exhibition.description && (
-              <Card className="p-6">
-                <h3 className="font-semibold text-lg mb-3">About This Event</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {exhibition.description}
-                </p>
-              </Card>
-            )}
           </div>
 
           {/* Main Content - OTP Login or Registration Form */}
@@ -285,6 +253,7 @@ export default function ExhibitionPage({ params: paramsPromise }: PageProps) {
                     <OTPLogin
                       exhibitionId={exhibition._id || exhibition.id}
                       exhibitionName={exhibition.name}
+                      exhibitionLogo={logoUrl}
                       onAuthSuccess={(hasExistingRegistration, registrationId) => {
                         if (hasExistingRegistration && registrationId) {
                           // Redirect to success page with existing registration
@@ -348,6 +317,22 @@ export default function ExhibitionPage({ params: paramsPromise }: PageProps) {
             )}
           </div>
         </div>
+
+        {/* Exhibition Banner - Full Width Centered */}
+        {bannerUrl && (
+          <div className="flex justify-center w-full mt-8">
+            <div className="rounded-xl overflow-hidden shadow-lg max-w-4xl w-full">
+              <div className="relative w-full h-[400px]">
+                <Image
+                  src={bannerUrl}
+                  alt={`${exhibition.name} banner`}
+                  fill
+                  className="object-cover"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <Footer />

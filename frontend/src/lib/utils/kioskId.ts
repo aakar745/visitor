@@ -34,18 +34,23 @@ export function getKioskId(): string {
     const urlKioskId = urlParams.get('kioskId');
     
     if (urlKioskId && urlKioskId.trim() !== '') {
-      // Save URL parameter to localStorage
-      const trimmedId = urlKioskId.trim();
-      const existing = localStorage.getItem(KIOSK_ID_KEY);
-      
-      if (existing !== trimmedId) {
-        localStorage.setItem(KIOSK_ID_KEY, trimmedId);
-        console.log('[Kiosk ID] Set from URL parameter:', trimmedId);
-      } else {
-        console.log('[Kiosk ID] Loaded from URL:', trimmedId);
+      try {
+        // Validate URL parameter before saving
+        const validatedId = validateKioskId(urlKioskId);
+        const existing = localStorage.getItem(KIOSK_ID_KEY);
+        
+        if (existing !== validatedId) {
+          localStorage.setItem(KIOSK_ID_KEY, validatedId);
+          console.log('[Kiosk ID] Set from URL parameter:', validatedId);
+        } else {
+          console.log('[Kiosk ID] Loaded from URL:', validatedId);
+        }
+        
+        return validatedId;
+      } catch (error) {
+        console.error('[Kiosk ID] Invalid kiosk ID in URL:', error instanceof Error ? error.message : String(error));
+        // Continue to localStorage/generate new ID
       }
-      
-      return trimmedId;
     }
   }
 
@@ -66,23 +71,56 @@ export function getKioskId(): string {
 }
 
 /**
- * Set a custom kiosk ID (for manual configuration)
- * Useful for admin-assigned IDs like "kiosk-entrance", "kiosk-hall-1"
+ * Validate and sanitize kiosk ID
+ * - Must be 3-50 characters
+ * - Alphanumeric, hyphens, and underscores only
+ * - Prevents Redis key injection attacks
  */
-export function setKioskId(kioskId: string): void {
+function validateKioskId(kioskId: string): string {
   if (!kioskId || kioskId.trim() === '') {
     throw new Error('Kiosk ID cannot be empty');
   }
   
-  localStorage.setItem(KIOSK_ID_KEY, kioskId);
-  console.log('[Kiosk ID] Set custom kiosk ID:', kioskId);
+  const trimmed = kioskId.trim();
+  
+  // Length validation
+  if (trimmed.length < 3) {
+    throw new Error('Kiosk ID must be at least 3 characters');
+  }
+  
+  if (trimmed.length > 50) {
+    throw new Error('Kiosk ID must be 50 characters or less');
+  }
+  
+  // Format validation: alphanumeric, hyphens, and underscores only
+  // This prevents Redis key injection and special character issues
+  const validFormat = /^[a-zA-Z0-9_-]+$/;
+  if (!validFormat.test(trimmed)) {
+    throw new Error('Kiosk ID can only contain letters, numbers, hyphens, and underscores');
+  }
+  
+  return trimmed;
+}
+
+/**
+ * Set a custom kiosk ID (for manual configuration)
+ * Useful for admin-assigned IDs like "kiosk-entrance", "kiosk-hall-1"
+ */
+export function setKioskId(kioskId: string): void {
+  const validatedId = validateKioskId(kioskId);
+  
+  localStorage.setItem(KIOSK_ID_KEY, validatedId);
+  console.log('[Kiosk ID] Set custom kiosk ID:', validatedId);
 }
 
 /**
  * Get the current kiosk ID without generating a new one
- * Returns null if no ID exists
+ * Returns null if no ID exists or during SSR
  */
 export function getCurrentKioskId(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
   return localStorage.getItem(KIOSK_ID_KEY);
 }
 
