@@ -10,6 +10,7 @@ interface VisitorAuthState {
   // Authentication state
   isAuthenticated: boolean;
   phoneNumber: string | null;
+  authTimestamp: number | null; // 🔒 Track when user authenticated
   
   // Visitor data (after lookup)
   visitorData: {
@@ -41,6 +42,7 @@ export const useVisitorAuthStore = create<VisitorAuthState>()(
       // Initial state
       isAuthenticated: false,
       phoneNumber: null,
+      authTimestamp: null,
       visitorData: null,
       hasExistingRegistration: false,
       existingRegistrationId: null,
@@ -50,6 +52,7 @@ export const useVisitorAuthStore = create<VisitorAuthState>()(
         set({
           isAuthenticated: true,
           phoneNumber: phone,
+          authTimestamp: Date.now(), // 🔒 Record authentication time
           visitorData: visitorData || null,
           hasExistingRegistration: false, // Will be checked per exhibition
           existingRegistrationId: null,
@@ -61,6 +64,7 @@ export const useVisitorAuthStore = create<VisitorAuthState>()(
         set({
           isAuthenticated: false,
           phoneNumber: null,
+          authTimestamp: null,
           visitorData: null,
           hasExistingRegistration: false,
           existingRegistrationId: null,
@@ -90,9 +94,17 @@ export const useVisitorAuthStore = create<VisitorAuthState>()(
         // Only persist these fields
         isAuthenticated: state.isAuthenticated,
         phoneNumber: state.phoneNumber,
+        authTimestamp: state.authTimestamp,
         visitorData: state.visitorData,
       }),
     }
   )
 );
+
+// 🔒 Helper: Check if auth session is expired (24 hours)
+export const isAuthExpired = (authTimestamp: number | null): boolean => {
+  if (!authTimestamp) return true;
+  const AUTH_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+  return Date.now() - authTimestamp > AUTH_EXPIRY_MS;
+};
 

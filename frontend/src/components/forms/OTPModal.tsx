@@ -1,18 +1,25 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ConfirmationResult } from 'firebase/auth';
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/auth';
 import { verifyOTP } from '@/lib/firebase/phoneAuth';
 import { verifyWhatsAppOTP } from '@/lib/api/whatsappOtp';
 import { Loader2, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
 
 type OTPMethod = 'sms' | 'whatsapp';
 
+// ⚙️ Constants - Extract magic numbers
+const RESEND_COUNTDOWN_SECONDS = 60;
+const SMS_SLOW_WARNING_MS = 30000; // 30 seconds
+const OTP_LENGTH = 6;
+const SUCCESS_DELAY_MS = 500; // Reduced from 1500ms for faster UX
+
 interface OTPModalProps {
   isOpen: boolean;
   onClose: () => void;
   phoneNumber: string;
-  confirmationResult: ConfirmationResult | null;
+  confirmationResult: firebase.auth.ConfirmationResult | null;
   onVerificationSuccess: () => void;
   onResendOTP: () => void;
   companyName?: string;
@@ -29,12 +36,13 @@ export const OTPModal: React.FC<OTPModalProps> = ({
   companyName = 'Aakar Exhibition',
   otpMethod = 'sms',
 }) => {
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [otp, setOtp] = useState(Array(OTP_LENGTH).fill(''));
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [countdown, setCountdown] = useState(60);
+  const [countdown, setCountdown] = useState(RESEND_COUNTDOWN_SECONDS);
   const [canResend, setCanResend] = useState(false);
+  const [showSlowSMSWarning, setShowSlowSMSWarning] = useState(false);
   
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -62,16 +70,79 @@ export const OTPModal: React.FC<OTPModalProps> = ({
     }
   }, [isOpen]);
 
+  // 🔥 WebOTP API - Auto-fill OTP from SMS (Chrome/Edge/Safari)
+  useEffect(() => {
+    if (!isOpen || otpMethod !== 'sms') return;
+
+    // Check if WebOTP API is supported
+    if ('OTPCredential' in window) {
+      const abortController = new AbortController();
+
+      navigator.credentials
+        .get({
+          otp: { transport: ['sms'] },
+          signal: abortController.signal,
+        } as any)
+        .then((otpCredential: any) => {
+          if (otpCredential?.code) {
+            console.log('🎉 Auto-filled OTP from SMS:', otpCredential.code);
+            const otpDigits = otpCredential.code.split('').slice(0, 6);
+            setOtp(otpDigits);
+            // Auto-verify
+            if (otpDigits.length === 6) {
+              handleVerify(otpDigits.join(''));
+            }
+          }
+        })
+        .catch((err: any) => {
+          // User cancelled or API not available
+          console.log('WebOTP not available or cancelled:', err);
+        });
+
+      return () => {
+        abortController.abort();
+      };
+    }
+  }, [isOpen, otpMethod]);
+
   // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
-      setOtp(['', '', '', '', '', '']);
+      setOtp(Array(OTP_LENGTH).fill(''));
       setError('');
       setSuccess(false);
-      setCountdown(60);
+      setCountdown(RESEND_COUNTDOWN_SECONDS);
       setCanResend(false);
+      setShowSlowSMSWarning(false);
     }
   }, [isOpen]);
+
+  // 🔥 Show "SMS slow?" warning after 30 seconds for SMS method
+  useEffect(() => {
+    if (!isOpen || otpMethod !== 'sms') return;
+
+    const timer = setTimeout(() => {
+      if (!success && otp.every(d => d === '')) {
+        setShowSlowSMSWarning(true);
+      }
+    }, SMS_SLOW_WARNING_MS);
+
+    return () => clearTimeout(timer);
+  }, [isOpen, otpMethod, success, otp]);
+
+  // ⌨️ Keyboard Escape Handler - Close modal on ESC
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isVerifying) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen, isVerifying, onClose]);
 
   const handleChange = (index: number, value: string) => {
     // Only allow digits
@@ -135,10 +206,10 @@ export const OTPModal: React.FC<OTPModalProps> = ({
           setTimeout(() => {
             onVerificationSuccess();
             onClose();
-          }, 1500);
+          }, SUCCESS_DELAY_MS);
         } else {
           setError('Verification failed. Please try again.');
-          setOtp(['', '', '', '', '', '']);
+          setOtp(Array(OTP_LENGTH).fill(''));
           inputRefs.current[0]?.focus();
         }
       } else {
@@ -155,10 +226,10 @@ export const OTPModal: React.FC<OTPModalProps> = ({
           setTimeout(() => {
             onVerificationSuccess();
             onClose();
-          }, 1500);
+          }, SUCCESS_DELAY_MS);
         } else {
           setError('Verification failed. Please try again.');
-          setOtp(['', '', '', '', '', '']);
+          setOtp(Array(OTP_LENGTH).fill(''));
           inputRefs.current[0]?.focus();
         }
       }
@@ -166,7 +237,7 @@ export const OTPModal: React.FC<OTPModalProps> = ({
       console.error('OTP verification error:', err);
       const errorMessage = err.response?.data?.message || err.message || 'Invalid OTP. Please try again.';
       setError(errorMessage);
-      setOtp(['', '', '', '', '', '']);
+      setOtp(Array(OTP_LENGTH).fill(''));
       inputRefs.current[0]?.focus();
     } finally {
       setIsVerifying(false);
@@ -174,7 +245,7 @@ export const OTPModal: React.FC<OTPModalProps> = ({
   };
 
   const handleResend = () => {
-    setOtp(['', '', '', '', '', '']);
+    setOtp(Array(OTP_LENGTH).fill(''));
     setError('');
     setCountdown(60);
     setCanResend(false);
@@ -225,6 +296,7 @@ export const OTPModal: React.FC<OTPModalProps> = ({
                   onChange={(e) => handleChange(index, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(index, e)}
                   onPaste={index === 0 ? handlePaste : undefined}
+                  autoComplete={index === 0 ? 'one-time-code' : 'off'}
                   className={`otp-input ${error ? 'error' : ''} ${success ? 'success' : ''}`}
                   disabled={isVerifying || success}
                   aria-label={`Digit ${index + 1}`}
@@ -236,7 +308,7 @@ export const OTPModal: React.FC<OTPModalProps> = ({
             {isVerifying && (
               <div className="status verifying">
                 <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Verifying...</span>
+                <span>{otpMethod === 'whatsapp' ? 'Verifying with WhatsApp...' : 'Verifying with Firebase...'}</span>
               </div>
             )}
 
@@ -256,11 +328,28 @@ export const OTPModal: React.FC<OTPModalProps> = ({
               </div>
             )}
 
+            {/* SMS Slow Warning */}
+            {showSlowSMSWarning && otpMethod === 'sms' && !success && (
+              <div className="sms-slow-warning">
+                <p className="text-sm text-amber-700 font-medium mb-2">
+                  📱 SMS taking longer than usual?
+                </p>
+                <button
+                  onClick={onResendOTP}
+                  className="alt-method-button"
+                  disabled={isVerifying}
+                >
+                  Switch to WhatsApp (Faster)
+                </button>
+              </div>
+            )}
+
             {/* Resend OTP */}
             <div className="resend-container">
               {!canResend ? (
                 <p className="resend-text">
                   Resend code in <strong>{countdown}s</strong>
+                  {otpMethod === 'sms' && <span className="text-xs block mt-1 text-muted-foreground">SMS usually takes 10-30 seconds</span>}
                 </p>
               ) : (
                 <button
@@ -500,6 +589,41 @@ export const OTPModal: React.FC<OTPModalProps> = ({
         }
 
         .resend-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .sms-slow-warning {
+          background: #fffbeb;
+          border: 2px solid #fbbf24;
+          border-radius: 0.5rem;
+          padding: 1rem;
+          margin-bottom: 1rem;
+          text-align: center;
+        }
+
+        .alt-method-button {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          background: #10b981;
+          color: white;
+          border: none;
+          padding: 0.5rem 1rem;
+          border-radius: 0.375rem;
+          font-size: 0.875rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .alt-method-button:hover:not(:disabled) {
+          background: #059669;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .alt-method-button:disabled {
           opacity: 0.5;
           cursor: not-allowed;
         }

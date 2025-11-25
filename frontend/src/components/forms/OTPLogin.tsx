@@ -23,9 +23,24 @@ import PhoneInput from './PhoneInput';
 import { OTPModal } from './OTPModal';
 import { isValidPhoneNumber } from 'libphonenumber-js';
 import type { E164Number } from 'libphonenumber-js';
-import type { ConfirmationResult } from 'firebase/auth';
-import { sendOTP, initializeRecaptcha, cleanupRecaptcha } from '@/lib/firebase/phoneAuth';
+import type firebase from 'firebase/compat/app';
 import { sendWhatsAppOTP } from '@/lib/api/whatsappOtp';
+
+// 🔥 Lazy load Firebase only when SMS method is selected
+let firebaseLoaded = false;
+let sendOTP: any = null;
+let cleanupRecaptcha: any = null;
+
+const loadFirebase = async () => {
+  if (firebaseLoaded) return { sendOTP, cleanupRecaptcha };
+  
+  const phoneAuth = await import('@/lib/firebase/phoneAuth');
+  sendOTP = phoneAuth.sendOTP;
+  cleanupRecaptcha = phoneAuth.cleanupRecaptcha;
+  firebaseLoaded = true;
+  
+  return { sendOTP, cleanupRecaptcha };
+};
 
 interface OTPLoginProps {
   exhibitionId: string;
@@ -41,23 +56,18 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
   const [otpMethod, setOtpMethod] = useState<OTPMethod>('whatsapp'); // Default to WhatsApp
   const [phoneNumber, setPhoneNumber] = useState<E164Number | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [confirmationResult, setConfirmationResult] = useState<firebase.auth.ConfirmationResult | null>(null);
   const [showOTPModal, setShowOTPModal] = useState(false);
   
-  // NEW: reCAPTCHA solve state tracking
-  const [isRecaptchaSolved, setIsRecaptchaSolved] = useState(false);
-  
-  // NEW: Rate limiting and retry state
-  const [retryCount, setRetryCount] = useState(0);
-  const [attemptsRemaining, setAttemptsRemaining] = useState(3);
+  // Rate limiting state
   const [lockoutTime, setLockoutTime] = useState<Date | null>(null);
+  const [retryAttempts, setRetryAttempts] = useState(0);
+  const [nextRetryDelay, setNextRetryDelay] = useState(0);
   
   const { setAuthenticated, setExistingRegistration, clearAuthentication } = useVisitorAuthStore();
   const { clearDraft } = useRegistrationStore();
-  
-  const MAX_RETRIES = 2;
 
-  // Initialize reCAPTCHA on component mount and clear old auth data
+  // Initialize component: clear old auth data
   useEffect(() => {
     // CRITICAL: Clear any old persisted visitor data from localStorage
     // This prevents old visitor data from auto-filling when a new user logs in
@@ -69,57 +79,21 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
     clearDraft();
     console.log('[OTP] Cleared old form drafts');
 
+    // Cleanup reCAPTCHA on component unmount
     return () => {
-      cleanupRecaptcha();
+      console.log('[OTP] Component unmounting - cleaning up reCAPTCHA');
+      if (cleanupRecaptcha) {
+        cleanupRecaptcha();
+      }
     };
   }, []);
 
-  // Initialize reCAPTCHA when SMS method is selected
+  // 🔥 Lazy load Firebase when SMS method is selected
   useEffect(() => {
-    let isMounted = true; // FIX: Track mount state to prevent race conditions
-    
-    if (typeof window !== 'undefined' && otpMethod === 'sms') {
-      // Small delay to ensure DOM is ready
-      const timer = setTimeout(async () => {
-        try {
-          await initializeRecaptcha(
-            'recaptcha-container',
-            () => {
-              if (isMounted) {
-                setIsRecaptchaSolved(true);
-                console.log('[OTP] reCAPTCHA solved successfully');
-              }
-            },
-            () => {
-              if (isMounted) {
-                setIsRecaptchaSolved(false);
-                console.log('[OTP] reCAPTCHA expired or failed');
-              }
-            }
-          );
-          if (isMounted) {
-            console.log('[OTP] reCAPTCHA initialized for SMS');
-          }
-        } catch (error) {
-          console.error('Failed to initialize reCAPTCHA:', error);
-          if (isMounted) {
-            toast.error('Security verification failed to load', {
-              description: 'Please refresh the page and try again',
-            });
-          }
-        }
-      }, 100);
-      
-      return () => {
-        isMounted = false; // FIX: Set flag on cleanup
-        clearTimeout(timer);
-        cleanupRecaptcha();
-        setIsRecaptchaSolved(false); // Reset solve state
-      };
-    } else {
-      // Clean up reCAPTCHA when switching to WhatsApp
-      cleanupRecaptcha();
-      setIsRecaptchaSolved(false);
+    if (otpMethod === 'sms' && !firebaseLoaded) {
+      loadFirebase().then(() => {
+        console.log('[OTP] ✅ Firebase loaded lazily');
+      });
     }
   }, [otpMethod]);
 
@@ -206,35 +180,26 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
         await sendWhatsAppOTP(phoneNumber);
         setShowOTPModal(true);
         setStep('otp');
-        setRetryCount(0); // Reset retry count on success
+        setRetryAttempts(0); // Reset on success
         
         toast.success('🎪 Aakar Exhibition - WhatsApp OTP Sent!', {
           description: 'Check WhatsApp for your verification code (expires in 10 minutes)',
         });
       } else {
-        // Send OTP via SMS (Firebase)
-        // FIX: Check if reCAPTCHA is initialized AND solved
-        if (!window.recaptchaVerifier) {
-          toast.error('Security verification required', {
-            description: 'Please complete the reCAPTCHA verification',
-          });
-          setIsLoading(false);
-          return;
+        // 🔥 Load Firebase first (lazy load)
+        const { sendOTP: sendOTPFn } = await loadFirebase();
+        
+        // Send OTP via SMS (Firebase) - reCAPTCHA created ON-DEMAND
+        const confirmation = await sendOTPFn(phoneNumber);
+        
+        if (!confirmation) {
+          throw new Error('Failed to initialize OTP session');
         }
         
-        if (!isRecaptchaSolved) {
-          toast.error('Please solve the reCAPTCHA puzzle', {
-            description: 'Complete the security check before sending OTP',
-          });
-          setIsLoading(false);
-          return;
-        }
-        
-        const result = await sendOTP(phoneNumber);
-        setConfirmationResult(result);
+        setConfirmationResult(confirmation);
         setShowOTPModal(true);
         setStep('otp');
-        setRetryCount(0); // Reset retry count on success
+        setRetryAttempts(0); // Reset on success
         
         toast.success('🎪 Aakar Exhibition - SMS OTP Sent!', {
           description: 'Check your phone for the verification code',
@@ -247,7 +212,6 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
       if (error.code === 'auth/too-many-requests') {
         const lockout = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
         setLockoutTime(lockout);
-        setAttemptsRemaining(0);
         toast.error('Too many attempts', {
           description: `Please wait 15 minutes before trying again`,
         });
@@ -255,31 +219,11 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
         return;
       }
       
-      // FIX: Automatic retry with fallback
-      if (retryCount < MAX_RETRIES && error.code !== 'auth/too-many-requests') {
-        setRetryCount(prev => prev + 1);
-        setAttemptsRemaining(prev => prev - 1);
-        toast.error(`Send failed, retrying...`, {
-          description: `Attempt ${retryCount + 1}/${MAX_RETRIES}`,
-        });
-        setIsLoading(false);
-        setTimeout(() => handleSendOTP(), 2000);
-        return;
-      } else if (otpMethod === 'sms' && retryCount >= MAX_RETRIES) {
-        // Automatic fallback to WhatsApp after SMS fails
-        toast.error('SMS delivery failed', {
-          description: 'Switching to WhatsApp for better delivery...',
-        });
-        setOtpMethod('whatsapp');
-        setRetryCount(0);
-        setIsLoading(false);
-        setTimeout(() => handleSendOTP(), 1000);
-        return;
-      }
-      
+      // 🔥 NO AUTO-RETRY - User must manually retry
+      // Auto-retry causes token conflicts with Firebase reCAPTCHA
       const method = otpMethod === 'whatsapp' ? 'WhatsApp' : 'SMS';
       toast.error(`Failed to send ${method} OTP`, {
-        description: error.message || 'Please try again or contact support',
+        description: error.message || 'Please try again manually',
       });
     } finally {
       setIsLoading(false);
@@ -352,9 +296,32 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
     }
   };
 
-  // Handle resend OTP
+  // 🔥 Calculate exponential backoff delay
+  const calculateBackoffDelay = (attempts: number): number => {
+    // Exponential backoff: 2s, 4s, 8s, 16s, 30s (max)
+    const baseDelay = 2000; // 2 seconds
+    const delay = Math.min(baseDelay * Math.pow(2, attempts), 30000);
+    return delay;
+  };
+
+  // Handle resend OTP with exponential backoff
   const handleResendOTP = async () => {
     setShowOTPModal(false);
+    
+    // Calculate delay for this retry attempt
+    const delay = calculateBackoffDelay(retryAttempts);
+    setNextRetryDelay(delay);
+    
+    // Show user-friendly message about wait time
+    if (retryAttempts > 0) {
+      toast.info(`Waiting ${delay / 1000}s before retry...`, {
+        description: 'This prevents rate limiting',
+      });
+      
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+    
+    setRetryAttempts(prev => prev + 1);
     await handleSendOTP();
   };
 
@@ -435,16 +402,6 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
               </AlertDescription>
             </Alert>
           )}
-          
-          {/* Attempts Remaining */}
-          {!lockoutTime && attemptsRemaining < 3 && attemptsRemaining > 0 && (
-            <Alert>
-              <Shield className="h-4 w-4" />
-              <AlertDescription className="text-sm">
-                <strong>Attempts remaining:</strong> {attemptsRemaining}/3
-              </AlertDescription>
-            </Alert>
-          )}
 
           {/* Info Alert */}
           <Alert>
@@ -458,14 +415,14 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
           {/* Send OTP Button */}
           <Button
             onClick={handleSendOTP}
-            disabled={!isValidPhone() || isLoading || (otpMethod === 'sms' && !isRecaptchaSolved) || (lockoutTime !== null && new Date() < lockoutTime)}
+            disabled={!isValidPhone() || isLoading || (lockoutTime !== null && new Date() < lockoutTime)}
             className="w-full h-12 text-base"
             size="lg"
           >
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Sending OTP...
+                {otpMethod === 'whatsapp' ? 'Sending to WhatsApp...' : 'Sending SMS...'}
               </>
             ) : (
               <>
@@ -483,6 +440,17 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
               </>
             )}
           </Button>
+
+          {/* Loading Progress Indicator */}
+          {isLoading && (
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground animate-pulse">
+                {otpMethod === 'whatsapp' 
+                  ? '⚡ Usually arrives in 2-5 seconds...' 
+                  : '📱 Usually arrives in 10-30 seconds...'}
+              </p>
+            </div>
+          )}
 
           {/* Method-specific Info */}
           <div className="text-center">
@@ -512,18 +480,6 @@ export function OTPLogin({ exhibitionId, exhibitionName, onAuthSuccess }: OTPLog
         companyName="Aakar Exhibition"
         otpMethod={otpMethod}
       />
-
-      {/* reCAPTCHA container - visible for SMS verification */}
-      {otpMethod === 'sms' && (
-        <Card className="p-6">
-          <div className="text-center mb-4">
-            <p className="text-sm text-muted-foreground">
-              Please complete the security verification below
-            </p>
-          </div>
-          <div id="recaptcha-container" className="flex justify-center"></div>
-        </Card>
-      )}
 
       {/* Security Note */}
       <div className="text-center">

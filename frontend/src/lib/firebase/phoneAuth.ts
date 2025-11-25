@@ -1,145 +1,112 @@
-import {
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
-  ConfirmationResult,
-  PhoneAuthProvider,
-  signInWithCredential,
-} from 'firebase/auth';
-import { getFirebaseAuth } from './config';
+// 🔥 FINAL FIX - ON-DEMAND reCAPTCHA creation (ChatGPT recommended)
+// Fixes: Token not attaching due to Next.js hydration + early initialization
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/auth';
+import { auth } from './config';
 
-// Declare global for reCAPTCHA
-declare global {
-  interface Window {
-    recaptchaVerifier: RecaptchaVerifier | undefined;
-    recaptchaWidgetId: number | undefined;
-    recaptchaEnterpriseKey: string | undefined;
-  }
-}
+// Keep reference to recaptcha verifier
+let recaptchaVerifier: firebase.auth.RecaptchaVerifier | null = null;
+let isSending = false; // 🔒 Prevent double-sending
 
 /**
- * Initialize reCAPTCHA verifier for phone authentication
- * @param containerId - ID of the HTML element where reCAPTCHA will be rendered
- * @param onSuccess - Callback when reCAPTCHA is solved
- * @param onError - Callback when reCAPTCHA encounters an error
+ * Get or create reCAPTCHA verifier ON-DEMAND (button click)
+ * This ensures token is fresh and properly attached to Firebase request
+ * 
+ * 🔥 KEY FIX: Create at button click, not during component mount/hydration
  */
-export const initializeRecaptcha = async (
-  containerId: string = 'recaptcha-container',
-  onSuccess?: () => void,
-  onError?: (error: Error) => void
-): Promise<RecaptchaVerifier> => {
-  // Clear existing verifier if any
-  if (window.recaptchaVerifier) {
-    window.recaptchaVerifier.clear();
-    window.recaptchaVerifier = undefined;
+export const getRecaptcha = async (): Promise<firebase.auth.RecaptchaVerifier> => {
+  // 🔥 ALWAYS clean previous verifier (safest for Next.js)
+  // Do NOT try to reuse - Firebase compat doesn't support verify()
+  if (recaptchaVerifier) {
+    try {
+      recaptchaVerifier.clear();
+    } catch {}
+    recaptchaVerifier = null;
   }
 
-  try {
-    console.log('🔒 Initializing reCAPTCHA (standard) for phone authentication...');
-    
-    // Get Firebase Auth instance (client-side only)
-    const auth = getFirebaseAuth();
-    
-    // Firebase will automatically use its standard reCAPTCHA
-    // No site key needed - it's auto-provisioned by Firebase
-    // Note: Firebase v9 API - container first, then options, then auth
-    const recaptchaVerifier = new RecaptchaVerifier(containerId, {
-      size: 'normal', // Visible reCAPTCHA for better reliability
+  // Clear HTML container to prevent "already rendered" error
+  const container = document.getElementById('recaptcha-container');
+  if (container) container.innerHTML = '';
+
+  if (!auth) {
+    throw new Error('Firebase Auth not initialized. Client-side only!');
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔒 Creating fresh reCAPTCHA verifier...');
+  }
+
+  // Create NEW verifier with auth.app (REQUIRED for token attachment)
+  recaptchaVerifier = new firebase.auth.RecaptchaVerifier(
+    'recaptcha-container',
+    {
+      size: 'invisible',
       callback: () => {
-        console.log('✅ reCAPTCHA solved successfully');
-        onSuccess?.();
+        if (process.env.NODE_ENV === 'development') {
+          console.log('✅ reCAPTCHA solved!');
+        }
       },
-      'expired-callback': () => {
-        console.warn('⚠️ reCAPTCHA expired');
-        const error = new Error('reCAPTCHA expired. Please try again.');
-        onError?.(error);
-      },
-      'error-callback': (error: Error) => {
-        console.error('❌ reCAPTCHA error:', error);
-        onError?.(error);
-      },
-    }, auth);
+    },
+    auth.app
+  );
 
-    window.recaptchaVerifier = recaptchaVerifier;
-    
-    // Render the reCAPTCHA widget
-    await recaptchaVerifier.render();
-    
-    console.log('✅ reCAPTCHA initialized and ready');
-    return recaptchaVerifier;
-  } catch (error: any) {
-    console.error('❌ Error initializing reCAPTCHA:', error);
-    
-    // Provide helpful debugging info
-    if (error.message?.includes('reCAPTCHA')) {
-      const auth = getFirebaseAuth();
-      console.error('');
-      console.error('📋 FIREBASE CONSOLE SETUP REQUIRED:');
-      console.error('   1. Go to: https://console.firebase.google.com/');
-      console.error('   2. Select project:', auth.app.options.projectId);
-      console.error('   3. Authentication → Settings → Phone Number Sign-in');
-      console.error('   4. Select "reCAPTCHA (Standard)" - NOT Enterprise');
-      console.error('   5. Authorized domains → Add "localhost"');
-      console.error('   6. Wait 5 minutes, clear cache, refresh');
-      console.error('');
-    }
-    
-    throw error;
-  }
+  // Render and return
+  await recaptchaVerifier.render();
+  return recaptchaVerifier;
 };
 
 /**
  * Send OTP to the provided phone number
+ * 🔥 Creates reCAPTCHA ON-DEMAND for fresh token
  * @param phoneNumber - Phone number in E.164 format (e.g., +919999999999)
  * @returns ConfirmationResult object for OTP verification
  */
-export const sendOTP = async (phoneNumber: string): Promise<ConfirmationResult> => {
+export const sendOTP = async (phoneNumber: string): Promise<firebase.auth.ConfirmationResult> => {
+  // 🔒 Prevent double-sending
+  if (isSending) {
+    throw new Error('Please wait, OTP is already being sent.');
+  }
+
+  isSending = true;
+
   try {
-    console.log('📱 [DEBUG] Attempting to send OTP...');
-    console.log('📱 [DEBUG] Phone number:', phoneNumber);
-    console.log('📱 [DEBUG] reCAPTCHA verifier exists:', !!window.recaptchaVerifier);
-    
-    // Ensure reCAPTCHA is initialized
-    if (!window.recaptchaVerifier) {
-      throw new Error('reCAPTCHA not initialized. Please refresh and try again.');
+    if (!auth) {
+      throw new Error('Firebase Auth not initialized. Client-side only!');
     }
 
-    console.log('📱 [DEBUG] Calling signInWithPhoneNumber...');
-    
-    // Get Firebase Auth instance (client-side only)
-    const auth = getFirebaseAuth();
-    
-    // Send OTP via Firebase
-    const confirmationResult = await signInWithPhoneNumber(
-      auth,
-      phoneNumber,
-      window.recaptchaVerifier
-    );
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📱 Sending OTP to:', phoneNumber);
+    }
 
-    console.log('✅ OTP sent successfully to:', phoneNumber);
-    console.log('📱 [DEBUG] Confirmation result received');
+    // 🔥 CREATE RECAPTCHA HERE (ON-DEMAND) - This is the key fix!
+    const verifier = await getRecaptcha();
+
+    // Send OTP with fresh verifier
+    const confirmationResult = await auth.signInWithPhoneNumber(phoneNumber, verifier);
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ OTP sent successfully!');
+    }
     return confirmationResult;
   } catch (error: any) {
-    console.error('❌ [DEBUG] Error sending OTP:', error);
-    console.error('❌ [DEBUG] Error code:', error.code);
-    console.error('❌ [DEBUG] Error message:', error.message);
-    console.error('❌ [DEBUG] Full error:', JSON.stringify(error, null, 2));
-    
-    // Clear reCAPTCHA on error to allow retry
-    if (window.recaptchaVerifier) {
-      window.recaptchaVerifier.clear();
-      window.recaptchaVerifier = undefined;
+    console.error('❌ OTP error:', error);
+
+    // Clear verifier on error for retry
+    if (recaptchaVerifier) {
+      try {
+        recaptchaVerifier.clear();
+      } catch (_) {}
+      recaptchaVerifier = null;
     }
 
     // Provide user-friendly error messages
-    if (error.code === 'auth/invalid-phone-number') {
-      throw new Error('Invalid phone number format. Please check and try again.');
-    } else if (error.code === 'auth/too-many-requests') {
-      throw new Error('Too many attempts. Please try again later.');
-    } else if (error.code === 'auth/quota-exceeded') {
-      throw new Error('SMS quota exceeded. Please contact support.');
-    } else {
-      throw new Error(error.message || 'Failed to send OTP. Please try again.');
+    if (error.code === 'auth/invalid-app-credential') {
+      throw new Error('Security verification failed. Please refresh and try again.');
     }
+
+    throw new Error(error.message || 'Failed to send OTP. Try again.');
+  } finally {
+    isSending = false; // 🔓 Always unlock
   }
 };
 
@@ -150,20 +117,23 @@ export const sendOTP = async (phoneNumber: string): Promise<ConfirmationResult> 
  * @returns Promise<boolean> - true if verification successful
  */
 export const verifyOTP = async (
-  confirmationResult: ConfirmationResult,
+  confirmationResult: firebase.auth.ConfirmationResult,
   otp: string
 ): Promise<boolean> => {
   try {
-    // Verify the OTP code
+    // Verify the OTP code (compat mode)
     const result = await confirmationResult.confirm(otp);
     
     if (result.user) {
-      console.log('OTP verified successfully for:', result.user.phoneNumber);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('OTP verified successfully for:', result.user.phoneNumber);
+      }
       
       // Sign out immediately after verification
       // We only need to verify the phone number, not keep the user signed in
-      const auth = getFirebaseAuth();
-      await auth.signOut();
+      if (auth) {
+        await auth.signOut();
+      }
       
       return true;
     }
@@ -187,14 +157,16 @@ export const verifyOTP = async (
  * Clean up reCAPTCHA verifier
  */
 export const cleanupRecaptcha = () => {
-  if (window.recaptchaVerifier) {
+  if (recaptchaVerifier) {
     try {
-      window.recaptchaVerifier.clear();
-    } catch (error) {
-      console.error('Error clearing reCAPTCHA:', error);
-    }
-    window.recaptchaVerifier = undefined;
+      recaptchaVerifier.clear();
+    } catch (_) {}
+    recaptchaVerifier = null;
   }
+
+  // Clear container to prevent issues on remount
+  const container = document.getElementById('recaptcha-container');
+  if (container) container.innerHTML = '';
 };
 
 /**

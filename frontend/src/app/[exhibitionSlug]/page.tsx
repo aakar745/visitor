@@ -351,6 +351,23 @@ export default function ExhibitionPage({ params: paramsPromise }: PageProps) {
       </div>
 
       <Footer />
+      
+      {/* 🔥 reCAPTCHA container - MUST be outside React components and conditional rendering */}
+      {/* Required for Firebase Phone Auth - created on-demand during OTP send */}
+      <div id="recaptcha-container"></div>
+      
+      {/* Hide reCAPTCHA badge (Google's terms require showing alternative notice) */}
+      <style jsx global>{`
+        .grecaptcha-badge {
+          visibility: hidden !important;
+          opacity: 0 !important;
+        }
+      `}</style>
+      
+      {/* reCAPTCHA Terms Notice (required when hiding badge) */}
+      <div className="fixed bottom-2 right-2 text-xs text-gray-500 bg-white px-2 py-1 rounded shadow-sm z-50">
+        Protected by <a href="https://www.google.com/recaptcha/about/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">reCAPTCHA</a>
+      </div>
     </div>
   );
 }
