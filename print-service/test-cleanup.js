@@ -9,8 +9,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const { getUserDataDir } = require('./lib/env-loader');
 
-const OUTPUT_DIR = path.join(__dirname, 'labels');
+// Use same writable directory as server.js and print-worker.js
+const OUTPUT_DIR = path.join(getUserDataDir(), 'labels');
 
 // Ensure output directory exists
 if (!fs.existsSync(OUTPUT_DIR)) {

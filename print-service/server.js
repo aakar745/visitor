@@ -9,7 +9,7 @@ const { PDFDocument } = require('pdf-lib');
 const ptp = require('pdf-to-printer');
 
 // ✅ Load environment variables using shared loader (Electron-aware)
-const { loadEnv } = require('./lib/env-loader');
+const { loadEnv, getUserDataDir } = require('./lib/env-loader');
 loadEnv();
 
 const app = express();
@@ -27,10 +27,14 @@ console.log(`   Printer: ${PRINTER_NAME}`);
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-// Create output directory for labels
-const OUTPUT_DIR = path.join(__dirname, 'labels');
+// ✅ Create output directory for labels in WRITABLE location
+// Use user data directory (same as .env location) to avoid permission issues
+const OUTPUT_DIR = path.join(getUserDataDir(), 'labels');
 if (!fs.existsSync(OUTPUT_DIR)) {
-  fs.mkdirSync(OUTPUT_DIR);
+  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+  console.log(`📁 Created labels directory: ${OUTPUT_DIR}`);
+} else {
+  console.log(`📁 Using labels directory: ${OUTPUT_DIR}`);
 }
 
 // ==========================================

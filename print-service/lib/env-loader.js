@@ -13,6 +13,25 @@ const fs = require('fs');
 const path = require('path');
 
 /**
+ * Get the writable user data directory
+ * 
+ * Priority:
+ * 1. Electron user data path (C:\Users\...\AppData\Roaming\...)
+ * 2. Current directory (development)
+ * 
+ * @returns {string} Writable directory path
+ */
+function getUserDataDir() {
+  // 1. Electron user data path (packaged app)
+  if (process.env.USER_DATA_PATH) {
+    return process.env.USER_DATA_PATH;
+  }
+
+  // 2. Current directory (development)
+  return path.join(__dirname, '..');
+}
+
+/**
  * Load environment variables with Electron-aware path resolution
  * 
  * @returns {string|null} Path to loaded .env file, or null if none found
@@ -45,5 +64,5 @@ function loadEnv() {
   }
 }
 
-module.exports = { loadEnv };
+module.exports = { loadEnv, getUserDataDir };
 

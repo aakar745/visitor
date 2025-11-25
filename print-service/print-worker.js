@@ -23,7 +23,7 @@ const { PDFDocument } = require('pdf-lib');
 const ptp = require('pdf-to-printer');
 
 // ✅ Load environment variables using shared loader (Electron-aware)
-const { loadEnv } = require('./lib/env-loader');
+const { loadEnv, getUserDataDir } = require('./lib/env-loader');
 const envPath = loadEnv();
 
 // ✅ Import shared functions from server.js (avoids duplication)
@@ -55,10 +55,9 @@ if (!REDIS_HOST || !REDIS_PASSWORD) {
   process.exit(1);
 }
 
-// Use a writable directory (AppData/Local for Windows, or system temp)
-// C:\Program Files is read-only, so we use user's local app data folder
-const OUTPUT_DIR = process.env.OUTPUT_DIR || 
-  path.join(process.env.LOCALAPPDATA || process.env.TMPDIR || '/tmp', 'VisitorPrintService', 'labels');
+// ✅ Use same writable directory as server.js (user data directory)
+// This ensures all components use the same location for generated files
+const OUTPUT_DIR = process.env.OUTPUT_DIR || path.join(getUserDataDir(), 'labels');
 
 const RATE_LIMIT_DELAY = 2000; // 2 seconds between jobs
 

@@ -68,7 +68,7 @@ export function OTPLogin({ exhibitionId, exhibitionName, exhibitionLogo, onAuthS
   
   const { setAuthenticated, setExistingRegistration, clearAuthentication } = useVisitorAuthStore();
   const { clearDraft } = useRegistrationStore();
-
+  
   // Initialize component: clear old auth data
   useEffect(() => {
     // CRITICAL: Clear any old persisted visitor data from localStorage
@@ -85,7 +85,7 @@ export function OTPLogin({ exhibitionId, exhibitionName, exhibitionLogo, onAuthS
     return () => {
       console.log('[OTP] Component unmounting - cleaning up reCAPTCHA');
       if (cleanupRecaptcha) {
-        cleanupRecaptcha();
+      cleanupRecaptcha();
       }
     };
   }, []);
@@ -349,12 +349,12 @@ export function OTPLogin({ exhibitionId, exhibitionName, exhibitionLogo, onAuthS
               </div>
             ) : (
               <div className="inline-flex h-[120px] w-[120px] items-center justify-center rounded-full bg-primary/10 mb-4">
-                {otpMethod === 'whatsapp' ? (
+              {otpMethod === 'whatsapp' ? (
                   <MessageCircle className="h-16 w-16 text-green-600" />
-                ) : (
+              ) : (
                   <MessageSquare className="h-16 w-16 text-primary" />
-                )}
-              </div>
+              )}
+            </div>
             )}
             <h3 className="text-xl font-semibold mb-2">Choose Verification Method</h3>
             <p className="text-sm text-muted-foreground">

@@ -10,6 +10,7 @@ const path = require('path');
 const { spawn, exec } = require('child_process');
 const fs = require('fs');
 const Redis = require('ioredis');
+const { getUserDataDir } = require('./lib/env-loader');
 
 // Helper function to find Node.js executable
 function findNodeExecutable() {
@@ -687,7 +688,14 @@ ipcMain.handle('get-printers', async () => {
 });
 
 ipcMain.handle('open-folder', async () => {
-  const labelsPath = path.join(__dirname, 'labels');
+  // Use same writable directory as server.js
+  const labelsPath = path.join(getUserDataDir(), 'labels');
+  
+  // Ensure directory exists before opening
+  if (!fs.existsSync(labelsPath)) {
+    fs.mkdirSync(labelsPath, { recursive: true });
+  }
+  
   require('electron').shell.openPath(labelsPath);
   return { success: true };
 });
@@ -707,7 +715,8 @@ ipcMain.handle('open-folder', async () => {
  * This GUI button allows manual cleanup on demand, independent of the schedule.
  */
 ipcMain.handle('cleanup-labels', async () => {
-  const labelsPath = path.join(__dirname, 'labels');
+  // Use same writable directory as server.js
+  const labelsPath = path.join(getUserDataDir(), 'labels');
   const MAX_AGE_DAYS = 7; // Must match server.js MAX_AGE_DAYS
   const MAX_AGE_MS = MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
   
