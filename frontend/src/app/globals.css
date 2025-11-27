@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
-/* CSS Variables for theming */
+/* CSS Variables for theming - Tailwind CSS v4 @theme directive */
+/* @theme is a Tailwind v4 feature - ignore linter warning */
 @theme {
   /* Colors */
   --color-background: oklch(100% 0 0);

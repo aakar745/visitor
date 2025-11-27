@@ -149,13 +149,13 @@ export default function ExhibitionPage({ params: paramsPromise }: PageProps) {
               )}
 
               {/* Exhibition Title */}
-              <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold drop-shadow-2xl tracking-tight leading-tight">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold drop-shadow-2xl tracking-tight leading-tight">
                 {exhibition.name}
               </h1>
 
               {/* Tagline */}
               {exhibition.tagline && (
-                <p className="text-xl md:text-2xl text-white/95 drop-shadow-lg font-medium max-w-3xl">
+                <p className="text-base sm:text-lg md:text-xl text-white/95 drop-shadow-lg font-medium max-w-3xl">
                   {exhibition.tagline}
                 </p>
               )}

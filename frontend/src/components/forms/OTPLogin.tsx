@@ -548,11 +548,11 @@ export function OTPLogin({ exhibitionId, exhibitionName, exhibitionLogo, exhibit
             <p className="text-xs text-muted-foreground">
               {otpMethod === 'whatsapp' ? (
                 <>
-                  WhatsApp OTP powered by <strong>Interakt</strong> • Expires in 10 minutes
+                  WhatsApp OTP • Expires in 10 minutes
                 </>
               ) : (
                 <>
-                  SMS OTP powered by <strong>Firebase</strong> • May appear as "VERIFY"
+                  SMS OTP • May appear as "VERIFY"
                 </>
               )}
             </p>

@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/shared/Header';
 import { Footer } from '@/components/shared/Footer';
-import { CheckCircle2, Download, Mail, Home, Calendar, Loader2 } from 'lucide-react';
+import { CheckCircle2, Download, Mail, Home, Calendar, Loader2, MessageCircle, UserPlus } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useRegistrationDetails } from '@/lib/hooks/useRegistration';
 
@@ -61,8 +61,8 @@ export default function SuccessPage() {
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/20">
       <Header />
 
-      <div className="container mx-auto max-w-4xl px-4 py-20 flex-1 flex items-center">
-        <Card className="w-full p-12 text-center">
+      <div className="container mx-auto max-w-4xl px-4 py-8 sm:py-20 flex-1 flex items-center">
+        <Card className="w-full p-4 sm:p-8 md:p-12 text-center">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-12">
               <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
@@ -71,58 +71,58 @@ export default function SuccessPage() {
           ) : (
             <>
               {/* Success Icon */}
-              <div className="flex justify-center mb-6">
+              <div className="flex justify-center mb-4 sm:mb-6">
                 <div className="relative">
                   <div className="absolute inset-0 bg-green-500 rounded-full blur-2xl opacity-30 animate-pulse" />
-                  <div className="relative flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg">
-                    <CheckCircle2 className="h-12 w-12 text-white" />
+                  <div className="relative flex h-16 w-16 sm:h-20 sm:w-20 md:h-24 md:w-24 items-center justify-center rounded-full bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg">
+                    <CheckCircle2 className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 text-white" />
                   </div>
                 </div>
               </div>
 
               {/* Success Message */}
-              <h1 className="text-3xl md:text-4xl font-bold mb-4 bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
                 Registration Successful!
               </h1>
 
               {/* Registration Number */}
               {registration?.registration.registrationNumber && (
-                <div className="mb-6">
-                  <p className="text-sm text-muted-foreground mb-2">Your Registration Number</p>
-                  <div className="inline-block px-6 py-3 bg-primary/10 border-2 border-primary rounded-lg">
-                    <p className="text-2xl font-mono font-bold text-primary">
+                <div className="mb-4 sm:mb-6">
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-1 sm:mb-2">Your Registration Number</p>
+                  <div className="inline-block px-3 py-2 sm:px-4 sm:py-2.5 md:px-6 md:py-3 bg-primary/10 border-2 border-primary rounded-lg">
+                    <p className="text-base sm:text-lg md:text-xl lg:text-2xl font-mono font-bold text-primary">
                       {registration.registration.registrationNumber}
                     </p>
                   </div>
                 </div>
               )}
 
-              <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
+              <p className="text-sm sm:text-base md:text-lg text-muted-foreground mb-4 sm:mb-6 md:mb-8 max-w-2xl mx-auto px-2">
                 Thank you for registering! We've sent a confirmation email with your visitor badge. 
                 Please check your inbox and spam folder.
               </p>
 
               {/* Visitor Badge Display (Enterprise Design) */}
               {(registration?.badgeUrl || registration?.qrCode) && (
-                <div className="mb-8">
-                  <div className="inline-block p-6 bg-white rounded-lg shadow-2xl border-2 border-primary/20">
+                <div className="mb-4 sm:mb-6 md:mb-8">
+                  <div className="inline-block p-2 sm:p-3 md:p-4 lg:p-6 bg-white rounded-lg shadow-2xl border-2 border-primary/20">
                     <img 
                       src={registration.badgeUrl || registration.qrCode} 
                       alt="Visitor Badge" 
-                      className={registration.badgeUrl ? "w-full max-w-md mx-auto" : "w-64 h-64 mx-auto"}
+                      className={registration.badgeUrl ? "w-full max-w-md mx-auto" : "w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 mx-auto"}
                       style={{ maxHeight: '600px' }}
                     />
-                    <p className="text-xs text-muted-foreground mt-3 text-center">
+                    <p className="text-xs text-muted-foreground mt-2 sm:mt-3 text-center">
                       {registration.badgeUrl ? 'Show this badge at the venue' : 'Show this QR code at the venue'}
                     </p>
                   </div>
-                  <div className="mt-4">
+                  <div className="mt-3 sm:mt-4">
                     <Button 
                       onClick={downloadBadge}
                       size="lg"
-                      className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                      className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-sm sm:text-base"
                     >
-                      <Download className="mr-2 h-5 w-5" />
+                      <Download className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
                       {registration.badgeUrl ? 'Download Visitor Badge' : 'Download QR Code'}
                     </Button>
                   </div>
@@ -134,24 +134,24 @@ export default function SuccessPage() {
           {!isLoading && (
             <>
               {/* Info Cards */}
-              <div className="grid md:grid-cols-3 gap-4 mb-8">
-                <div className="p-4 rounded-lg bg-muted/50">
-                  <Mail className="h-6 w-6 text-primary mx-auto mb-2" />
-                  <p className="text-sm font-medium">Check Your Email</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6 md:mb-8">
+                <div className="p-3 sm:p-4 rounded-lg bg-muted/50">
+                  <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6 text-green-600 mx-auto mb-1 sm:mb-2" />
+                  <p className="text-xs sm:text-sm font-medium">Check Your WhatsApp</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     Confirmation sent
                   </p>
                 </div>
-                <div className="p-4 rounded-lg bg-muted/50">
-                  <Download className="h-6 w-6 text-purple-600 mx-auto mb-2" />
-                  <p className="text-sm font-medium">QR Code Ready</p>
+                <div className="p-3 sm:p-4 rounded-lg bg-muted/50">
+                  <Download className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600 mx-auto mb-1 sm:mb-2" />
+                  <p className="text-xs sm:text-sm font-medium">Badge Ready</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     Download above
                   </p>
                 </div>
-                <div className="p-4 rounded-lg bg-muted/50">
-                  <Calendar className="h-6 w-6 text-pink-600 mx-auto mb-2" />
-                  <p className="text-sm font-medium">Event Reminder</p>
+                <div className="p-3 sm:p-4 rounded-lg bg-muted/50">
+                  <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-pink-600 mx-auto mb-1 sm:mb-2" />
+                  <p className="text-xs sm:text-sm font-medium">Event Reminder</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     We'll remind you
                   </p>
@@ -159,23 +159,30 @@ export default function SuccessPage() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button asChild size="lg" className="bg-gradient-to-r from-primary to-purple-600">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+            <Button asChild size="lg" className="bg-gradient-to-r from-primary to-purple-600 text-sm sm:text-base">
               <Link href="/" className="flex items-center gap-2">
-                <Home className="h-5 w-5" />
+                <Home className="h-4 w-4 sm:h-5 sm:w-5" />
                 Back to Home
               </Link>
             </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link href="/" className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Browse More Events
-              </Link>
-            </Button>
+            {registration?.exhibition?.slug && (
+              <Button 
+                asChild 
+                size="lg" 
+                variant="outline" 
+                className="text-sm sm:text-base border-green-600 text-green-600 hover:bg-green-50"
+              >
+                <Link href={`/${registration.exhibition.slug}`} className="flex items-center gap-2">
+                  <UserPlus className="h-4 w-4 sm:h-5 sm:w-5" />
+                  Another Registration
+                </Link>
+              </Button>
+            )}
               </div>
 
               {/* Help Text */}
-              <p className="text-sm text-muted-foreground mt-8">
+              <p className="text-xs sm:text-sm text-muted-foreground mt-4 sm:mt-6 md:mt-8 px-2">
             Need help? Contact us at{' '}
             <a href="mailto:info@exhibithub.com" className="text-primary hover:underline">
               info@exhibithub.com

@@ -281,7 +281,7 @@ export const OTPModal: React.FC<OTPModalProps> = ({
             {isVerifying && (
               <div className="status verifying">
                 <Loader2 className="w-5 h-5 animate-spin" />
-                <span>{otpMethod === 'whatsapp' ? 'Verifying with WhatsApp...' : 'Verifying with Firebase...'}</span>
+                <span>{otpMethod === 'whatsapp' ? 'Verifying WhatsApp OTP...' : 'Verifying SMS OTP...'}</span>
               </div>
             )}
 
