@@ -6,7 +6,7 @@ import { Exhibition, ExhibitionDocument } from '../../database/schemas/exhibitio
 import { ExhibitionRegistration, ExhibitionRegistrationDocument } from '../../database/schemas/exhibition-registration.schema';
 import { CreateExhibitorDto, UpdateExhibitorDto, QueryExhibitorDto } from './dto';
 import { sanitizeSearch } from '../../common/utils/sanitize.util';
-import { sanitizePagination } from '../../common/constants/pagination.constants';
+import { sanitizePagination, buildSortObject, calculatePaginationMeta } from '../../common/constants/pagination.constants';
 import { generateSlug } from '../../common/utils/slug.util';
 
 @Injectable()
@@ -103,7 +103,7 @@ export class ExhibitorsService {
       totalPages: number;
     };
   }> {
-    const { page, limit } = sanitizePagination(query.page, query.limit);
+    const { page, limit, skip } = sanitizePagination(query.page, query.limit);
     const { search, exhibitionId, isActive, sortBy = 'createdAt', sortOrder = 'desc' } = query;
 
     const filter: any = {};
@@ -128,9 +128,7 @@ export class ExhibitorsService {
       filter.isActive = isActive;
     }
 
-    const skip = (page - 1) * limit;
-    const sort: any = {};
-    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    const sort = buildSortObject(sortBy, sortOrder);
 
     const [exhibitors, total] = await Promise.all([
       this.exhibitorModel
@@ -159,12 +157,7 @@ export class ExhibitorsService {
 
     return {
       exhibitors: transformedExhibitors as any[],
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      pagination: calculatePaginationMeta(page, limit, total),
     };
   }
 

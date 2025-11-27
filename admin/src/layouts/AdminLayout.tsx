@@ -72,6 +72,10 @@ const { Text } = Typography;
         label: 'All Visitors',
       },
       {
+        key: '/visitors/analytics',
+        label: 'Analytics',
+      },
+      {
         key: '/visitors/reports',
         label: 'Exhibition Reports',
       },
@@ -132,6 +136,10 @@ const AdminLayout: React.FC = () => {
       navigationKey = '/visitors';
     } else if (key === '/exhibitions/exhibitor-links') {
       navigationKey = '/exhibitions/exhibitor-links';
+    } else if (key === '/visitors/analytics') {
+      navigationKey = '/visitors/analytics';
+    } else if (key === '/visitors/reports') {
+      navigationKey = '/visitors/reports';
     }
     navigate(navigationKey);
     if (isSmallScreen) {
@@ -232,6 +240,8 @@ const AdminLayout: React.FC = () => {
           location.pathname === '/exhibitions' ? '/exhibitions/list' : 
           location.pathname === '/visitors' ? '/visitors/all' :
           location.pathname === '/exhibitions/exhibitor-links' ? '/exhibitions/exhibitor-links' :
+          location.pathname === '/visitors/analytics' ? '/visitors/analytics' :
+          location.pathname === '/visitors/reports' ? '/visitors/reports' :
           location.pathname
         ]}
         items={menuItems}
@@ -333,7 +343,9 @@ const AdminLayout: React.FC = () => {
                 {location.pathname === '/dashboard' && 'Dashboard'}
                 {location.pathname === '/exhibitions/exhibitor-links' && 'Exhibitor Links'}
                 {location.pathname.startsWith('/exhibitions') && location.pathname !== '/exhibitions/exhibitor-links' && 'Exhibition Management'}
-                {location.pathname.startsWith('/visitors') && 'Visitor Management'}
+                {location.pathname === '/visitors/analytics' && 'Analytics Dashboard'}
+                {location.pathname === '/visitors/reports' && 'Exhibition Reports'}
+                {location.pathname.startsWith('/visitors') && location.pathname !== '/visitors/analytics' && location.pathname !== '/visitors/reports' && 'Visitor Management'}
                 {location.pathname === '/users' && 'User Management'}
                 {location.pathname === '/roles' && 'Roles Management'}
                 {location.pathname === '/settings' && 'Settings'}

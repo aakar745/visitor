@@ -44,8 +44,14 @@ export const exhibitionService = {
     // The actual data is in response.data.data which contains { exhibitions, pagination }
     const responseData = response.data.data;
     
+    // Transform _id to id for frontend compatibility
+    const exhibitions = (responseData?.exhibitions || []).map((ex: any) => ({
+      ...ex,
+      id: ex._id || ex.id,
+    }));
+    
     return {
-      data: responseData?.exhibitions || [],
+      data: exhibitions,
       pagination: responseData?.pagination || { page: 1, limit: 10, total: 0, totalPages: 0 },
     };
 
@@ -55,19 +61,34 @@ export const exhibitionService = {
   // Get single exhibition by ID
   async getExhibition(id: string): Promise<Exhibition> {
     const response = await api.get(`${API_ENDPOINTS.EXHIBITIONS?.BASE || '/exhibitions'}/${id}`);
-    return response.data.data;
+    const data = response.data.data;
+    // Transform _id to id for frontend compatibility
+    return {
+      ...data,
+      id: data._id || data.id,
+    };
   },
 
   // Create new exhibition
   async createExhibition(data: ExhibitionRequest): Promise<Exhibition> {
     const response = await api.post(API_ENDPOINTS.EXHIBITIONS?.BASE || '/exhibitions', data);
-    return response.data.data;
+    const result = response.data.data;
+    // Transform _id to id for frontend compatibility
+    return {
+      ...result,
+      id: result._id || result.id,
+    };
   },
 
   // Update existing exhibition
   async updateExhibition(id: string, data: Partial<ExhibitionRequest>): Promise<Exhibition> {
     const response = await api.put(`${API_ENDPOINTS.EXHIBITIONS?.BASE || '/exhibitions'}/${id}`, data);
-    return response.data.data;
+    const result = response.data.data;
+    // Transform _id to id for frontend compatibility
+    return {
+      ...result,
+      id: result._id || result.id,
+    };
   },
 
   // Delete exhibition
@@ -80,7 +101,12 @@ export const exhibitionService = {
     const response = await api.patch(`${API_ENDPOINTS.EXHIBITIONS?.BASE || '/exhibitions'}/${id}/status`, { 
       status 
     });
-    return response.data.data;
+    const result = response.data.data;
+    // Transform _id to id for frontend compatibility
+    return {
+      ...result,
+      id: result._id || result.id,
+    };
   },
 
   // Upload exhibition files (logo, banner)

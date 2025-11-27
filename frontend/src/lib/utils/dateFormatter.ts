@@ -81,3 +81,27 @@ export const formatDateRangeShort = (startDate: string | Date, endDate: string |
   }
 };
 
+/**
+ * Format date for CSV export as DD-MM-YYYY
+ * Example: 10-11-2025
+ */
+export const formatDateForExport = (date: string | Date): string => {
+  try {
+    return dateFnsFormat(new Date(date), 'dd-MM-yyyy');
+  } catch {
+    return 'Invalid Date';
+  }
+};
+
+/**
+ * Format datetime for CSV export as DD-MM-YYYY HH:mm:ss
+ * Example: 10-11-2025 15:30:45
+ */
+export const formatDateTimeForExport = (date: string | Date): string => {
+  try {
+    return dateFnsFormat(new Date(date), 'dd-MM-yyyy HH:mm:ss');
+  } catch {
+    return 'Invalid Date';
+  }
+};
+

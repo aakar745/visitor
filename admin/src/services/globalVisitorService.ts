@@ -90,9 +90,22 @@ export const globalVisitorService = {
       status?: string;
       category?: string;
       paymentStatus?: string;
+      registrationType?: 'free' | 'paid';
+      registrationTiming?: 'pre-registration' | 'on-spot';
+      checkInStatus?: 'checked-in' | 'not-checked-in';
+      dateRange?: { start: string; end: string };
     }
   ): Promise<PaginatedResponse<VisitorWithRegistration>> {
-    const response = await api.get(`/exhibitions/${exhibitionId}/registrations`, { params });
+    // ✅ FIX: Transform dateRange object to startDate/endDate query params
+    const { dateRange, ...otherParams } = params;
+    const queryParams: any = { ...otherParams };
+    
+    if (dateRange?.start && dateRange?.end) {
+      queryParams.startDate = dateRange.start;
+      queryParams.endDate = dateRange.end;
+    }
+    
+    const response = await api.get(`/exhibitions/${exhibitionId}/registrations`, { params: queryParams });
     return response.data.data;
   },
 
@@ -227,14 +240,31 @@ export const globalVisitorService = {
     exhibitionId: string,
     format: 'csv' | 'excel',
     filters?: {
-      status?: string;
+      registrationType?: 'free' | 'paid'; // Changed from status to registrationType
+      registrationTiming?: 'pre-registration' | 'on-spot'; // Pre-Reg vs On-Spot
+      checkInStatus?: 'checked-in' | 'not-checked-in'; // Check-in status
       category?: string;
+      paymentStatus?: string;
       dateRange?: { start: string; end: string };
     }
   ): Promise<Blob> {
+    const params: any = { format };
+    
+    // ✅ FIX: Transform dateRange object to startDate/endDate query params
+    if (filters?.registrationType) params.registrationType = filters.registrationType;
+    if (filters?.registrationTiming) params.registrationTiming = filters.registrationTiming;
+    if (filters?.checkInStatus) params.checkInStatus = filters.checkInStatus;
+    if (filters?.category) params.category = filters.category;
+    if (filters?.paymentStatus) params.paymentStatus = filters.paymentStatus;
+    if (filters?.dateRange?.start) params.startDate = filters.dateRange.start;
+    if (filters?.dateRange?.end) params.endDate = filters.dateRange.end;
+    
+    console.log('📤 Export API Params:', params);
+    
     const response = await api.get(`/exhibitions/${exhibitionId}/export`, {
-      params: { format, ...filters },
+      params,
       responseType: 'blob',
+      timeout: 300000, // 5 minutes for large exports (100k+ records)
     });
     return response.data;
   },
@@ -243,13 +273,16 @@ export const globalVisitorService = {
   async exportGlobalVisitors(
     format: 'csv' | 'excel',
     filters?: {
-      dateRange?: { start: string; end: string };
+      search?: string;
+      state?: string;
+      city?: string;
       minRegistrations?: number;
     }
   ): Promise<Blob> {
-    const response = await api.get('/visitors/global/export', {
+    const response = await api.get('/visitors/export', {
       params: { format, ...filters },
       responseType: 'blob',
+      timeout: 300000, // 5 minutes for large exports (100k+ records)
     });
     return response.data;
   },

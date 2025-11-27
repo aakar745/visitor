@@ -3,7 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { GlobalVisitor, GlobalVisitorDocument } from '../../database/schemas/global-visitor.schema';
 import { ExhibitionRegistration, ExhibitionRegistrationDocument } from '../../database/schemas/exhibition-registration.schema';
-import { sanitizePagination } from '../../common/constants/pagination.constants';
+import { sanitizePagination, buildSortObject, calculatePaginationMeta } from '../../common/constants/pagination.constants';
 import { sanitizeSearch } from '../../common/utils/sanitize.util';
 import { MeilisearchService } from '../meilisearch/meilisearch.service';
 
@@ -66,8 +66,7 @@ export class VisitorsService {
     const { page: rawPage, limit: rawLimit, sortBy = 'createdAt', sortOrder = 'desc', search, state, city } = query;
 
     // Sanitize pagination
-    const { page, limit } = sanitizePagination(rawPage, rawLimit);
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = sanitizePagination(rawPage, rawLimit);
 
     // Build filter
     const filter: any = {};
@@ -91,9 +90,7 @@ export class VisitorsService {
       filter.city = city;
     }
 
-    // Build sort
-    const sort: any = {};
-    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    const sort = buildSortObject(sortBy, sortOrder);
 
     // Execute query - returns global visitor profiles only
     const [data, total] = await Promise.all([
@@ -109,12 +106,7 @@ export class VisitorsService {
 
     return {
       data,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      pagination: calculatePaginationMeta(page, limit, total),
     };
   }
 
@@ -359,6 +351,342 @@ export class VisitorsService {
     limit: number = 20,
   ): Promise<any> {
     return await this.meilisearchService.searchVisitors(query, exhibitionId, limit);
+  }
+
+  /**
+   * Export all global visitors to CSV or Excel with streaming
+   * Handles large datasets efficiently with dynamic field discovery
+   * 
+   * ✅ Exports ALL visitors (not just current page)
+   * ✅ Discovers all dynamic fields in data (including removed fields)
+   * ✅ Streams data for memory efficiency
+   * ✅ Supports filtering by search, state, city, minRegistrations
+   */
+  async exportGlobalVisitors(
+    res: any,
+    options: {
+      format: 'csv' | 'excel';
+      search?: string;
+      state?: string;
+      city?: string;
+      minRegistrations?: number;
+    },
+  ): Promise<void> {
+    this.logger.log('[Export] Starting global visitor export...');
+
+    // Build filter
+    const filter: any = {};
+    
+    if (options.search) {
+      const sanitizedSearch = sanitizeSearch(options.search);
+      filter.$or = [
+        { name: { $regex: sanitizedSearch, $options: 'i' } },
+        { email: { $regex: sanitizedSearch, $options: 'i' } },
+        { phone: { $regex: sanitizedSearch, $options: 'i' } },
+        { company: { $regex: sanitizedSearch, $options: 'i' } },
+      ];
+    }
+
+    if (options.state) filter.state = options.state;
+    if (options.city) filter.city = options.city;
+    if (options.minRegistrations) {
+      filter.totalRegistrations = { $gte: options.minRegistrations };
+    }
+
+    // Count total for logging
+    const total = await this.visitorModel.countDocuments(filter).exec();
+    this.logger.log(`[Export] Total records to export: ${total.toLocaleString()}`);
+
+    // ✅ DYNAMIC FIELD DISCOVERY - Find ALL fields in actual data
+    // This ensures no data is hidden when fields are added/removed
+    const allFieldsInData = await this.findAllFieldsInGlobalVisitors(filter);
+    this.logger.log(`[Export] Found ${allFieldsInData.length} dynamic fields in visitor data`);
+
+    if (options.format === 'csv') {
+      return this.exportGlobalVisitorsAsCSV(res, filter, allFieldsInData);
+    } else {
+      return this.exportGlobalVisitorsAsExcel(res, filter, allFieldsInData);
+    }
+  }
+
+  /**
+   * Find all unique dynamic field names in global visitor data
+   * Samples visitors to discover all possible field names (including removed fields)
+   * Excludes standard visitor fields
+   */
+  private async findAllFieldsInGlobalVisitors(filter: any): Promise<string[]> {
+    const sampleSize = 100; // Sample size to discover fields
+
+    const samples = await this.visitorModel
+      .find(filter)
+      .limit(sampleSize)
+      .lean()
+      .exec();
+
+    const fieldSet = new Set<string>();
+
+    // Standard visitor fields that we exclude from dynamic detection
+    const standardFields = new Set([
+      '_id',
+      '__v',
+      'id',
+      'name',
+      'email',
+      'phone',
+      'company',
+      'designation',
+      'city',
+      'state',
+      'pincode',
+      'address',
+      'countryId',
+      'stateId',
+      'cityId',
+      'pincodeId',
+      'createdAt',
+      'updatedAt',
+      'totalRegistrations',
+      'lastRegistrationDate',
+      'registeredExhibitions',
+    ]);
+
+    samples.forEach((visitor: any) => {
+      Object.keys(visitor).forEach((key) => {
+        if (!standardFields.has(key)) {
+          const value = (visitor as any)[key];
+          // Only add if field has actual data (not null/undefined/empty)
+          if (value !== null && value !== undefined && value !== '') {
+            fieldSet.add(key);
+          }
+        }
+      });
+    });
+
+    return Array.from(fieldSet).sort();
+  }
+
+  /**
+   * Export global visitors as CSV with streaming
+   * Memory-efficient for large datasets
+   */
+  private async exportGlobalVisitorsAsCSV(
+    res: any,
+    filter: any,
+    dynamicFields: string[],
+  ): Promise<void> {
+    const fileName = `global-visitors-${new Date().toISOString().split('T')[0]}-${Date.now()}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+    // Standard columns
+    const standardColumns = [
+      'Name',
+      'Email',
+      'Phone',
+      'Company',
+      'Designation',
+      'City',
+      'State',
+      'Pincode',
+      'Address',
+    ];
+
+    // Dynamic columns (convert field names to readable headers)
+    const dynamicColumns = dynamicFields.map((field) =>
+      field
+        .split('_')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' '),
+    );
+
+    // Summary columns
+    const summaryColumns = [
+      'Total Registrations',
+      'Created Date',
+    ];
+
+    const headers = [...standardColumns, ...dynamicColumns, ...summaryColumns];
+
+    // Write header row
+    res.write(headers.map((h) => `"${h}"`).join(',') + '\n');
+
+    // Stream data in batches for memory efficiency
+    const BATCH_SIZE = 1000;
+    const cursor = this.visitorModel.find(filter).lean().cursor();
+
+    let batch: any[] = [];
+    let processedCount = 0;
+
+    for await (const visitor of cursor) {
+      batch.push(visitor);
+
+      if (batch.length >= BATCH_SIZE) {
+        const csvRows = this.formatVisitorBatchToCSV(batch, dynamicFields);
+        res.write(csvRows);
+        processedCount += batch.length;
+        this.logger.debug(`[Export] Processed ${processedCount} visitors...`);
+        batch = [];
+      }
+    }
+
+    // Write remaining batch
+    if (batch.length > 0) {
+      const csvRows = this.formatVisitorBatchToCSV(batch, dynamicFields);
+      res.write(csvRows);
+      processedCount += batch.length;
+    }
+
+    res.end();
+    this.logger.log(`[Export] Global visitor CSV export completed: ${processedCount} records`);
+  }
+
+  /**
+   * Format a batch of visitors to CSV rows
+   */
+  private formatVisitorBatchToCSV(batch: any[], dynamicFields: string[]): string {
+    return batch
+      .map((v: any) => {
+        // Standard field values
+        const standardValues = [
+          v.name || '',
+          v.email || '',
+          v.phone || '',
+          v.company || '',
+          v.designation || '',
+          v.city || '',
+          v.state || '',
+          v.pincode || '',
+          v.address || '',
+        ];
+
+        // Dynamic field values
+        const dynamicValues = dynamicFields.map((field) => {
+          const value = v[field];
+          if (Array.isArray(value)) return value.join('; ');
+          return value || '';
+        });
+
+        // Summary field values
+        const summaryValues = [
+          v.totalRegistrations || 0,
+          new Date(v.createdAt).toISOString().split('T')[0],
+        ];
+
+        const row = [...standardValues, ...dynamicValues, ...summaryValues];
+
+        // Escape CSV values (handle quotes and commas)
+        return row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',') + '\n';
+      })
+      .join('');
+  }
+
+  /**
+   * Export global visitors as Excel with streaming
+   * Memory-efficient for large datasets
+   */
+  private async exportGlobalVisitorsAsExcel(
+    res: any,
+    filter: any,
+    dynamicFields: string[],
+  ): Promise<void> {
+    const ExcelJS = require('exceljs');
+    const fileName = `global-visitors-${new Date().toISOString().split('T')[0]}-${Date.now()}.xlsx`;
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+    const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
+      stream: res,
+      useStyles: true,
+      useSharedStrings: true,
+    });
+
+    const worksheet = workbook.addWorksheet('Visitors', {
+      properties: { defaultRowHeight: 20 },
+    });
+
+    // Standard columns
+    const standardColumns = [
+      { header: 'Name', key: 'name', width: 25 },
+      { header: 'Email', key: 'email', width: 30 },
+      { header: 'Phone', key: 'phone', width: 18 },
+      { header: 'Company', key: 'company', width: 25 },
+      { header: 'Designation', key: 'designation', width: 20 },
+      { header: 'City', key: 'city', width: 18 },
+      { header: 'State', key: 'state', width: 18 },
+      { header: 'Pincode', key: 'pincode', width: 12 },
+      { header: 'Address', key: 'address', width: 30 },
+    ];
+
+    // Dynamic columns
+    const dynamicColumns = dynamicFields.map((field) => ({
+      header: field
+        .split('_')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' '),
+      key: `dynamic_${field}`,
+      width: 20,
+    }));
+
+    // Summary columns
+    const summaryColumns = [
+      { header: 'Total Registrations', key: 'totalRegistrations', width: 18 },
+      { header: 'Created Date', key: 'createdAt', width: 20 },
+    ];
+
+    worksheet.columns = [...standardColumns, ...dynamicColumns, ...summaryColumns];
+
+    // Style header row
+    worksheet.getRow(1).font = { bold: true, size: 11 };
+    worksheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF4472C4' },
+    };
+    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+
+    // Stream data
+    const cursor = this.visitorModel.find(filter).lean().cursor();
+    let processedCount = 0;
+
+    for await (const visitor of cursor) {
+      const visitorAny = visitor as any;
+      const rowData: any = {
+        name: visitorAny.name || '',
+        email: visitorAny.email || '',
+        phone: visitorAny.phone || '',
+        company: visitorAny.company || '',
+        designation: visitorAny.designation || '',
+        city: visitorAny.city || '',
+        state: visitorAny.state || '',
+        pincode: visitorAny.pincode || '',
+        address: visitorAny.address || '',
+        totalRegistrations: visitorAny.totalRegistrations || 0,
+        createdAt: new Date(visitorAny.createdAt).toISOString().split('T')[0],
+      };
+
+      // Add dynamic fields
+      dynamicFields.forEach((field) => {
+        const value = visitorAny[field];
+        rowData[`dynamic_${field}`] = Array.isArray(value) ? value.join('; ') : value || '';
+      });
+
+      worksheet.addRow(rowData).commit();
+      processedCount++;
+
+      if (processedCount % 1000 === 0) {
+        this.logger.debug(`[Export] Processed ${processedCount} visitors...`);
+      }
+    }
+
+    await worksheet.commit();
+    await workbook.commit();
+
+    this.logger.log(`[Export] Global visitor Excel export completed: ${processedCount} records`);
   }
 }
 

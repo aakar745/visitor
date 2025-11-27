@@ -13,7 +13,9 @@ import {
   CheckCircle2,
   Lock,
   MessageCircle,
-  MessageSquare
+  MessageSquare,
+  Building2,
+  Info
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { registrationsApi } from '@/lib/api/registrations';
@@ -47,13 +49,19 @@ interface OTPLoginProps {
   exhibitionId: string;
   exhibitionName: string;
   exhibitionLogo?: string;
+  exhibitorLogo?: string;
+  exhibitor?: {
+    name: string;
+    companyName?: string;
+    boothNumber?: string;
+  };
   onAuthSuccess: (hasExistingRegistration: boolean, registrationId?: string) => void;
 }
 
 type Step = 'phone' | 'otp';
 type OTPMethod = 'sms' | 'whatsapp';
 
-export function OTPLogin({ exhibitionId, exhibitionName, exhibitionLogo, onAuthSuccess }: OTPLoginProps) {
+export function OTPLogin({ exhibitionId, exhibitionName, exhibitionLogo, exhibitorLogo, exhibitor, onAuthSuccess }: OTPLoginProps) {
   const [step, setStep] = useState<Step>('phone');
   const [otpMethod, setOtpMethod] = useState<OTPMethod>('whatsapp'); // Default to WhatsApp
   const [phoneNumber, setPhoneNumber] = useState<E164Number | undefined>(undefined);
@@ -327,6 +335,38 @@ export function OTPLogin({ exhibitionId, exhibitionName, exhibitionLogo, onAuthS
     await handleSendOTP();
   };
 
+  // Handle switching from SMS to WhatsApp
+  const handleSwitchToWhatsApp = async () => {
+    if (!phoneNumber) return;
+    
+    setShowOTPModal(false);
+    setOtpMethod('whatsapp');
+    setIsLoading(true);
+    
+    toast.info('Switching to WhatsApp...', {
+      description: 'Sending OTP via WhatsApp now',
+    });
+    
+    try {
+      // Send OTP via WhatsApp directly (bypass method check)
+      await sendWhatsAppOTP(phoneNumber);
+      setShowOTPModal(true);
+      setStep('otp');
+      setRetryAttempts(0);
+      
+      toast.success('🎪 Aakar Exhibition - WhatsApp OTP Sent!', {
+        description: 'Check WhatsApp for your verification code (expires in 10 minutes)',
+      });
+    } catch (error: any) {
+      console.error('Switch to WhatsApp error:', error);
+      toast.error('Failed to send WhatsApp OTP', {
+        description: error.message || 'Please try again manually',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Main OTP Card */}
@@ -334,18 +374,38 @@ export function OTPLogin({ exhibitionId, exhibitionName, exhibitionLogo, onAuthS
         {/* Phone Number Entry */}
         <div className="space-y-6">
           <div className="text-center mb-6">
-            {/* Exhibition Logo */}
-            {exhibitionLogo ? (
-              <div className="inline-flex h-[120px] w-auto max-w-md items-center justify-center rounded-2xl bg-white overflow-hidden mb-4 shadow-lg px-3 py-2">
-                <div className="relative h-full w-auto">
-                  <Image
-                    src={exhibitionLogo}
-                    alt={exhibitionName}
-                    width={300}
-                    height={120}
-                    className="object-contain h-full w-auto"
-                  />
-                </div>
+            {/* Exhibition Logo + Exhibitor Logo (side-by-side when exhibitor exists) */}
+            {exhibitionLogo || exhibitorLogo ? (
+              <div className="inline-flex items-center justify-center gap-4 mb-4">
+                {/* Exhibition Logo */}
+                {exhibitionLogo && (
+                  <div className="inline-flex h-[120px] w-auto max-w-[200px] items-center justify-center rounded-2xl bg-white overflow-hidden shadow-lg px-3 py-2">
+                    <div className="relative h-full w-auto">
+                      <Image
+                        src={exhibitionLogo}
+                        alt={exhibitionName}
+                        width={200}
+                        height={120}
+                        className="object-contain h-full w-auto"
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                {/* Exhibitor Logo (shown when present) */}
+                {exhibitorLogo && (
+                  <div className="inline-flex h-[120px] w-auto max-w-[200px] items-center justify-center rounded-2xl bg-white overflow-hidden shadow-lg px-3 py-2">
+                    <div className="relative h-full w-auto">
+                      <Image
+                        src={exhibitorLogo}
+                        alt="Exhibitor logo"
+                        width={200}
+                        height={120}
+                        className="object-contain h-full w-auto"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="inline-flex h-[120px] w-[120px] items-center justify-center rounded-full bg-primary/10 mb-4">
@@ -356,7 +416,21 @@ export function OTPLogin({ exhibitionId, exhibitionName, exhibitionLogo, onAuthS
               )}
             </div>
             )}
-            <h3 className="text-xl font-semibold mb-2">Choose Verification Method</h3>
+            
+            {/* Exhibitor Context Banner - RIGHT BELOW LOGOS */}
+            {exhibitor && (
+              <div className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary/5 border border-primary/20 rounded-lg text-sm mb-4">
+                <Building2 className="h-4 w-4 text-primary flex-shrink-0" />
+                <span className="text-muted-foreground">
+                  Registering via <span className="font-medium text-foreground">{exhibitor.companyName}</span>
+                  {exhibitor.boothNumber && (
+                    <span className="text-muted-foreground ml-1">• Stall No. {exhibitor.boothNumber}</span>
+                  )}
+                </span>
+              </div>
+            )}
+            
+            <h3 className="text-lg font-semibold mb-2">Choose Verification Method</h3>
             <p className="text-sm text-muted-foreground">
               Select how you'd like to receive your one-time password
             </p>
@@ -494,6 +568,7 @@ export function OTPLogin({ exhibitionId, exhibitionName, exhibitionLogo, onAuthS
         confirmationResult={confirmationResult}
         onVerificationSuccess={handleVerificationSuccess}
         onResendOTP={handleResendOTP}
+        onSwitchToWhatsApp={handleSwitchToWhatsApp}
         companyName="Aakar Exhibition"
         otpMethod={otpMethod}
       />

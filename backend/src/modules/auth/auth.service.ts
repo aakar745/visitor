@@ -6,6 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { Otp, OtpDocument, OtpType } from '../../database/schemas/otp.schema';
 import { WhatsAppOtpService } from '../../services/whatsapp-otp.service';
+import { normalizePhoneNumberE164 } from '../../common/utils/sanitize.util';
 import { LoginDto } from './dto/login.dto';
 
 @Injectable()
@@ -320,8 +321,8 @@ export class AuthService {
         throw new BadRequestException('Invalid phone number');
       }
 
-      // Normalize phone number (remove spaces, dashes, etc.)
-      const normalizedPhone = phoneNumber.replace(/[\s\-()]/g, '');
+      // Normalize phone number to E.164 format (international support)
+      const normalizedPhone = normalizePhoneNumberE164(phoneNumber);
 
       // Check if there's a recent OTP request (rate limiting)
       const recentOtp = await this.otpModel.findOne({
@@ -394,8 +395,8 @@ export class AuthService {
         throw new BadRequestException('Invalid OTP format. Must be 6 digits.');
       }
 
-      // Normalize phone number
-      const normalizedPhone = phoneNumber.replace(/[\s\-()]/g, '');
+      // Normalize phone number to E.164 format (international support)
+      const normalizedPhone = normalizePhoneNumberE164(phoneNumber);
 
       // Find the most recent unverified OTP
       const otpRecord = await this.otpModel.findOne({

@@ -3,10 +3,10 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
-import * as crypto from 'crypto';
 import { Public } from '../../common/decorators/public.decorator';
 import { SkipCsrf } from '../../common/decorators/skip-csrf.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { generateCsrfToken } from '../../common/utils/crypto.util';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 
@@ -52,7 +52,7 @@ export class AuthController {
     response.cookie('refreshToken', result.refreshToken, cookieOptions);
 
     // Set fresh CSRF token on login (consistent with token refresh)
-    const csrfToken = crypto.randomBytes(32).toString('hex');
+    const csrfToken = generateCsrfToken();
     response.cookie('XSRF-TOKEN', csrfToken, {
       httpOnly: false, // Must be readable by JavaScript
       secure: isProduction,
@@ -159,7 +159,7 @@ export class AuthController {
     // This prevents CSRF token expiry for long-running sessions
     // CSRF tokens expire after 24 hours, but users may stay logged in longer via token refresh
     const cookieDomain = this.configService.get('COOKIE_DOMAIN');
-    const csrfToken = crypto.randomBytes(32).toString('hex');
+    const csrfToken = generateCsrfToken();
     response.cookie('XSRF-TOKEN', csrfToken, {
       httpOnly: false, // Must be readable by JavaScript for client to include in headers
       secure: isProduction,

@@ -226,7 +226,8 @@ const ExhibitorLinks: React.FC = () => {
       return exhibitionId === exhibitor.exhibitionId;
     });
     if (exhibition) {
-      const link = `${FRONTEND_URL}/${exhibition.slug}?ref=${exhibitor.slug}`;
+      // Co-branded exhibitor link: /[exhibition-slug]/[exhibitor-slug]
+      const link = `${FRONTEND_URL}/${exhibition.slug}/${exhibitor.slug}`;
       navigator.clipboard.writeText(link);
       message.success('Link copied to clipboard!');
     }
@@ -396,7 +397,8 @@ const ExhibitorLinks: React.FC = () => {
           const exhibitionId = e.id || (e as any)._id;
           return exhibitionId === record.exhibitionId;
         });
-        const link = exhibition ? `/register/${exhibition.slug}?ref=${record.slug}` : '';
+        // Co-branded exhibitor link format
+        const link = exhibition ? `/${exhibition.slug}/${record.slug}` : '';
         return (
           <Space direction="vertical" size="small" style={{ width: '100%' }}>
             <div className="exhibitor-link-cell">
@@ -507,7 +509,8 @@ const ExhibitorLinks: React.FC = () => {
       return exhibitionId === exhibitor.exhibitionId;
     });
     if (!exhibition) return '';
-    return `${FRONTEND_URL}/${exhibition.slug}?ref=${exhibitor.slug}`;
+    // Co-branded exhibitor link format: /[exhibition-slug]/[exhibitor-slug]
+    return `${FRONTEND_URL}/${exhibition.slug}/${exhibitor.slug}`;
   };
 
   const getLogoUrl = (logoPath: string | undefined) => {
@@ -765,14 +768,14 @@ const ExhibitorLinks: React.FC = () => {
           <Form.Item
             name="slug"
             label="URL Slug"
-            tooltip="Used in registration link. Auto-generated from exhibitor name."
+            tooltip="Used in co-branded registration link. Auto-generated from exhibitor name."
           >
             <Space.Compact style={{ width: '100%' }}>
               <Input
-                value="?ref="
+                value="/[exhibition]/"
                 disabled
                 style={{ 
-                  width: '80px', 
+                  width: '120px', 
                   textAlign: 'center',
                   background: '#f5f5f5',
                   color: '#595959',
@@ -780,7 +783,7 @@ const ExhibitorLinks: React.FC = () => {
                 }}
               />
               <Input
-                placeholder="xyz-technologies (auto-generated)"
+                placeholder="exhibitor-slug (auto-generated)"
                 size="large"
                 disabled
                 style={{ flex: 1 }}

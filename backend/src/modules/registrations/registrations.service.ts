@@ -26,7 +26,7 @@ import * as QRCode from 'qrcode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { ConfigService } from '@nestjs/config';
-import { generateRegistrationQR, generateDetailedQR, normalizePhoneNumber } from '../../common/utils/sanitize.util';
+import { generateRegistrationQR, generateDetailedQR, normalizePhoneNumberE164 } from '../../common/utils/sanitize.util';
 
 @Injectable()
 export class RegistrationsService {
@@ -137,10 +137,10 @@ export class RegistrationsService {
     let visitor: GlobalVisitorDocument | null = null;
     
     // Phone is the PRIMARY identifier - look for visitor by phone ONLY
-    // IMPORTANT: Normalize phone number for consistent lookup/storage
+    // IMPORTANT: Normalize phone number to E.164 format for international support
     let normalizedPhone = '';
     if (dto.phone && dto.phone.trim()) {
-      normalizedPhone = normalizePhoneNumber(dto.phone.trim()); // ✅ Using shared utility
+      normalizedPhone = normalizePhoneNumberE164(dto.phone.trim()); // ✅ Using E.164 format
       this.logger.debug(`Phone normalization: ${dto.phone} -> ${normalizedPhone}`);
       
       visitor = await this.visitorModel.findOne({
@@ -780,11 +780,11 @@ export class RegistrationsService {
 
   /**
    * Lookup visitor by phone (Public)
-   * Normalizes phone number before lookup to handle different formats
+   * Normalizes phone number to E.164 format for international support
    */
   async lookupVisitorByPhone(phone: string) {
-    // Normalize phone number for consistent lookup
-    const normalizedPhone = normalizePhoneNumber(phone.trim()); // ✅ Using shared utility
+    // Normalize phone number to E.164 format for consistent lookup
+    const normalizedPhone = normalizePhoneNumberE164(phone.trim()); // ✅ Using E.164 format
     this.logger.log(`[LOOKUP] Original phone: ${phone} -> Normalized: ${normalizedPhone}`);
     
     const visitor = await this.visitorModel.findOne({

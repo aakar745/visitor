@@ -39,7 +39,7 @@ export interface ImportProgress {
 @Injectable()
 export class ImportService {
   private readonly logger = new Logger(ImportService.name);
-  private readonly MAX_ROWS = 500000; // 5 lakh
+  // ✅ NO LIMIT - System can handle any size dataset with batch processing
   private readonly BATCH_SIZE = 1000; // Process 1000 rows at a time
 
   constructor(
@@ -116,15 +116,14 @@ export class ImportService {
 
     const totalRows = rows.length;
 
-    // Check row limit
-    if (totalRows > this.MAX_ROWS) {
-      throw new BadRequestException(
-        `CSV file exceeds maximum allowed rows of ${this.MAX_ROWS.toLocaleString()}. Found ${totalRows.toLocaleString()} rows.`,
-      );
-    }
-
+    // ✅ NO ROW LIMIT - System handles unlimited rows with batch processing
     if (totalRows === 0) {
       throw new BadRequestException('CSV file is empty');
+    }
+
+    // Log info for large imports
+    if (totalRows > 100000) {
+      this.logger.log(`[Import] Large dataset detected: ${totalRows.toLocaleString()} rows. Processing in batches for optimal performance.`);
     }
 
     // Validate headers

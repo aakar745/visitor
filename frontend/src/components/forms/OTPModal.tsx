@@ -22,6 +22,7 @@ interface OTPModalProps {
   confirmationResult: firebase.auth.ConfirmationResult | null;
   onVerificationSuccess: () => void;
   onResendOTP: () => void;
+  onSwitchToWhatsApp?: () => void;
   companyName?: string;
   otpMethod?: OTPMethod;
 }
@@ -33,6 +34,7 @@ export const OTPModal: React.FC<OTPModalProps> = ({
   confirmationResult,
   onVerificationSuccess,
   onResendOTP,
+  onSwitchToWhatsApp,
   companyName = 'Aakar Exhibition',
   otpMethod = 'sms',
 }) => {
@@ -300,13 +302,13 @@ export const OTPModal: React.FC<OTPModalProps> = ({
             )}
 
             {/* SMS Slow Warning */}
-            {showSlowSMSWarning && otpMethod === 'sms' && !success && (
+            {showSlowSMSWarning && otpMethod === 'sms' && !success && onSwitchToWhatsApp && (
               <div className="sms-slow-warning">
                 <p className="text-sm text-amber-700 font-medium mb-2">
                   📱 SMS taking longer than usual?
                 </p>
                 <button
-                  onClick={onResendOTP}
+                  onClick={onSwitchToWhatsApp}
                   className="alt-method-button"
                   disabled={isVerifying}
                 >

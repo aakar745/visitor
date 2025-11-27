@@ -1,6 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
+import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
 
 /**
  * WhatsApp OTP Service using Interakt API
@@ -46,44 +47,62 @@ export class WhatsAppOtpService {
   }
 
   /**
-   * Format phone number for Interakt API
-   * Input: "+919876543210" or "9876543210"
+   * Format phone number for Interakt API (International Support)
+   * Input: "+919876543210", "+14155552671", "+971501234567", etc.
    * Output: { countryCode: "+91", phoneNumber: "9876543210" }
+   * 
+   * Supports all international phone formats (7-15 digits depending on country)
    */
   private formatPhoneNumber(phoneNumber: string): {
     countryCode: string;
     phoneNumber: string;
   } {
-    // Remove all non-digit characters except +
-    const cleaned = phoneNumber.replace(/[\s\-()]/g, '');
-
-    let countryCode = '+91'; // Default to India
-    let phone = cleaned;
-
-    // Parse country code
-    if (cleaned.startsWith('+91')) {
-      countryCode = '+91';
-      phone = cleaned.substring(3);
-    } else if (cleaned.startsWith('91') && cleaned.length > 10) {
-      countryCode = '+91';
-      phone = cleaned.substring(2);
-    } else if (cleaned.startsWith('+')) {
-      // Extract country code
-      const match = cleaned.match(/^(\+\d{1,3})(\d+)$/);
-      if (match) {
-        countryCode = match[1];
-        phone = match[2];
+    try {
+      // First, validate the phone number is in valid E.164 format
+      if (!isValidPhoneNumber(phoneNumber)) {
+        throw new BadRequestException(
+          `Invalid phone number format: ${phoneNumber}. Please provide a valid international number.`,
+        );
       }
-    }
 
-    // Validate phone number length (should be 10 digits for India)
-    if (phone.length !== 10) {
+      // Parse the phone number to extract country code and national number
+      const parsed = parsePhoneNumber(phoneNumber);
+      
+      if (!parsed) {
+        throw new BadRequestException(
+          `Unable to parse phone number: ${phoneNumber}`,
+        );
+      }
+
+      // Extract country code (e.g., "+91") and national number (e.g., "9876543210")
+      const countryCode = `+${parsed.countryCallingCode}`;
+      const nationalNumber = parsed.nationalNumber;
+
+      this.logger.debug(`📞 Parsed: ${phoneNumber} → ${countryCode} ${nationalNumber} (${parsed.country || 'Unknown'})`);
+
+      // Validate national number length (typically 7-15 digits internationally)
+      if (nationalNumber.length < 7 || nationalNumber.length > 15) {
+        throw new BadRequestException(
+          `Invalid phone number length: ${nationalNumber.length} digits. Expected 7-15 digits.`,
+        );
+      }
+
+      return { 
+        countryCode, 
+        phoneNumber: nationalNumber 
+      };
+    } catch (error) {
+      // If it's already a BadRequestException, re-throw it
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      // Otherwise, wrap in a user-friendly error
+      this.logger.error(`❌ Phone number parsing error:`, error);
       throw new BadRequestException(
-        `Invalid phone number format. Expected 10 digits, got ${phone.length}`,
+        `Invalid phone number format. Please provide a valid international number (e.g., +919876543210, +14155552671).`,
       );
     }
-
-    return { countryCode, phoneNumber: phone };
   }
 
   /**

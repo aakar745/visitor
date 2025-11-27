@@ -51,6 +51,7 @@
     "class-validator": "^0.14.1",
     "compression": "^1.7.4",
     "cookie-parser": "^1.4.7",
+    "exceljs": "^4.4.0",
     "helmet": "^8.0.0",
     "ioredis": "^5.8.2",
     "libphonenumber-js": "^1.12.29",

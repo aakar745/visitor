@@ -13,7 +13,6 @@ import {
   Input,
   AutoComplete,
   DatePicker,
-  Progress,
   Tooltip,
   Modal,
   message,
@@ -28,7 +27,6 @@ import {
   CalendarOutlined,
   DollarOutlined,
   TeamOutlined,
-  TrophyOutlined,
   SearchOutlined,
   EyeOutlined,
   MailOutlined,
@@ -41,7 +39,8 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   DeleteOutlined,
-  ExclamationCircleOutlined
+  ExclamationCircleOutlined,
+  FireOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { formatDate, formatTime, formatDateRangeShort } from '../../utils/dateFormatter';
@@ -61,7 +60,9 @@ const { RangePicker } = DatePicker;
 
 interface FilterOptions {
   exhibitionId?: string;
-  status?: string;
+  registrationType?: 'free' | 'paid'; // Free vs Paid (based on amount)
+  registrationTiming?: 'pre-registration' | 'on-spot'; // Pre-Reg vs On-Spot (based on registration date vs exhibition dates)
+  checkInStatus?: 'checked-in' | 'not-checked-in'; // Check-in status filter
   category?: string;
   paymentStatus?: string;
   dateRange?: { start: string; end: string };
@@ -93,6 +94,9 @@ const ExhibitionReports: React.FC = () => {
   const [isAutocompleteLoading, setIsAutocompleteLoading] = useState(false);
   const [searchProcessingTime, setSearchProcessingTime] = useState<number>(0);
   const [selectedVisitorId, setSelectedVisitorId] = useState<string | null>(null); // Track selected visitor for highlighting
+
+  // ✅ Export State
+  const [isExporting, setIsExporting] = useState(false);
 
   // Load exhibitions on component mount
   useEffect(() => {
@@ -287,6 +291,15 @@ const ExhibitionReports: React.FC = () => {
     if (!selectedExhibition) return;
     
     setLoading(true);
+    
+    // ✅ DEBUG: Log filters being sent to API
+    console.log('🔍 Loading visitor data with filters:', {
+      page: currentPage,
+      limit: pageSize,
+      search: searchTerm || undefined,
+      ...filters
+    });
+    
     try {
       const response = await globalVisitorService.getExhibitionRegistrations(
         selectedExhibition,
@@ -397,12 +410,17 @@ const ExhibitionReports: React.FC = () => {
       setStats({
         exhibitionId: response?.exhibitionId || selectedExhibition,
         totalRegistrations: response?.totalRegistrations || 0,
+        preRegistrations: response?.preRegistrations || 0,
+        preRegCheckIns: response?.preRegCheckIns || 0,
+        onSpotRegistrations: response?.onSpotRegistrations || 0,
+        onSpotCheckIns: response?.onSpotCheckIns || 0,
         confirmedRegistrations: response?.confirmedRegistrations || 0,
         paidRegistrations: response?.paidRegistrations || 0,
         freeRegistrations: response?.freeRegistrations || 0,
         cancelledRegistrations: response?.cancelledRegistrations || 0,
         waitlistedRegistrations: response?.waitlistedRegistrations || 0,
         checkInCount: response?.checkInCount || 0,
+        notCheckedInCount: response?.notCheckedInCount || 0,
         noShowCount: response?.noShowCount || 0,
         revenue: response?.revenue || 0,
         registrationsByCategory: response?.registrationsByCategory || {
@@ -422,12 +440,17 @@ const ExhibitionReports: React.FC = () => {
       setStats({
         exhibitionId: selectedExhibition,
         totalRegistrations: 0,
+        preRegistrations: 0,
+        preRegCheckIns: 0,
+        onSpotRegistrations: 0,
+        onSpotCheckIns: 0,
         confirmedRegistrations: 0,
         paidRegistrations: 0,
         freeRegistrations: 0,
         cancelledRegistrations: 0,
         waitlistedRegistrations: 0,
         checkInCount: 0,
+        notCheckedInCount: 0,
         noShowCount: 0,
         revenue: 0,
         registrationsByCategory: {
@@ -444,8 +467,38 @@ const ExhibitionReports: React.FC = () => {
     }
   };
 
+  /**
+   * Sanitize filename for safe cross-platform downloads
+   * Removes special characters, spaces, and unicode that might cause issues
+   */
+  const sanitizeFilename = (name: string): string => {
+    return name
+      .replace(/[^a-zA-Z0-9-_]/g, '-') // Replace special chars with dash
+      .replace(/\s+/g, '-')             // Replace spaces with dash
+      .replace(/-+/g, '-')              // Remove consecutive dashes
+      .replace(/^-|-$/g, '')            // Remove leading/trailing dashes
+      .toLowerCase();                    // Lowercase for consistency
+  };
+
   const handleExportData = async (format: 'csv' | 'excel') => {
-    if (!selectedExhibition) return;
+    if (!selectedExhibition) {
+      message.warning('Please select an exhibition first');
+      return;
+    }
+    
+    // ✅ VALIDATION: Check if there are any records to export
+    if (totalRecords === 0 || visitors.length === 0) {
+      message.warning('No data available for the selected date range. Please adjust your filters and try again.');
+      return;
+    }
+    
+    setIsExporting(true);
+    
+    // Show progress message for large datasets
+    const hideProgress = message.loading(
+      `Exporting ${totalRecords.toLocaleString()} registration${totalRecords === 1 ? '' : 's'} as ${format.toUpperCase()}...${totalRecords > 10000 ? ' This may take a minute.' : ''}`,
+      0 // Don't auto-hide
+    );
     
     try {
       const blob = await globalVisitorService.exportExhibitionRegistrations(
@@ -454,19 +507,36 @@ const ExhibitionReports: React.FC = () => {
         filters
       );
       
+      hideProgress();
+      
+      // Get exhibition name for filename
+      const exhibitionName = exhibitions?.find(e => e.id === selectedExhibition)?.name || 'exhibition';
+      
+      // Sanitize filename to prevent download issues with special characters
+      const sanitizedName = sanitizeFilename(exhibitionName);
+      
+      // Fix file extension: 'excel' -> 'xlsx', 'csv' -> 'csv'
+      const fileExtension = format === 'excel' ? 'xlsx' : 'csv';
+      const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const fileName = `${sanitizedName}-visitors-${timestamp}.${fileExtension}`;
+      
       // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${exhibitions?.find(e => e.id === selectedExhibition)?.name || 'exhibition'}-visitors.${format}`;
+      link.download = fileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
       
-      message.success(`Data exported successfully as ${format.toUpperCase()}`);
+      message.success(`Successfully exported ${totalRecords.toLocaleString()} record${totalRecords === 1 ? '' : 's'} as ${format.toUpperCase()}`);
     } catch (error) {
-      message.error('Failed to export data');
+      hideProgress();
+      console.error('Export error:', error);
+      message.error('Failed to export data. Please try again.');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -815,6 +885,31 @@ const ExhibitionReports: React.FC = () => {
       width: 80,
       render: (date: string) => (
         <Text type="secondary" style={{ fontSize: '11px' }}>
+          {date ? formatTime(date) : '-'}
+        </Text>
+      ),
+    });
+
+    // Check-in Date & Time
+    cols.push({
+      title: 'Check-in Date',
+      dataIndex: ['registration', 'checkInTime'],
+      key: 'checkInDate',
+      width: 110,
+      render: (date: string) => (
+        <Text style={{ fontSize: '12px', color: date ? '#52c41a' : undefined }}>
+          {date ? formatDate(date) : '-'}
+        </Text>
+      ),
+    });
+
+    cols.push({
+      title: 'Check-in Time',
+      dataIndex: ['registration', 'checkInTime'],
+      key: 'checkInTime',
+      width: 90,
+      render: (date: string) => (
+        <Text type="secondary" style={{ fontSize: '11px', color: date ? '#52c41a' : undefined }}>
           {date ? formatTime(date) : '-'}
         </Text>
       ),
@@ -1207,169 +1302,153 @@ const ExhibitionReports: React.FC = () => {
         <>
           {stats ? (
             <>
-              {/* Beautiful Statistics Cards */}
-              <Row gutter={[16, 16]} style={{ marginBottom: '32px' }}>
-                <Col xs={24} sm={12} lg={6}>
+              {/* Compact Statistics Cards - Optimized Layout */}
+              <Row gutter={[12, 12]} style={{ marginBottom: '24px' }}>
+                {/* 1. Total Registrations */}
+                <Col xs={24} sm={12} md={8} lg={6} xl={4}>
                   <Card
                     style={{ 
-                      borderRadius: '12px',
+                      borderRadius: '10px',
                       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                       border: 'none',
                       color: 'white',
-                      minHeight: '140px'
+                      minHeight: '110px'
                     }}
+                    styles={{ body: { padding: '16px' } }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                      <div>
-                        <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px', fontWeight: 500 }}>
-                          TOTAL REGISTRATIONS
-                        </Text>
-                      </div>
-                      <div style={{ 
-                        backgroundColor: 'rgba(255,255,255,0.2)', 
-                        borderRadius: '8px', 
-                        padding: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <TeamOutlined style={{ fontSize: '20px', color: 'white' }} />
-                      </div>
+                    <div style={{ marginBottom: '8px' }}>
+                      <TeamOutlined style={{ fontSize: '18px', opacity: 0.8 }} />
                     </div>
-                    <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'white', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '28px', fontWeight: 'bold', color: 'white', marginBottom: '2px', lineHeight: 1 }}>
                       {(stats.totalRegistrations || 0).toLocaleString()}
                     </div>
-                    <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>
-                      📈 All visitor registrations
+                    <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: '11px', fontWeight: 500, textTransform: 'uppercase' }}>
+                      Total Registrations
                     </Text>
                   </Card>
                 </Col>
-                
-                <Col xs={24} sm={12} lg={6}>
+
+                {/* 2. Pre-Registrations */}
+                <Col xs={24} sm={12} md={8} lg={6} xl={4}>
                   <Card
                     style={{ 
-                      borderRadius: '12px',
+                      borderRadius: '10px',
                       background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
                       border: 'none',
                       color: 'white',
-                      minHeight: '140px'
+                      minHeight: '110px'
                     }}
+                    styles={{ body: { padding: '16px' } }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                      <div>
-                        <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px', fontWeight: 500 }}>
-                          CONFIRMED VISITORS
-                        </Text>
-                      </div>
-                      <div style={{ 
-                        backgroundColor: 'rgba(255,255,255,0.2)', 
-                        borderRadius: '8px', 
-                        padding: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <TrophyOutlined style={{ fontSize: '20px', color: 'white' }} />
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'white', marginBottom: '8px' }}>
-                      {(stats.confirmedRegistrations || 0).toLocaleString()}
-                    </div>
                     <div style={{ marginBottom: '8px' }}>
-                      <Progress
-                        percent={stats.totalRegistrations > 0 ? Math.round(((stats.confirmedRegistrations || 0) / stats.totalRegistrations) * 100) : 0}
-                        size="small"
-                        showInfo={false}
-                        strokeColor="rgba(255,255,255,0.8)"
-                        trailColor="rgba(255,255,255,0.2)"
-                      />
+                      <CalendarOutlined style={{ fontSize: '18px', opacity: 0.8 }} />
                     </div>
-                    <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>
-                      ✅ {stats.totalRegistrations > 0 ? Math.round(((stats.confirmedRegistrations || 0) / stats.totalRegistrations) * 100) : 0}% confirmation rate
+                    <div style={{ fontSize: '28px', fontWeight: 'bold', color: 'white', marginBottom: '2px', lineHeight: 1 }}>
+                      {(stats.preRegistrations || 0).toLocaleString()}
+                    </div>
+                    <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: '11px', fontWeight: 500, textTransform: 'uppercase' }}>
+                      Pre-Register
                     </Text>
                   </Card>
                 </Col>
-                
-                <Col xs={24} sm={12} lg={6}>
+
+                {/* 3. Check-In */}
+                <Col xs={24} sm={12} md={8} lg={6} xl={4}>
                   <Card
                     style={{ 
-                      borderRadius: '12px',
-                      background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                      borderRadius: '10px',
+                      background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
                       border: 'none',
                       color: 'white',
-                      minHeight: '140px'
+                      minHeight: '110px'
                     }}
+                    styles={{ body: { padding: '16px' } }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                      <div>
-                        <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px', fontWeight: 500 }}>
-                          ACTUAL VISITORS
-                        </Text>
-                      </div>
-                      <div style={{ 
-                        backgroundColor: 'rgba(255,255,255,0.2)', 
-                        borderRadius: '8px', 
-                        padding: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <CalendarOutlined style={{ fontSize: '20px', color: 'white' }} />
-                      </div>
+                    <div style={{ marginBottom: '8px' }}>
+                      <CheckCircleOutlined style={{ fontSize: '18px', opacity: 0.8 }} />
                     </div>
-                    <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'white', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '28px', fontWeight: 'bold', color: 'white', marginBottom: '2px', lineHeight: 1 }}>
                       {(stats.checkInCount || 0).toLocaleString()}
                     </div>
-                    <div style={{ marginBottom: '8px' }}>
-                      <Progress
-                        percent={stats.confirmedRegistrations > 0 ? Math.round(((stats.checkInCount || 0) / stats.confirmedRegistrations) * 100) : 0}
-                        size="small"
-                        showInfo={false}
-                        strokeColor="rgba(255,255,255,0.8)"
-                        trailColor="rgba(255,255,255,0.2)"
-                      />
-                    </div>
-                    <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>
-                      🎯 {stats.confirmedRegistrations > 0 ? Math.round(((stats.checkInCount || 0) / stats.confirmedRegistrations) * 100) : 0}% attendance rate
+                    <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: '11px', fontWeight: 500, textTransform: 'uppercase' }}>
+                      Check-In
                     </Text>
                   </Card>
                 </Col>
-                
-                <Col xs={24} sm={12} lg={6}>
+
+                {/* 4. Not Checked In */}
+                <Col xs={24} sm={12} md={8} lg={6} xl={4}>
                   <Card
                     style={{ 
-                      borderRadius: '12px',
-                      background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+                      borderRadius: '10px',
+                      background: 'linear-gradient(135deg, #f2994a 0%, #f2c94c 100%)',
                       border: 'none',
                       color: 'white',
-                      minHeight: '140px'
+                      minHeight: '110px'
                     }}
+                    styles={{ body: { padding: '16px' } }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                      <div>
-                        <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px', fontWeight: 500 }}>
-                          TOTAL REVENUE
-                        </Text>
-                      </div>
-                      <div style={{ 
-                        backgroundColor: 'rgba(255,255,255,0.2)', 
-                        borderRadius: '8px', 
-                        padding: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <DollarOutlined style={{ fontSize: '20px', color: 'white' }} />
-                      </div>
+                    <div style={{ marginBottom: '8px' }}>
+                      <ClockCircleOutlined style={{ fontSize: '18px', opacity: 0.8 }} />
                     </div>
-                    <div style={{ fontSize: '28px', fontWeight: 'bold', color: 'white', marginBottom: '4px' }}>
-                      ₹{(stats.revenue || 0).toLocaleString()}
+                    <div style={{ fontSize: '28px', fontWeight: 'bold', color: 'white', marginBottom: '2px', lineHeight: 1 }}>
+                      {(stats.notCheckedInCount || 0).toLocaleString()}
                     </div>
-                    <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>
-                      💰 Generated from registrations
+                    <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: '11px', fontWeight: 500, textTransform: 'uppercase' }}>
+                      Not Checked In
                     </Text>
                   </Card>
                 </Col>
+
+                {/* 5. On-Spot Registrations */}
+                <Col xs={24} sm={12} md={8} lg={6} xl={4}>
+                  <Card
+                    style={{ 
+                      borderRadius: '10px',
+                      background: 'linear-gradient(135deg, #ee0979 0%, #ff6a00 100%)',
+                      border: 'none',
+                      color: 'white',
+                      minHeight: '110px'
+                    }}
+                    styles={{ body: { padding: '16px' } }}
+                  >
+                    <div style={{ marginBottom: '8px' }}>
+                      <FireOutlined style={{ fontSize: '18px', opacity: 0.8 }} />
+                    </div>
+                    <div style={{ fontSize: '28px', fontWeight: 'bold', color: 'white', marginBottom: '2px', lineHeight: 1 }}>
+                      {(stats.onSpotRegistrations || 0).toLocaleString()}
+                    </div>
+                    <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: '11px', fontWeight: 500, textTransform: 'uppercase' }}>
+                      On-Spot
+                    </Text>
+                  </Card>
+                </Col>
+
+                {/* 6. Total Revenue (only if paid exhibition) */}
+                {isPaidExhibition && (
+                  <Col xs={24} sm={12} md={8} lg={6} xl={4}>
+                    <Card
+                      style={{ 
+                        borderRadius: '10px',
+                        background: 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)',
+                        border: 'none',
+                        color: 'white',
+                        minHeight: '110px'
+                      }}
+                      styles={{ body: { padding: '16px' } }}
+                    >
+                      <div style={{ marginBottom: '8px' }}>
+                        <DollarOutlined style={{ fontSize: '18px', opacity: 0.8 }} />
+                      </div>
+                      <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'white', marginBottom: '2px', lineHeight: 1 }}>
+                        ₹{(stats.revenue || 0).toLocaleString()}
+                      </div>
+                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: '11px', fontWeight: 500, textTransform: 'uppercase' }}>
+                        Total Revenue
+                      </Text>
+                    </Card>
+                  </Col>
+                )}
               </Row>
             </>
           ) : (
@@ -1492,21 +1571,57 @@ const ExhibitionReports: React.FC = () => {
               <Col xs={24} sm={12} md={5} lg={4}>
                 <div style={{ marginBottom: '8px' }}>
                   <Text strong style={{ fontSize: '13px', color: '#595959' }}>
-                    Registration Status
+                    Registration Type
+                  </Text>
+                </div>
+                <Select
+                  placeholder="All Types"
+                  style={{ width: '100%', borderRadius: '6px' }}
+                  size="middle"
+                  value={filters.registrationType}
+                  onChange={(value) => setFilters({ ...filters, registrationType: value })}
+                  allowClear
+                >
+                  <Option value="free">🆓 Free</Option>
+                  <Option value="paid">💰 Paid</Option>
+                </Select>
+              </Col>
+              
+              <Col xs={24} sm={12} md={5} lg={4}>
+                <div style={{ marginBottom: '8px' }}>
+                  <Text strong style={{ fontSize: '13px', color: '#595959' }}>
+                    Registration Timing
+                  </Text>
+                </div>
+                <Select
+                  placeholder="All Timing"
+                  style={{ width: '100%', borderRadius: '6px' }}
+                  size="middle"
+                  value={filters.registrationTiming}
+                  onChange={(value) => setFilters({ ...filters, registrationTiming: value })}
+                  allowClear
+                >
+                  <Option value="pre-registration">📅 Pre-Registration</Option>
+                  <Option value="on-spot">🔥 On-Spot</Option>
+                </Select>
+              </Col>
+              
+              <Col xs={24} sm={12} md={5} lg={4}>
+                <div style={{ marginBottom: '8px' }}>
+                  <Text strong style={{ fontSize: '13px', color: '#595959' }}>
+                    Check-in Status
                   </Text>
                 </div>
                 <Select
                   placeholder="All Status"
                   style={{ width: '100%', borderRadius: '6px' }}
                   size="middle"
-                  value={filters.status}
-                  onChange={(value) => setFilters({ ...filters, status: value })}
+                  value={filters.checkInStatus}
+                  onChange={(value) => setFilters({ ...filters, checkInStatus: value })}
                   allowClear
                 >
-                  <Option value="registered">📝 Registered</Option>
-                  <Option value="confirmed">✅ Confirmed</Option>
-                  <Option value="cancelled">❌ Cancelled</Option>
-                  <Option value="waitlisted">⏳ Waitlisted</Option>
+                  <Option value="checked-in">✅ Checked In</Option>
+                  <Option value="not-checked-in">⏳ Not Checked In</Option>
                 </Select>
               </Col>
               
@@ -1519,16 +1634,21 @@ const ExhibitionReports: React.FC = () => {
                 <RangePicker
                   style={{ width: '100%', borderRadius: '6px' }}
                   size="middle"
+                  format="DD-MM-YYYY"
                   onChange={(dates) => {
                     if (dates && dates[0] && dates[1]) {
+                      const startDate = toBackendDate(dates[0], false); // Start of day (00:00:00)
+                      const endDate = toBackendDate(dates[1], true);     // End of day (23:59:59)
+                      
                       setFilters({
                         ...filters,
                         dateRange: {
-                          start: toBackendDate(dates[0], false), // Start of day
-                          end: toBackendDate(dates[1], false)
+                          start: startDate,
+                          end: endDate
                         }
                       });
                     } else {
+                      console.log('📅 Date Range Cleared');
                       const { dateRange, ...restFilters } = filters;
                       setFilters(restFilters);
                     }
@@ -1543,20 +1663,32 @@ const ExhibitionReports: React.FC = () => {
                   </Text>
                 </div>
                 <Space size="small" wrap>
-                  <Tooltip title="Export as Excel">
+                  <Tooltip title={
+                    isExporting ? 'Exporting...' : 
+                    totalRecords === 0 ? 'No data available for export' : 
+                    `Export ${totalRecords.toLocaleString()} record${totalRecords === 1 ? '' : 's'} as Excel`
+                  }>
                     <Button 
                       icon={<FileExcelOutlined />}
                       onClick={() => handleExportData('excel')}
+                      loading={isExporting}
+                      disabled={isExporting || totalRecords === 0}
                       style={{ borderRadius: '6px', color: '#52c41a', borderColor: '#52c41a' }}
                       size="middle"
                     >
                       Excel
                     </Button>
                   </Tooltip>
-                  <Tooltip title="Export as CSV">
+                  <Tooltip title={
+                    isExporting ? 'Exporting...' : 
+                    totalRecords === 0 ? 'No data available for export' : 
+                    `Export ${totalRecords.toLocaleString()} record${totalRecords === 1 ? '' : 's'} as CSV`
+                  }>
                     <Button 
                       icon={<DownloadOutlined />}
                       onClick={() => handleExportData('csv')}
+                      loading={isExporting}
+                      disabled={isExporting || totalRecords === 0}
                       style={{ borderRadius: '6px' }}
                       size="middle"
                     >
@@ -1568,7 +1700,9 @@ const ExhibitionReports: React.FC = () => {
                     onClick={() => {
                       setFilters({});
                       setSearchTerm('');
+                      setSelectedVisitorId(null);
                     }}
+                    disabled={isExporting}
                     size="middle"
                     style={{ borderRadius: '6px' }}
                   >
@@ -1766,6 +1900,14 @@ const ExhibitionReports: React.FC = () => {
                       <Text type="secondary" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Registration Date</Text>
                       <div style={{ fontSize: '13px', marginTop: '4px' }}>
                         {formatDate(selectedVisitor.registration.registrationDate) + ' • ' + formatTime(selectedVisitor.registration.registrationDate)}
+                      </div>
+                    </div>
+                    <div>
+                      <Text type="secondary" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Check-in Date</Text>
+                      <div style={{ fontSize: '13px', marginTop: '4px', color: selectedVisitor.registration.checkInTime ? '#52c41a' : undefined }}>
+                        {selectedVisitor.registration.checkInTime 
+                          ? formatDate(selectedVisitor.registration.checkInTime) + ' • ' + formatTime(selectedVisitor.registration.checkInTime)
+                          : 'Not checked in'}
                       </div>
                     </div>
                     <div>

@@ -24,7 +24,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
   error,
   disabled = false,
   required = false,
-  placeholder = 'Enter phone number',
+  placeholder = 'Enter phone number with country code',
   className = '',
 }) => {
   const [touched, setTouched] = useState(false);
@@ -38,35 +38,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
 
   const handleChange = (newValue: E164Number | undefined) => {
     onChange(newValue);
-    
-    // Check if number format matches a different country
-    if (newValue && newValue.length > 5) {
-      try {
-        const parsed = parsePhoneNumber(newValue);
-        if (parsed && parsed.country) {
-          const selectedCountry = newValue.substring(1, 3); // Get country code from value
-          const actualCountry = parsed.country;
-          
-          // If the number is valid but for a different country, show warning
-          if (parsed.isValid() && actualCountry !== 'IN' && newValue.startsWith('+91')) {
-            // Number starts with +91 but is valid for another country - unlikely, keep as is
-            setCountryMismatch(false);
-          } else if (parsed.isValid() && !newValue.startsWith(`+${parsed.countryCallingCode}`)) {
-            // Number is valid but country code doesn't match
-            setCountryMismatch(true);
-            setDetectedCountry(getCountryName(actualCountry));
-          } else {
-            setCountryMismatch(false);
-          }
-        } else {
-          setCountryMismatch(false);
-        }
-      } catch {
-        setCountryMismatch(false);
-      }
-    } else {
-      setCountryMismatch(false);
-    }
+    setCountryMismatch(false); // International mode - no mismatch warnings needed
   };
 
   const getCountryName = (code: CountryCode): string => {
@@ -109,15 +81,15 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
   return (
     <div className={`modern-phone-wrapper ${className}`}>
       <PhoneInputWithCountry
-        international={false}
+        international
         defaultCountry="IN"
         value={value}
         onChange={handleChange}
         onBlur={handleBlur}
         disabled={disabled}
         placeholder={placeholder}
-        countryCallingCodeEditable={false}
-        withCountryCallingCode={false}
+        countryCallingCodeEditable={true}
+        withCountryCallingCode
         className="modern-phone-component"
       />
       
@@ -168,8 +140,8 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
         .PhoneInputCountry {
           display: flex !important;
           align-items: center !important;
-          gap: 0.375rem !important;
-          padding: 0.375rem 0.625rem !important;
+          gap: 0.5rem !important;
+          padding: 0.375rem 0.75rem !important;
           border: none !important;
           background: #f9fafb !important;
           cursor: pointer !important;
@@ -177,6 +149,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
           transition: all 0.15s !important;
           position: relative !important;
           flex-shrink: 0 !important;
+          min-width: fit-content !important;
         }
 
         .PhoneInputCountry:hover {
@@ -248,6 +221,11 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
           font-weight: 600 !important;
         }
 
+        /* Country calling code display */
+        .PhoneInputCountryIconImg {
+          display: block !important;
+        }
+
         /* Input field - ONLY DIGITS, clean and borderless */
         .PhoneInputInput {
           flex: 1 !important;
@@ -262,6 +240,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
           font-weight: 400 !important;
           box-shadow: none !important;
           width: 100% !important;
+          min-width: 0 !important;
         }
 
         .PhoneInputInput:focus {

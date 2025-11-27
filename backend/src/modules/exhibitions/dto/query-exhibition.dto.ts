@@ -2,15 +2,10 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsEnum, IsBoolean, IsString, IsNumber, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ExhibitionStatus } from '../../../database/schemas/exhibition.schema';
+import { BasePaginationDto } from '../../../common/dto/base-pagination.dto';
 
-export class QueryExhibitionDto {
-  @ApiPropertyOptional({ description: 'Page number', example: 1, default: 1, minimum: 1 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  page?: number = 1;
-
+export class QueryExhibitionDto extends BasePaginationDto {
+  // Override limit with higher maximum (500 for exhibitions)
   @ApiPropertyOptional({ description: 'Items per page', example: 10, default: 10, minimum: 1, maximum: 500 })
   @IsOptional()
   @Type(() => Number)

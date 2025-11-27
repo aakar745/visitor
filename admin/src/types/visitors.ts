@@ -98,15 +98,23 @@ export interface RegistrationFormData extends VisitorFormData {
 export interface ExhibitionRegistrationStats {
   exhibitionId: string;
   totalRegistrations: number;
+  preRegistrations: number;
+  preRegCheckIns: number;
+  onSpotRegistrations: number;
+  onSpotCheckIns: number;
   confirmedRegistrations: number;
   paidRegistrations: number;
   freeRegistrations: number;
   cancelledRegistrations: number;
   waitlistedRegistrations: number;
   checkInCount: number;
+  notCheckedInCount: number;
   noShowCount: number;
   revenue: number;
   registrationsByCategory: Record<RegistrationCategory, number>;
+  registrationsByCity?: Array<{ _id: string; count: number }>;
+  registrationsByState?: Array<{ _id: string; count: number }>;
+  registrationsByCountry?: Array<{ _id: string; count: number }>;
   registrationTrend: Array<{
     date: string;
     count: number;

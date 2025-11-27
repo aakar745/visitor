@@ -17,6 +17,7 @@ import ExhibitionList from './pages/exhibitions/ExhibitionList';
 import CreateExhibition from './pages/exhibitions/CreateExhibition';
 import EditExhibition from './pages/exhibitions/EditExhibition';
 import ExhibitionReports from './pages/visitors/ExhibitionReports';
+import Analytics from './pages/visitors/Analytics';
 import ExhibitorLinks from './pages/exhibitions/ExhibitorLinks';
 import KioskSettings from './pages/kiosk/KioskSettings';
 import Users from './pages/users/Users';
@@ -168,6 +169,16 @@ const App: React.FC = () => {
                           <ErrorBoundary>
                             <Suspense fallback={<LoadingScreen type="table" />}>
                               <ExhibitionReports />
+                            </Suspense>
+                          </ErrorBoundary>
+                        } 
+                      />
+                      <Route 
+                        path="visitors/analytics" 
+                        element={
+                          <ErrorBoundary>
+                            <Suspense fallback={<LoadingScreen type="dashboard" />}>
+                              <Analytics />
                             </Suspense>
                           </ErrorBoundary>
                         } 

@@ -11,10 +11,13 @@ import {
   HttpCode,
   HttpStatus,
   Req,
+  Res,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  StreamableFile,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { Request } from 'express';
@@ -171,6 +174,11 @@ export class ExhibitionsController {
   @ApiQuery({ name: 'status', description: 'Registration status filter', required: false })
   @ApiQuery({ name: 'category', description: 'Registration category filter', required: false })
   @ApiQuery({ name: 'paymentStatus', description: 'Payment status filter', required: false })
+  @ApiQuery({ name: 'registrationType', description: 'Registration type (free/paid)', required: false, enum: ['free', 'paid'] })
+  @ApiQuery({ name: 'registrationTiming', description: 'Registration timing (pre-registration/on-spot)', required: false, enum: ['pre-registration', 'on-spot'] })
+  @ApiQuery({ name: 'checkInStatus', description: 'Check-in status (checked-in/not-checked-in)', required: false, enum: ['checked-in', 'not-checked-in'] })
+  @ApiQuery({ name: 'startDate', description: 'Start date for date range filter (ISO string)', required: false })
+  @ApiQuery({ name: 'endDate', description: 'End date for date range filter (ISO string)', required: false })
   @ApiResponse({ status: 200, description: 'Registrations retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Exhibition not found' })
   async getExhibitionRegistrations(
@@ -180,6 +188,11 @@ export class ExhibitionsController {
     @Query('status') status?: string,
     @Query('category') category?: string,
     @Query('paymentStatus') paymentStatus?: string,
+    @Query('registrationType') registrationType?: 'free' | 'paid',
+    @Query('registrationTiming') registrationTiming?: 'pre-registration' | 'on-spot',
+    @Query('checkInStatus') checkInStatus?: 'checked-in' | 'not-checked-in',
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ): Promise<any> {
     return await this.exhibitionsService.getExhibitionRegistrations(id, {
       page,
@@ -187,7 +200,62 @@ export class ExhibitionsController {
       status,
       category,
       paymentStatus,
+      registrationType,
+      registrationTiming,
+      checkInStatus,
+      dateRange: startDate && endDate ? { start: startDate, end: endDate } : undefined,
     });
+  }
+
+  /**
+   * Export exhibition registrations (CSV/Excel) - Streaming for large datasets
+   * Handles millions of records efficiently without memory overflow
+   */
+  @Get(':id/export')
+  @ApiOperation({ summary: 'Export exhibition registrations (streaming for large datasets)' })
+  @ApiParam({ name: 'id', description: 'Exhibition ID' })
+  @ApiQuery({ name: 'format', description: 'Export format', required: true, enum: ['csv', 'excel'] })
+  @ApiQuery({ name: 'registrationType', description: 'Filter by free/paid', required: false, enum: ['free', 'paid'] })
+  @ApiQuery({ name: 'registrationTiming', description: 'Filter by pre-registration/on-spot', required: false, enum: ['pre-registration', 'on-spot'] })
+  @ApiQuery({ name: 'checkInStatus', description: 'Filter by check-in status', required: false, enum: ['checked-in', 'not-checked-in'] })
+  @ApiQuery({ name: 'category', description: 'Filter by category', required: false })
+  @ApiQuery({ name: 'paymentStatus', description: 'Filter by payment status', required: false })
+  @ApiQuery({ name: 'startDate', description: 'Start date filter', required: false })
+  @ApiQuery({ name: 'endDate', description: 'End date filter', required: false })
+  @ApiResponse({ status: 200, description: 'Export file generated successfully' })
+  @ApiResponse({ status: 404, description: 'Exhibition not found' })
+  async exportExhibitionRegistrations(
+    @Param('id') id: string,
+    @Res() res: Response, // Remove passthrough for binary file response
+    @Query('format') format: 'csv' | 'excel',
+    @Query('registrationType') registrationType?: 'free' | 'paid',
+    @Query('registrationTiming') registrationTiming?: 'pre-registration' | 'on-spot',
+    @Query('checkInStatus') checkInStatus?: 'checked-in' | 'not-checked-in',
+    @Query('category') category?: string,
+    @Query('paymentStatus') paymentStatus?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ): Promise<void> {
+    // Set response headers for file download
+    const exhibition = await this.exhibitionsService.findOne(id);
+    const filename = `${exhibition.slug}-registrations-${new Date().toISOString().split('T')[0]}.${format === 'excel' ? 'xlsx' : 'csv'}`;
+    
+    res.setHeader('Content-Type', format === 'csv' ? 'text/csv; charset=utf-8' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    const streamableFile = await this.exhibitionsService.exportExhibitionRegistrations(id, {
+      format,
+      registrationType,
+      registrationTiming,
+      checkInStatus,
+      category,
+      paymentStatus,
+      dateRange: startDate && endDate ? { start: startDate, end: endDate } : undefined,
+    });
+
+    // Pipe the stream directly to the response
+    const stream = streamableFile.getStream();
+    stream.pipe(res);
   }
 
   /**

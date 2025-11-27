@@ -32,9 +32,12 @@ export const PAGINATION_LIMITS = {
  * 
  * @param page - Requested page number
  * @param limit - Requested items per page
- * @returns Sanitized pagination parameters
+ * @returns Sanitized pagination parameters with skip offset
  */
-export function sanitizePagination(page?: number, limit?: number): { page: number; limit: number } {
+export function sanitizePagination(
+  page?: number, 
+  limit?: number
+): { page: number; limit: number; skip: number } {
   const sanitizedPage = Math.max(
     PAGINATION_LIMITS.MIN_PAGE,
     Math.floor(Number(page) || PAGINATION_LIMITS.MIN_PAGE)
@@ -48,6 +51,39 @@ export function sanitizePagination(page?: number, limit?: number): { page: numbe
     )
   );
 
-  return { page: sanitizedPage, limit: sanitizedLimit };
+  // Calculate skip offset for MongoDB queries
+  const skip = (sanitizedPage - 1) * sanitizedLimit;
+
+  return { page: sanitizedPage, limit: sanitizedLimit, skip };
+}
+
+/**
+ * Build MongoDB sort object from sort parameters
+ * 
+ * @param sortBy - Field to sort by
+ * @param sortOrder - Sort order (asc/desc)
+ * @returns MongoDB sort object
+ */
+export function buildSortObject(sortBy: string = 'createdAt', sortOrder: 'asc' | 'desc' = 'desc'): Record<string, 1 | -1> {
+  const sort: Record<string, 1 | -1> = {};
+  sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+  return sort;
+}
+
+/**
+ * Calculate pagination metadata
+ * 
+ * @param page - Current page number
+ * @param limit - Items per page
+ * @param total - Total number of items
+ * @returns Pagination metadata object
+ */
+export function calculatePaginationMeta(page: number, limit: number, total: number) {
+  return {
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit),
+  };
 }
 

@@ -57,6 +57,8 @@ const Visitors: React.FC = () => {
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<any>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'csv' | 'excel'>('csv');
   
   // ✅ MeiliSearch Autocomplete State
   const [autocompleteOptions, setAutocompleteOptions] = useState<any[]>([]);
@@ -258,77 +260,47 @@ const Visitors: React.FC = () => {
     });
   };
 
-  // Export functionality
-  const handleExport = () => {
+  // Export functionality with backend streaming (CSV or Excel)
+  const handleExport = async (format: 'csv' | 'excel') => {
     try {
-      // Standard headers
-      const standardHeaders = [
-        'Name',
-        'Email',
-        'Phone',
-        'Company',
-        'Designation',
-        'City',
-        'State',
-        'Pincode',
-        'Address',
-      ];
-
-      // Dynamic field headers
-      const dynamicHeaders = dynamicFields.map(field =>
-        field.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+      setIsExporting(true);
+      setExportFormat(format);
+      
+      // Show progress message for large datasets
+      const formatName = format === 'csv' ? 'CSV' : 'Excel';
+      const hideMessage = message.loading(
+        `Exporting ${total.toLocaleString()} visitor${total === 1 ? '' : 's'} to ${formatName}... This may take a moment for large datasets.`,
+        0
       );
 
-      // Summary headers
-      const summaryHeaders = [
-        'Total Registrations',
-        'Last Registration',
-        'Created Date',
-      ];
-
-      const csvHeaders = [...standardHeaders, ...dynamicHeaders, ...summaryHeaders];
-
-      const csvRows = visitors.map((v: any) => {
-        const standardValues = [
-          v.name || '',
-          v.email || '',
-          v.phone || '',
-          v.company || '',
-          v.designation || '',
-          v.city || '',
-          v.state || '',
-          v.pincode || '',
-          v.address || '',
-        ];
-
-        const dynamicValues = dynamicFields.map(field => {
-          const value = v[field];
-          if (Array.isArray(value)) return value.join('; ');
-          return value || '';
-        });
-
-        const summaryValues = [
-          v.totalRegistrations || 0,
-          v.lastRegistrationDate ? formatDateForExport(v.lastRegistrationDate) : '',
-          formatDateForExport(v.createdAt),
-        ];
-
-        return [...standardValues, ...dynamicValues, ...summaryValues];
+      // Call backend export endpoint (exports ALL visitors, not just current page)
+      const blob = await globalVisitorService.exportGlobalVisitors(format, {
+        search: searchTerm || undefined,
+        // Add other filters if needed
       });
 
-      const csvContent = [
-        csvHeaders.join(','),
-        ...csvRows.map((row: any[]) => row.map((cell: any) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-      ].join('\n');
+      hideMessage();
 
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      // Sanitize filename
+      const sanitizedName = 'all-visitors'.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      const extension = format === 'csv' ? 'csv' : 'xlsx';
+      
+      // Download file
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `all-visitors-${formatDateForExport(new Date())}.csv`;
+      link.href = url;
+      link.download = `${sanitizedName}-${formatDateForExport(new Date())}.${extension}`;
+      document.body.appendChild(link);
       link.click();
-      message.success('Visitors exported successfully!');
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      message.success(`Successfully exported ${total.toLocaleString()} visitor${total === 1 ? '' : 's'} to ${formatName}!`);
     } catch (error) {
-      message.error('Failed to export data');
+      console.error('Export error:', error);
+      message.error('Failed to export data. Please try again.');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -487,18 +459,6 @@ const Visitors: React.FC = () => {
       ),
     },
     {
-      title: 'Last Registration',
-      dataIndex: 'lastRegistrationDate',
-      key: 'lastRegistrationDate',
-      width: 160,
-      sorter: true,
-      render: (date: string) => (
-        <Text style={{ fontSize: '12px' }}>
-          {date ? formatDateTime(date) : '-'}
-        </Text>
-      ),
-    },
-    {
       title: 'Created Date',
       dataIndex: 'createdAt',
       key: 'createdAt',
@@ -633,15 +593,26 @@ const Visitors: React.FC = () => {
                   Refresh
                 </Button>
               </Tooltip>
-              <Button
-                icon={<ExportOutlined />}
-                size="middle"
-                onClick={handleExport}
-                disabled={visitors.length === 0}
-                style={{ borderRadius: '6px' }}
-              >
-                Export CSV
-              </Button>
+              <Space.Compact>
+                <Button
+                  icon={<ExportOutlined />}
+                  size="middle"
+                  onClick={() => handleExport('csv')}
+                  loading={isExporting && exportFormat === 'csv'}
+                  disabled={visitors.length === 0 || isExporting}
+                >
+                  Export CSV
+                </Button>
+                <Button
+                  icon={<ExportOutlined />}
+                  size="middle"
+                  onClick={() => handleExport('excel')}
+                  loading={isExporting && exportFormat === 'excel'}
+                  disabled={visitors.length === 0 || isExporting}
+                >
+                  Export Excel
+                </Button>
+              </Space.Compact>
               {selectedRowKeys.length > 0 && (
                 <Button
                   danger
@@ -793,16 +764,23 @@ const Visitors: React.FC = () => {
                 }
               }}
               style={{ width: '100%' }}
-              size="large"
               allowClear
-              dropdownStyle={{ 
-                maxHeight: '320px', 
-                overflowY: 'auto',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                borderRadius: '8px',
-                padding: '4px 0'
+              styles={{
+                popup: {
+                  root: {
+                    maxHeight: '320px',
+                    overflowY: 'auto',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                    borderRadius: '8px',
+                    padding: '4px 0'
+                  }
+                }
               }}
-              popupClassName="visitor-autocomplete-dropdown"
+              classNames={{
+                popup: {
+                  root: 'visitor-autocomplete-dropdown'
+                }
+              }}
               notFoundContent={
                 isAutocompleteLoading ? (
                   <div style={{ textAlign: 'center', padding: '12px' }}>
@@ -824,6 +802,7 @@ const Visitors: React.FC = () => {
                 }
                 placeholder="Search by name, mobile, email, or company..."
                 style={{ borderRadius: '8px' }}
+                size="large"
               />
             </AutoComplete>
           </Col>
@@ -838,10 +817,14 @@ const Visitors: React.FC = () => {
               onChange={(value) => setSortBy(value)}
               style={{ width: '100%' }}
               size="large"
+              styles={{
+                popup: {
+                  root: {}
+                }
+              }}
             >
               <Option value="createdAt">Created Date</Option>
               <Option value="name">Name</Option>
-              <Option value="lastRegistrationDate">Last Registration</Option>
               <Option value="totalRegistrations">Total Registrations</Option>
             </Select>
           </Col>
@@ -856,6 +839,11 @@ const Visitors: React.FC = () => {
               onChange={(value) => setSortOrder(value)}
               style={{ width: '100%' }}
               size="large"
+              styles={{
+                popup: {
+                  root: {}
+                }
+              }}
             >
               <Option value="desc">Descending</Option>
               <Option value="asc">Ascending</Option>
@@ -1045,15 +1033,10 @@ const Visitors: React.FC = () => {
               column={2}
               size="small"
             >
-              <Descriptions.Item label="Total Registrations">
+              <Descriptions.Item label="Total Registrations" span={2}>
                 <Tag color="blue" style={{ fontSize: '13px' }}>
                   {selectedVisitor.totalRegistrations || 0}
                 </Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="Last Registration">
-                {selectedVisitor.lastRegistrationDate
-                  ? formatDateTime(selectedVisitor.lastRegistrationDate)
-                  : 'Never'}
               </Descriptions.Item>
               <Descriptions.Item label="Created Date" span={2}>
                 <Text style={{ color: '#52c41a', fontWeight: 500 }}>

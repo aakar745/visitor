@@ -4,7 +4,7 @@ import { Model } from 'mongoose';
 import { Role, RoleDocument } from '../../database/schemas/role.schema';
 import { CreateRoleDto, UpdateRoleDto, QueryRoleDto } from './dto';
 import { sanitizeSearch } from '../../common/utils/sanitize.util';
-import { sanitizePagination } from '../../common/constants/pagination.constants';
+import { sanitizePagination, calculatePaginationMeta } from '../../common/constants/pagination.constants';
 
 @Injectable()
 export class RolesService {
@@ -153,9 +153,8 @@ export class RolesService {
 
   async findAll(query: QueryRoleDto) {
     // Sanitize and enforce pagination limits (defense in depth)
-    const { page, limit } = sanitizePagination(query.page, query.limit);
+    const { page, limit, skip } = sanitizePagination(query.page, query.limit);
     const { search = '', isActive, isSystemRole } = query;
-    const skip = (page - 1) * limit;
 
     const filter: any = {};
     
@@ -183,10 +182,7 @@ export class RolesService {
 
     return {
       roles,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      ...calculatePaginationMeta(page, limit, total),
     };
   }
 

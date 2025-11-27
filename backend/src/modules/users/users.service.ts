@@ -5,7 +5,7 @@ import * as bcrypt from 'bcrypt';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { CreateUserDto, UpdateUserDto, QueryUserDto, ChangePasswordDto } from './dto';
 import { sanitizeSearch } from '../../common/utils/sanitize.util';
-import { sanitizePagination } from '../../common/constants/pagination.constants';
+import { sanitizePagination, calculatePaginationMeta } from '../../common/constants/pagination.constants';
 
 @Injectable()
 export class UsersService {
@@ -46,9 +46,8 @@ export class UsersService {
 
   async findAll(query: QueryUserDto) {
     // Sanitize and enforce pagination limits (defense in depth)
-    const { page, limit } = sanitizePagination(query.page, query.limit);
+    const { page, limit, skip } = sanitizePagination(query.page, query.limit);
     const { search = '', role, status } = query;
-    const skip = (page - 1) * limit;
 
     const filter: any = {};
     
@@ -78,10 +77,7 @@ export class UsersService {
 
     return {
       users,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      ...calculatePaginationMeta(page, limit, total),
     };
   }
 

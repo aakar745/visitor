@@ -80,10 +80,11 @@ class ExhibitorService {
 
   /**
    * Generate exhibitor registration link
+   * Format: /[exhibition-slug]/[exhibitor-slug]
    */
   generateExhibitorLink(exhibitionSlug: string, exhibitorSlug: string): string {
     const baseUrl = import.meta.env.VITE_FRONTEND_URL || window.location.origin;
-    return `${baseUrl}/register/${exhibitionSlug}?ref=${exhibitorSlug}`;
+    return `${baseUrl}/${exhibitionSlug}/${exhibitorSlug}`;
   }
 
   /**

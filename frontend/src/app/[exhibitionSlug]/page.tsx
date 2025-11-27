@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -9,9 +9,12 @@ import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Header } from '@/components/shared/Header';
 import { Footer } from '@/components/shared/Footer';
-import { OTPLogin } from '@/components/forms/OTPLogin';
-import { RegistrationForm } from '@/components/forms/RegistrationForm';
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner';
+import { OTPLoginSkeleton, FormSkeleton } from '@/components/shared/LoadingSkeleton';
+
+// ✅ Lazy load heavy components for better performance on old devices
+const OTPLogin = lazy(() => import('@/components/forms/OTPLogin').then(m => ({ default: m.OTPLogin })));
+const RegistrationForm = lazy(() => import('@/components/forms/RegistrationForm').then(m => ({ default: m.RegistrationForm })));
 import { exhibitionsApi } from '@/lib/api/exhibitions';
 import { useVisitorAuthStore } from '@/lib/store/visitorAuthStore';
 import { 
@@ -249,21 +252,25 @@ export default function ExhibitionPage({ params: paramsPromise }: PageProps) {
                   <>
                    
 
-                    {/* OTP Login Component */}
-                    <OTPLogin
-                      exhibitionId={exhibition._id || exhibition.id}
-                      exhibitionName={exhibition.name}
-                      exhibitionLogo={logoUrl}
-                      onAuthSuccess={(hasExistingRegistration, registrationId) => {
-                        if (hasExistingRegistration && registrationId) {
-                          // Redirect to success page with existing registration
-                          router.push(`/success?registrationId=${registrationId}`);
-                        } else {
-                          // Show registration form
-                          setShowForm(true);
-                        }
-                      }}
-                    />
+                    {/* OTP Login Component - Lazy Loaded */}
+                    <Suspense fallback={<OTPLoginSkeleton />}>
+                      <OTPLogin
+                        exhibitionId={exhibition._id || exhibition.id}
+                        exhibitionName={exhibition.name}
+                        exhibitionLogo={logoUrl}
+                        exhibitorLogo={undefined}
+                        exhibitor={undefined} // Direct registration (no exhibitor)
+                        onAuthSuccess={(hasExistingRegistration, registrationId) => {
+                          if (hasExistingRegistration && registrationId) {
+                            // Redirect to success page with existing registration
+                            router.push(`/success?registrationId=${registrationId}`);
+                          } else {
+                            // Show registration form
+                            setShowForm(true);
+                          }
+                        }}
+                      />
+                    </Suspense>
                   </>
                 ) : (
                   /* Show Registration Form */
@@ -293,8 +300,10 @@ export default function ExhibitionPage({ params: paramsPromise }: PageProps) {
                       </div>
                     </Card>
 
-                    {/* Registration Form */}
-                    <RegistrationForm exhibition={exhibition} />
+                    {/* Registration Form - Lazy Loaded */}
+                    <Suspense fallback={<FormSkeleton />}>
+                      <RegistrationForm exhibition={exhibition} />
+                    </Suspense>
                   </>
                 )}
               </div>

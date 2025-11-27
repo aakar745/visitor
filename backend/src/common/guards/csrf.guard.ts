@@ -3,7 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { SKIP_CSRF_KEY } from '../decorators/skip-csrf.decorator';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import * as crypto from 'crypto';
+import { generateCsrfToken } from '../utils/crypto.util';
 
 /**
  * CSRF Guard - Protects against Cross-Site Request Forgery attacks
@@ -44,7 +44,7 @@ export class CsrfGuard implements CanActivate {
     if (['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
       // Generate token if it doesn't exist
       if (!request.cookies[this.CSRF_COOKIE_NAME]) {
-        const token = crypto.randomBytes(32).toString('hex');
+        const token = generateCsrfToken();
         response.cookie(this.CSRF_COOKIE_NAME, token, {
           httpOnly: false, // Must be readable by JavaScript
           secure: process.env.NODE_ENV === 'production',

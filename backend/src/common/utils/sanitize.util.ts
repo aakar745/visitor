@@ -110,6 +110,8 @@ export async function generateCustomQR(
 // =============================================================================
 
 /**
+ * ⚠️ DEPRECATED - Use normalizePhoneNumberE164() for international support
+ * 
  * Normalize phone number to consistent 10-digit format for database storage
  * Removes country code, spaces, dashes, and stores only 10 digits
  * 
@@ -119,6 +121,7 @@ export async function generateCustomQR(
  * - +91 98765 43210 → 9876543210
  * - 9876543210 → 9876543210
  * 
+ * @deprecated Use normalizePhoneNumberE164() for international support
  * @param phone - Phone number in any format
  * @returns Normalized 10-digit phone number (Indian format) or empty string if invalid
  */
@@ -144,23 +147,55 @@ export function normalizePhoneNumber(phone: string | undefined): string {
 }
 
 /**
+ * Normalize phone number to E.164 format for international support
+ * Preserves country code and stores in standard E.164 format (+[country][number])
+ * 
+ * Handles various input formats:
+ * - +919876543210 → +919876543210 (India)
+ * - +14155552671 → +14155552671 (USA)
+ * - +971501234567 → +971501234567 (UAE)
+ * - 16089827071 → +16089827071 (adds + if missing)
+ * - 9876543210 → +919876543210 (adds +91 for 10-digit numbers without country code)
+ * 
+ * @param phone - Phone number in any format
+ * @returns Phone number in E.164 format (+[country][number]) or empty string if invalid
+ */
+export function normalizePhoneNumberE164(phone: string | undefined): string {
+  if (!phone || typeof phone !== 'string') return '';
+  
+  // Remove spaces, dashes, parentheses (but keep + for country code)
+  let cleaned = phone.replace(/[\s\-()]/g, '');
+  
+  // If already starts with +, validate and return
+  if (cleaned.startsWith('+')) {
+    return cleaned; // E.164 format, use as-is
+  }
+  
+  // If starts with digit, add + prefix
+  if (/^\d/.test(cleaned)) {
+    // If it's exactly 10 digits, assume India (+91)
+    if (cleaned.length === 10) {
+      return `+91${cleaned}`;
+    }
+    // Otherwise, add + prefix (user provided country code)
+    return `+${cleaned}`;
+  }
+  
+  return '';
+}
+
+/**
+ * ⚠️ DEPRECATED - Use normalizePhoneNumberE164() instead
+ * 
  * Format phone number with country code for API/WhatsApp usage
  * Returns phone in E.164 format (+919876543210)
  * 
+ * @deprecated Use normalizePhoneNumberE164() for international support
  * @param phone - Phone number in any format
  * @returns Phone in E.164 format (+919876543210) or empty string if invalid
  */
 export function formatPhoneE164(phone: string | undefined): string {
-  if (!phone) return '';
-  
-  // Normalize first to get 10 digits
-  const normalized = normalizePhoneNumber(phone);
-  
-  // If valid 10 digits, add country code
-  if (normalized.length === 10) {
-    return `+91${normalized}`;
-  }
-  
-  return '';
+  // Redirect to new international-aware function
+  return normalizePhoneNumberE164(phone);
 }
 

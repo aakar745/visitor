@@ -184,7 +184,7 @@ const ImportVisitorsModal: React.FC<ImportVisitorsModalProps> = ({
         )
       }
       width={700}
-      destroyOnClose
+      destroyOnHidden
     >
       {!importId ? (
         <>
@@ -201,7 +201,7 @@ const ImportVisitorsModal: React.FC<ImportVisitorsModalProps> = ({
                   <strong>Supported formats:</strong> CSV, Excel 2007+ (.xlsx), Excel 97-2003 (.xls)
                 </Paragraph>
                 <Paragraph style={{ marginBottom: 0 }}>
-                  <strong>Maximum rows:</strong> 500,000 (5 lakh)
+                  <strong>Capacity:</strong> ✅ Unlimited rows - System handles any size dataset with batch processing
                 </Paragraph>
               </div>
             }
@@ -296,7 +296,7 @@ const ImportVisitorsModal: React.FC<ImportVisitorsModalProps> = ({
               Click or drag CSV or Excel file to this area to upload
             </p>
             <p className="ant-upload-hint">
-              Supports CSV and Excel files (.csv, .xlsx, .xls). Maximum 500,000 rows.
+              Supports CSV and Excel files (.csv, .xlsx, .xls). ✅ Unlimited rows supported.
             </p>
           </Dragger>
         </>

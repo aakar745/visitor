@@ -1,22 +1,10 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsBoolean, IsNumber, Min, Max, IsEnum } from 'class-validator';
+import { IsOptional, IsString, IsBoolean, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
+import { BasePaginationDto } from '../../../common/dto/base-pagination.dto';
 
-export class QueryExhibitorDto {
-  @ApiPropertyOptional({ description: 'Page number', example: 1, default: 1 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  page?: number = 1;
-
-  @ApiPropertyOptional({ description: 'Items per page', example: 10, default: 10 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  @Max(100)
-  limit?: number = 10;
+export class QueryExhibitorDto extends BasePaginationDto {
+  // Pagination fields (page, limit) inherited from BasePaginationDto
 
   @ApiPropertyOptional({ description: 'Search by name or company name' })
   @IsOptional()

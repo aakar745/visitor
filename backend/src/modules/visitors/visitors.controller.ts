@@ -9,7 +9,9 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { VisitorsService, QueryVisitorDto, CreateVisitorDto, UpdateVisitorDto } from './visitors.service';
 import { GlobalVisitor } from '../../database/schemas/global-visitor.schema';
@@ -99,6 +101,41 @@ export class VisitorsController {
       data: stats,
       message: 'Statistics retrieved successfully',
     };
+  }
+
+  /**
+   * Export all global visitors to CSV or Excel
+   * Supports streaming for large datasets (100k+ records)
+   * ⚠️ IMPORTANT: Must be defined BEFORE /:id route
+   */
+  @Get('export')
+  @ApiOperation({ 
+    summary: 'Export all global visitors to CSV/Excel',
+    description: 'Streams visitor data with dynamic field discovery. Handles large datasets efficiently.'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'File download stream',
+    content: {
+      'text/csv': {},
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {}
+    }
+  })
+  async exportGlobalVisitors(
+    @Res() res: Response,
+    @Query('format') format?: 'csv' | 'excel',
+    @Query('search') search?: string,
+    @Query('state') state?: string,
+    @Query('city') city?: string,
+    @Query('minRegistrations') minRegistrations?: number,
+  ): Promise<void> {
+    return await this.visitorsService.exportGlobalVisitors(res, {
+      format: (format as 'csv' | 'excel') || 'csv',
+      search,
+      state,
+      city,
+      minRegistrations: minRegistrations ? parseInt(minRegistrations.toString()) : undefined,
+    });
   }
 
   /**
