@@ -92,7 +92,12 @@ async function bootstrap() {
   const corsOrigins = corsOriginsString.split(',').map(origin => origin.trim());
   
   console.log('🔒 CORS Configuration:');
-  console.log('   Allowed Origins:', corsOrigins);
+  // Security: Don't log full origin list in production (might contain internal URLs)
+  if (process.env.NODE_ENV === 'production') {
+    console.log(`   Allowed Origins: ${corsOrigins.length} origin(s) configured`);
+  } else {
+    console.log('   Allowed Origins:', corsOrigins);
+  }
   console.log('   Credentials: true');
   
   app.enableCors({

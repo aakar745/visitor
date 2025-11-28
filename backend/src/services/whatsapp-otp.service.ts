@@ -133,7 +133,9 @@ export class WhatsAppOtpService {
       const { countryCode, phoneNumber: phone } = this.formatPhoneNumber(phoneNumber);
 
       this.logger.log(`📱 Sending WhatsApp OTP to ${countryCode}${phone}`);
-      this.logger.debug(`🔢 OTP: ${otpCode}`);
+      // ✅ SECURITY: Never log OTP codes - even at debug level
+      // Logs can be accessed by unauthorized personnel or stored long-term
+      // this.logger.debug(`🔢 OTP: ${otpCode}`); // DISABLED FOR SECURITY
 
       // Prepare Interakt API payload
       const payload = {

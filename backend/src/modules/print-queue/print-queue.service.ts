@@ -60,7 +60,7 @@ export class PrintQueueService implements OnModuleInit {
     };
 
     this.logger.log('✅ Print Queue Service initialized');
-    this.logger.log(`📍 Redis: ${redisHost}:${redisPort}`);
+    this.logger.log(`📍 Redis: ${redisHost}:${redisPort} (Auth: ${redisPassword ? '✓' : '✗'})`);
   }
 
   /**

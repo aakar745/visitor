@@ -860,13 +860,18 @@ ipcMain.handle('save-config', async (event, config) => {
     // Debug: Show what was saved
     sendToWindow('log', '✅ Configuration file updated successfully');
     sendToWindow('log', '📝 File contents:');
-    const savedLines = envContent.trim().split('\n');
+    const savedLines = newEnvContent.trim().split('\n');
     savedLines.forEach(line => {
       if (line && !line.startsWith('#')) {
-        // Hide password values
-        if (line.includes('PASSWORD')) {
+        // ✅ SECURITY: Hide sensitive values (passwords, keys, tokens, secrets)
+        const sensitivePatterns = ['PASSWORD', 'SECRET', 'KEY', 'TOKEN'];
+        const isSensitive = sensitivePatterns.some(pattern => 
+          line.toUpperCase().includes(pattern)
+        );
+        
+        if (isSensitive) {
           const key = line.split('=')[0];
-          sendToWindow('log', `   ${key}=***`);
+          sendToWindow('log', `   ${key}=***HIDDEN***`);
         } else {
           sendToWindow('log', `   ${line}`);
         }

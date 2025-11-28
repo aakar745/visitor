@@ -49,7 +49,8 @@ if (!REDIS_HOST || !REDIS_PASSWORD) {
   console.error('  REDIS_DB=0\n');
   console.error('Current values:');
   console.error(`  REDIS_HOST: ${REDIS_HOST || '(NOT SET)'}`);
-  console.error(`  REDIS_PASSWORD: ${REDIS_PASSWORD ? 'SET' : '(NOT SET)'}\n`);
+  // ✅ SECURITY FIX: Never log password value, only whether it's configured
+  console.error(`  REDIS_PASSWORD: ${REDIS_PASSWORD ? '***CONFIGURED***' : '(NOT SET)'}\n`);
   console.error('Worker cannot start without Redis configuration.');
   console.error('Exiting...\n');
   process.exit(1);
@@ -76,7 +77,7 @@ console.log(`
 ║                                                   ║
 ║   Kiosk ID: ${(KIOSK_ID || 'default').padEnd(36)} ║
 ║   Queue: ${QUEUE_NAME.padEnd(39)} ║
-║   Redis: ${REDIS_HOST}:${REDIS_PORT}                            ║
+║   Redis: ${REDIS_HOST}:${REDIS_PORT} (Auth: ${REDIS_PASSWORD ? '✓' : '✗'})              ║
 ║   Printer: ${PRINTER_NAME.padEnd(36)} ║
 ║   Output: ${OUTPUT_DIR.substring(0, 44)}...   ║
 ║   Rate Limit: ${RATE_LIMIT_DELAY}ms between jobs                  ║
