@@ -45,16 +45,12 @@ export const loginUser = createAsyncThunk(
       const response = await authService.login(credentials);
       return response;
     } catch (error: any) {
-      console.error('[Login Error]', error);
-      
       // Extract error message from various possible locations
       const apiMessage = 
         error?.response?.data?.message || 
         error?.response?.data?.error || 
         error?.message || 
         'Unknown error';
-      
-      console.log('[Login Error Message]', apiMessage);
       
       // Map common backend errors to user-friendly messages
       const lowerMessage = apiMessage.toLowerCase();

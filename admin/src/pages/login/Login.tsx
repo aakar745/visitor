@@ -49,16 +49,13 @@ const Login: React.FC = () => {
   const handleSubmit = async (values: LoginRequest & { remember: boolean }) => {
     try {
       setError(null);
-      console.log('[Login] Attempting login for:', values.email);
       await login({
         email: values.email,
         password: values.password,
       });
-      console.log('[Login] Login successful, navigating to:', redirectPath);
       // Use sanitized redirect path to prevent infinite loops
       navigate(redirectPath, { replace: true });
     } catch (error: any) {
-      console.error('[Login] Login error:', error);
       // Error is already mapped to user-friendly message in authSlice
       setError(error || 'Login failed. Please try again.');
     }
