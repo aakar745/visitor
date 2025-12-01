@@ -25,7 +25,7 @@
     "seed": "ts-node -r tsconfig-paths/register src/database/seeds/run-seed.ts",
     "seed:production": "node seed-production.js",
     "update:superadmin": "ts-node -r tsconfig-paths/register src/scripts/update-superadmin-permissions.ts",
-    "update:superadmin:prod": "node update-superadmin-prod.js",
+    "update:superadmin:prod": "node scripts/update-superadmin-prod.js",
     "migrate:exhibitions": "ts-node -r tsconfig-paths/register src/scripts/migrate-exhibition-subdocuments.ts",
     "sync:meilisearch": "ts-node -r tsconfig-paths/register src/scripts/sync-meilisearch.ts",
     "sync:visitors": "ts-node -r tsconfig-paths/register src/scripts/sync-visitors-meilisearch.ts",

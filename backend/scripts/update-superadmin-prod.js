@@ -1,6 +1,6 @@
 /**
  * Production Script: Update Super Admin Role Permissions
- * Run: node update-superadmin-prod.js
+ * Run: node scripts/update-superadmin-prod.js
  */
 
 const mongoose = require('mongoose');
