@@ -86,6 +86,7 @@ const defaultRoles = [
       { id: 'users.view', name: 'View Users', action: 'view', resource: 'users', category: 'User Management' },
       { id: 'users.create', name: 'Create Users', action: 'create', resource: 'users', category: 'User Management' },
       { id: 'users.update', name: 'Edit Users', action: 'update', resource: 'users', category: 'User Management' },
+      { id: 'users.reset_password', name: 'Reset User Password', description: 'Reset password for any user', action: 'reset_password', resource: 'users', category: 'User Management' },
       { id: 'users.delete', name: 'Delete Users', action: 'delete', resource: 'users', category: 'User Management' },
       { id: 'users.export', name: 'Export Users', action: 'export', resource: 'users', category: 'User Management' },
       // Role Management

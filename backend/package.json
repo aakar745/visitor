@@ -23,6 +23,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed": "ts-node -r tsconfig-paths/register src/database/seeds/run-seed.ts",
+    "seed:production": "node seed-production.js",
     "update:superadmin": "ts-node -r tsconfig-paths/register src/scripts/update-superadmin-permissions.ts",
     "migrate:exhibitions": "ts-node -r tsconfig-paths/register src/scripts/migrate-exhibition-subdocuments.ts",
     "sync:meilisearch": "ts-node -r tsconfig-paths/register src/scripts/sync-meilisearch.ts",
