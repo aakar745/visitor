@@ -45,12 +45,6 @@ export function useFormCleanup(
         if (!f) return;
         
         try {
-          // Check if form instance is still valid and connected
-          if (!f.getFieldsValue) {
-            // Form is not connected or already destroyed
-            return;
-          }
-          
           if (clearErrors) {
             // Clear validation errors without resetting values
             try {
@@ -105,10 +99,8 @@ export function useModalFormCleanup(
     // When modal closes (visible changes to false), reset form
     if (!isVisible) {
       try {
-        // Check if form instance is still valid
-        if (form.getFieldsValue) {
-          form.resetFields();
-        }
+        // Check if form instance is still valid by attempting to get fields
+        form.resetFields();
       } catch (error) {
         // Silently fail - this can happen in React Strict Mode
       }
