@@ -50,8 +50,9 @@ RUN npm ci --omit=dev --legacy-peer-deps && \
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 
-# Copy production seed script
+# Copy production seed script and scripts folder
 COPY --chown=nestjs:nodejs seed-production.js ./
+COPY --chown=nestjs:nodejs scripts ./scripts
 
 # Copy necessary runtime files (optional - uncomment if you add templates folder)
 # COPY --chown=nestjs:nodejs ./templates ./templates
