@@ -475,7 +475,7 @@ const ExhibitorLinks: React.FC = () => {
       key: 'registrations',
       align: 'center',
       width: 150,
-      render: (count, record) => {
+      render: (count) => {
         const isTopPerformer = count === stats.topPerformer?.totalRegistrations && count > 0;
         const hasRegistrations = count > 0;
         return (
