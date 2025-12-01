@@ -106,7 +106,8 @@ export const useUserMutations = () => {
 
   // Reset password
   const resetPassword = useMutation({
-    mutationFn: (id: string) => userService.resetUserPassword(id),
+    mutationFn: ({ id, passwordData }: { id: string; passwordData: { newPassword: string; confirmPassword: string } }) =>
+      userService.resetUserPassword(id, passwordData),
   });
 
   // Toggle user status

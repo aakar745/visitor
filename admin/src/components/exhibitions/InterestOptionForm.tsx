@@ -42,6 +42,7 @@ interface InterestFormData {
   category: InterestCategory;
   description?: string;
   isActive: boolean;
+  required: boolean;
   order: number;
 }
 

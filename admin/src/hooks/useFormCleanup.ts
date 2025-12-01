@@ -46,8 +46,7 @@ export function useFormCleanup(
         
         try {
           // Check if form instance is still valid and connected
-          const formInstance = f.getInternalHooks?.('RC_FORM_INTERNAL_HOOKS');
-          if (!formInstance) {
+          if (!f.getFieldsValue) {
             // Form is not connected or already destroyed
             return;
           }
@@ -107,8 +106,7 @@ export function useModalFormCleanup(
     if (!isVisible) {
       try {
         // Check if form instance is still valid
-        const formInstance = form.getInternalHooks?.('RC_FORM_INTERNAL_HOOKS');
-        if (formInstance) {
+        if (form.getFieldsValue) {
           form.resetFields();
         }
       } catch (error) {

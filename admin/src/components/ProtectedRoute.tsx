@@ -35,7 +35,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole 
   // Check role-based access
   if (requiredRole && user) {
     // Extract role name whether it's a string or object
-    const userRoleName = getRoleName(user.role);
+    const userRoleName = getRoleName(user.role as any);
     
     // Check if user's role is in the required roles list
     if (!requiredRole.includes(userRoleName)) {

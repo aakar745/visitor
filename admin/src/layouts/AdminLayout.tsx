@@ -452,7 +452,7 @@ const AdminLayout: React.FC = () => {
                       textOverflow: 'ellipsis'
                     }}
                   >
-                    {getRoleName(user?.role)}
+                    {getRoleName(user?.role as any)}
                   </Text>
                 </div>
               </div>
