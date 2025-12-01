@@ -278,13 +278,6 @@ const ExhibitionList: React.FC = () => {
     const isDraft = exhibition.status === 'draft';
     // Handle both id and _id (backend returns _id, frontend type uses id)
     const exhibitionId = exhibition.id || (exhibition as any)._id;
-    
-    // Safety check: If no valid ID, don't render delete option
-    if (!exhibitionId) {
-      console.error('Exhibition ID is undefined:', exhibition);
-      return [];
-    }
-    
     const hasRegistrations = (exhibition.currentRegistrations || 0) > 0;
     
     const items = [];
