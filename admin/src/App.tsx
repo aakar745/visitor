@@ -42,23 +42,23 @@ const App: React.FC = () => {
           <ConfigProvider
             theme={{
               token: {
-                colorPrimary: '#1890ff',
+                colorPrimary: '#2E5778',
                 borderRadius: 8,
                 fontSize: 14,
               },
               components: {
                 Layout: {
                   headerBg: '#ffffff',
-                  siderBg: '#001529',
+                  siderBg: '#1a2935',
                 },
                 Menu: {
                   darkItemBg: 'transparent',
-                  darkItemSelectedBg: '#1890ff',
+                  darkItemSelectedBg: '#2E5778',
                   darkItemHoverBg: 'rgba(255, 255, 255, 0.08)',
                 },
                 Pagination: {
-                  itemActiveColor: '#1890ff',
-                  itemActiveColorHover: '#40a9ff',
+                  itemActiveColor: '#2E5778',
+                  itemActiveColorHover: '#4A7090',
                 },
                 Notification: {
                   colorBgElevated: '#ffffff',
@@ -67,7 +67,7 @@ const App: React.FC = () => {
                   pictureCardSize: 120,
                 },
                 Segmented: {
-                  itemSelectedBg: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
+                  itemSelectedBg: 'linear-gradient(135deg, #2E5778 0%, #4A7090 100%)',
                 },
               },
             }}

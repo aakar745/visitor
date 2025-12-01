@@ -1,9 +1,27 @@
+'use client';
+
 import Link from 'next/link';
+import Image from 'next/image';
+import { useEffect, useState } from 'react';
 import { Calendar, Mail, MapPin, Phone } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { getPublicSettings } from '@/lib/api/settings';
+import { API_BASE_URL } from '@/lib/constants';
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
+  const [footerLogoUrl, setFooterLogoUrl] = useState<string | null>(null);
+  const [appName, setAppName] = useState('ExhibitHub');
+
+  useEffect(() => {
+    // Fetch public settings on mount
+    getPublicSettings().then((settings) => {
+      setFooterLogoUrl(settings.footerLogoUrl);
+      if (settings.appName) {
+        setAppName(settings.appName);
+      }
+    });
+  }, []);
 
   return (
     <footer className="border-t bg-gradient-to-b from-background to-muted/30">
@@ -12,15 +30,29 @@ export function Footer() {
           {/* Brand */}
           <div className="space-y-4">
             <Link href="/" className="flex items-center space-x-2 group">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-primary to-purple-600 rounded-lg blur-lg opacity-50" />
-                <div className="relative bg-gradient-to-r from-primary to-purple-600 p-2 rounded-lg">
-                  <Calendar className="h-5 w-5 text-white" />
+              {footerLogoUrl ? (
+                <div className="relative h-10 w-auto">
+                  <Image
+                    src={`${API_BASE_URL.replace('/api/v1', '')}${footerLogoUrl}`}
+                    alt={appName}
+                    width={120}
+                    height={40}
+                    className="h-10 w-auto object-contain"
+                  />
                 </div>
-              </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
-                ExhibitHub
-              </span>
+              ) : (
+                <>
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-gradient-to-r from-primary via-primary to-[#4A7090] rounded-lg blur-lg opacity-50" />
+                    <div className="relative bg-gradient-to-r from-primary via-primary to-[#4A7090] p-2 rounded-lg">
+                      <Calendar className="h-5 w-5 text-white" />
+                    </div>
+                  </div>
+                  <span className="text-xl font-bold bg-gradient-to-r from-primary via-primary to-[#4A7090] bg-clip-text text-transparent">
+                    {appName}
+                  </span>
+                </>
+              )}
             </Link>
             <p className="text-sm text-muted-foreground max-w-xs">
               Your premier platform for discovering and registering for exhibitions and events worldwide.

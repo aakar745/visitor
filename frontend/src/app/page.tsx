@@ -13,7 +13,11 @@ import {
   Zap, 
   Shield,
   TrendingUp,
-  Clock
+  Clock,
+  Smartphone,
+  QrCode,
+  Scan,
+  CheckCircle
 } from 'lucide-react';
 import { exhibitionsApi } from '@/lib/api/exhibitions';
 import { Exhibition } from '@/types';
@@ -119,6 +123,154 @@ export default async function HomePage() {
                 <div className="text-sm text-muted-foreground">Exhibitors</div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section className="py-20 bg-gradient-to-b from-background to-muted/30">
+        <div className="container mx-auto max-w-7xl px-4">
+          <div className="text-center space-y-4 mb-16">
+            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary ring-1 ring-inset ring-primary/20 mb-4">
+              <Sparkles className="h-4 w-4" />
+              <span>Simple 4-Step Process</span>
+            </div>
+            <h2 className="text-3xl font-bold sm:text-4xl">How It Works</h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              From registration to entry - experience seamless access in just 4 simple steps
+            </p>
+          </div>
+
+          {/* Process Flow */}
+          <div className="relative">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+              {/* Step 1 */}
+              <div className="relative">
+              <Card className="p-6 text-center hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/30 hover:-translate-y-2 bg-gradient-to-br from-white to-primary/5">
+                <div className="relative mx-auto w-20 h-20 mb-6">
+                  {/* Number Badge */}
+                  <div className="absolute -top-2 -left-2 w-8 h-8 bg-gradient-to-r from-primary to-[#4A7090] text-white rounded-full flex items-center justify-center font-bold text-sm shadow-lg z-10">
+                    1
+                  </div>
+                  {/* Icon Circle */}
+                  <div className="w-full h-full rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center relative">
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary to-[#4A7090] opacity-10 animate-pulse"></div>
+                    <Smartphone className="h-10 w-10 text-primary z-10" />
+                  </div>
+                </div>
+                <h3 className="text-xl font-bold mb-2 bg-gradient-to-r from-primary to-[#4A7090] bg-clip-text text-transparent">
+                  Register Online
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Fill out the quick registration form online or at our kiosk
+                </p>
+              </Card>
+              {/* Arrow - Hidden on mobile */}
+              <div className="hidden md:flex absolute -right-4 top-1/2 -translate-y-1/2 z-20">
+                <ArrowRight className="h-6 w-6 text-primary/40" />
+              </div>
+            </div>
+
+            {/* Step 2 */}
+            <div className="relative">
+              <Card className="p-6 text-center hover:shadow-xl transition-all duration-300 border-2 hover:border-purple-500/30 hover:-translate-y-2 bg-gradient-to-br from-white to-purple-50/50">
+                <div className="relative mx-auto w-20 h-20 mb-6">
+                  <div className="absolute -top-2 -left-2 w-8 h-8 bg-gradient-to-r from-purple-600 to-purple-400 text-white rounded-full flex items-center justify-center font-bold text-sm shadow-lg z-10">
+                    2
+                  </div>
+                  <div className="w-full h-full rounded-full bg-gradient-to-br from-purple-500/20 to-purple-500/10 flex items-center justify-center relative">
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-purple-600 to-purple-400 opacity-10 animate-pulse"></div>
+                    <QrCode className="h-10 w-10 text-purple-600 z-10" />
+                  </div>
+                </div>
+                <h3 className="text-xl font-bold mb-2 bg-gradient-to-r from-purple-600 to-purple-400 bg-clip-text text-transparent">
+                  Receive QR Code
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Get your unique QR code badge instantly via email/WhatsApp
+                </p>
+              </Card>
+              {/* Arrow - Hidden on mobile */}
+              <div className="hidden md:flex absolute -right-4 top-1/2 -translate-y-1/2 z-20">
+                <ArrowRight className="h-6 w-6 text-purple-400/40" />
+              </div>
+            </div>
+
+            {/* Step 3 */}
+            <div className="relative">
+              <Card className="p-6 text-center hover:shadow-xl transition-all duration-300 border-2 hover:border-pink-500/30 hover:-translate-y-2 bg-gradient-to-br from-white to-pink-50/50">
+                <div className="relative mx-auto w-20 h-20 mb-6">
+                  <div className="absolute -top-2 -left-2 w-8 h-8 bg-gradient-to-r from-pink-600 to-pink-400 text-white rounded-full flex items-center justify-center font-bold text-sm shadow-lg z-10">
+                    3
+                  </div>
+                  <div className="w-full h-full rounded-full bg-gradient-to-br from-pink-500/20 to-pink-500/10 flex items-center justify-center relative">
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-600 to-pink-400 opacity-10 animate-pulse"></div>
+                    <Scan className="h-10 w-10 text-pink-600 z-10" />
+                  </div>
+                </div>
+                <h3 className="text-xl font-bold mb-2 bg-gradient-to-r from-pink-600 to-pink-400 bg-clip-text text-transparent">
+                  Scan at Entry
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Simply scan your QR code at the venue entrance kiosk
+                </p>
+              </Card>
+              {/* Arrow - Hidden on mobile */}
+              <div className="hidden md:flex absolute -right-4 top-1/2 -translate-y-1/2 z-20">
+                <ArrowRight className="h-6 w-6 text-pink-400/40" />
+              </div>
+            </div>
+
+            {/* Step 4 */}
+            <div className="relative">
+              <Card className="p-6 text-center hover:shadow-xl transition-all duration-300 border-2 hover:border-green-500/30 hover:-translate-y-2 bg-gradient-to-br from-white to-green-50/50">
+                <div className="relative mx-auto w-20 h-20 mb-6">
+                  <div className="absolute -top-2 -left-2 w-8 h-8 bg-gradient-to-r from-green-600 to-green-400 text-white rounded-full flex items-center justify-center font-bold text-sm shadow-lg z-10">
+                    4
+                  </div>
+                  <div className="w-full h-full rounded-full bg-gradient-to-br from-green-500/20 to-green-500/10 flex items-center justify-center relative">
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-green-600 to-green-400 opacity-10 animate-pulse"></div>
+                    <CheckCircle className="h-10 w-10 text-green-600 z-10" />
+                  </div>
+                </div>
+                <h3 className="text-xl font-bold mb-2 bg-gradient-to-r from-green-600 to-green-400 bg-clip-text text-transparent">
+                  Instant Access
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Walk in and enjoy the exhibition - it's that simple!
+                </p>
+              </Card>
+            </div>
+            </div>
+          </div>
+
+          {/* Additional Benefits */}
+          <div className="mt-16 text-center">
+            <Card className="max-w-4xl mx-auto p-8 bg-gradient-to-r from-primary/5 via-purple-50/50 to-pink-50/30 border-2 border-primary/20">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Clock className="h-6 w-6 text-primary" />
+                  </div>
+                  <div className="font-semibold">Under 2 Minutes</div>
+                  <div className="text-sm text-muted-foreground">Complete registration</div>
+                </div>
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center">
+                    <Shield className="h-6 w-6 text-purple-600" />
+                  </div>
+                  <div className="font-semibold">100% Secure</div>
+                  <div className="text-sm text-muted-foreground">Your data is protected</div>
+                </div>
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center">
+                    <Zap className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div className="font-semibold">Instant Badge</div>
+                  <div className="text-sm text-muted-foreground">Get your badge immediately</div>
+                </div>
+              </div>
+            </Card>
           </div>
         </div>
       </section>

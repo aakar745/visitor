@@ -1,14 +1,19 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar, Menu, X, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getPublicSettings } from '@/lib/api/settings';
+import { API_BASE_URL } from '@/lib/constants';
 
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [headerLogoUrl, setHeaderLogoUrl] = useState<string | null>(null);
+  const [appName, setAppName] = useState('ExhibitHub');
 
   useEffect(() => {
     const handleScroll = () => {
@@ -16,6 +21,16 @@ export function Header() {
     };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    // Fetch public settings on mount
+    getPublicSettings().then((settings) => {
+      setHeaderLogoUrl(settings.headerLogoUrl);
+      if (settings.appName) {
+        setAppName(settings.appName);
+      }
+    });
   }, []);
 
   return (
@@ -31,15 +46,30 @@ export function Header() {
         <div className="flex h-16 items-center justify-between px-4">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2 group">
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-primary to-purple-600 rounded-lg blur-lg opacity-50 group-hover:opacity-75 transition-opacity" />
-              <div className="relative bg-gradient-to-r from-primary to-purple-600 p-2 rounded-lg">
-                <Calendar className="h-5 w-5 text-white" />
+            {headerLogoUrl ? (
+              <div className="relative h-10 w-auto">
+                <Image
+                  src={`${API_BASE_URL.replace('/api/v1', '')}${headerLogoUrl}`}
+                  alt={appName}
+                  width={120}
+                  height={40}
+                  className="h-10 w-auto object-contain"
+                  priority
+                />
               </div>
-            </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
-              ExhibitHub
-            </span>
+            ) : (
+              <>
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary via-primary to-[#4A7090] rounded-lg blur-lg opacity-50 group-hover:opacity-75 transition-opacity" />
+                  <div className="relative bg-gradient-to-r from-primary via-primary to-[#4A7090] p-2 rounded-lg">
+                    <Calendar className="h-5 w-5 text-white" />
+                  </div>
+                </div>
+                <span className="text-xl font-bold bg-gradient-to-r from-primary via-primary to-[#4A7090] bg-clip-text text-transparent">
+                  {appName}
+                </span>
+              </>
+            )}
           </Link>
 
           {/* Desktop Navigation */}
@@ -70,7 +100,7 @@ export function Header() {
           <div className="hidden md:flex items-center space-x-2">
             <Button
               asChild
-              className="bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+              className="bg-gradient-to-r from-primary to-[#4A7090] hover:from-primary/90 hover:to-[#4A7090]/90 text-white shadow-lg hover:shadow-xl transition-all duration-300"
             >
               <Link href="/#exhibitions" className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4" />
@@ -120,7 +150,7 @@ export function Header() {
               </Link>
               <Button
                 asChild
-                className="w-full mt-4 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white"
+                className="w-full mt-4 bg-gradient-to-r from-primary to-[#4A7090] hover:from-primary/90 hover:to-[#4A7090]/90 text-white"
               >
                 <Link
                   href="/#exhibitions"

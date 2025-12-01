@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Card,
   Tabs,
@@ -20,10 +20,12 @@ import {
   Table,
   Tooltip,
   Popconfirm,
-  message,
+  App,
   Spin,
   Empty,
   Drawer,
+  Upload,
+  Image,
 } from 'antd';
 import {
   SettingOutlined,
@@ -46,6 +48,7 @@ import {
   SyncOutlined,
   EditOutlined,
   DeleteOutlined,
+  PictureOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { format } from 'date-fns';
@@ -64,9 +67,10 @@ import type {
   Setting,
   SettingsBackup,
 } from '../../types';
+import { BACKEND_BASE_URL } from '../../constants';
 
 const { Title, Text } = Typography;
-const { TabPane } = Tabs;
+// Removed deprecated TabPane - using Tabs items prop instead
 const { TextArea } = Input;
 const { Option } = Select;
 
@@ -75,7 +79,7 @@ const settingCategoryConfig = {
   general: {
     name: 'General',
     icon: <SettingOutlined />,
-    color: '#1890ff',
+    color: '#2E5778',
     description: 'Basic application settings and branding'
   },
   security: {
@@ -122,6 +126,13 @@ const Settings: React.FC = () => {
   const [isHistoryDrawerVisible, setIsHistoryDrawerVisible] = useState(false);
   const [isBackupModalVisible, setIsBackupModalVisible] = useState(false);
   const [backupForm] = Form.useForm();
+  
+  // Local state for input values to prevent cursor jumping
+  const [localValues, setLocalValues] = useState<Record<string, any>>({});
+  const updateTimers = useRef<Record<string, NodeJS.Timeout>>({});
+
+  // Ant Design hooks
+  const { message } = App.useApp();
 
   // Hooks
   const { data: settings, isLoading } = useSettings();
@@ -141,10 +152,12 @@ const Settings: React.FC = () => {
     clearCache,
     enableMaintenanceMode,
     disableMaintenanceMode,
+    uploadFile,
     isCreatingBackup,
     isExporting,
     isClearingCache,
     isTogglingMaintenance,
+    isUploading,
   } = useSettingsMutations();
 
   // Handlers
@@ -157,9 +170,60 @@ const Settings: React.FC = () => {
     }
   };
 
+  // Debounced update for text inputs (prevents cursor jumping)
+  const handleLocalValueChange = useCallback((key: string, value: any) => {
+    // Update local state immediately for smooth typing
+    setLocalValues(prev => ({ ...prev, [key]: value }));
+
+    // Clear existing timer
+    if (updateTimers.current[key]) {
+      clearTimeout(updateTimers.current[key]);
+    }
+
+    // Set new timer to update server after user stops typing
+    updateTimers.current[key] = setTimeout(async () => {
+      try {
+        await updateSetting.mutateAsync({ key, data: { value } });
+        // Don't show success message for every keystroke
+      } catch (error) {
+        message.error('Failed to update setting');
+        // Revert local value on error
+        setLocalValues(prev => {
+          const newValues = { ...prev };
+          delete newValues[key];
+          return newValues;
+        });
+      }
+    }, 800); // Wait 800ms after user stops typing
+  }, [updateSetting, message]);
+
+  // Get the display value (local if exists, otherwise from server)
+  const getDisplayValue = (key: string, serverValue: any) => {
+    return localValues.hasOwnProperty(key) ? localValues[key] : serverValue;
+  };
+
+  // Cleanup timers on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      Object.values(updateTimers.current).forEach(timer => clearTimeout(timer));
+    };
+  }, []);
+
 
   const handleResetSetting = async (key: string) => {
     try {
+      // Clear any pending updates
+      if (updateTimers.current[key]) {
+        clearTimeout(updateTimers.current[key]);
+        delete updateTimers.current[key];
+      }
+      // Clear local value
+      setLocalValues(prev => {
+        const newValues = { ...prev };
+        delete newValues[key];
+        return newValues;
+      });
+      // Reset on server
       await resetSetting.mutateAsync(key);
       message.success('Setting reset to default value');
     } catch (error) {
@@ -213,6 +277,29 @@ const Settings: React.FC = () => {
     }
   };
 
+  // Handle logo upload
+  const handleLogoUpload = async (file: File, settingKey: string) => {
+    try {
+      const result = await uploadFile.mutateAsync({ file, type: 'logo' });
+      await handleSettingUpdate(settingKey, result.url);
+      message.success('Logo uploaded successfully');
+      return result.url;
+    } catch (error) {
+      message.error('Failed to upload logo');
+      throw error;
+    }
+  };
+
+  // Handle logo removal
+  const handleLogoRemove = async (settingKey: string) => {
+    try {
+      await handleSettingUpdate(settingKey, null);
+      message.success('Logo removed successfully');
+    } catch (error) {
+      message.error('Failed to remove logo');
+    }
+  };
+
   // Render setting input based on type
   const renderSettingInput = (setting: Setting) => {
     const { valueType, value, options, validation } = setting;
@@ -220,11 +307,13 @@ const Settings: React.FC = () => {
     switch (valueType) {
       case 'boolean':
         return (
-          <Switch
-            checked={value}
-            onChange={(checked) => handleSettingUpdate(setting.key, checked)}
-            disabled={setting.isReadonly}
-          />
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <Switch
+              checked={value}
+              onChange={(checked) => handleSettingUpdate(setting.key, checked)}
+              disabled={setting.isReadonly}
+            />
+          </div>
         );
 
       case 'number':
@@ -236,6 +325,7 @@ const Settings: React.FC = () => {
             onChange={(val) => handleSettingUpdate(setting.key, val)}
             disabled={setting.isReadonly}
             style={{ width: '100%' }}
+            size="large"
           />
         );
 
@@ -246,6 +336,7 @@ const Settings: React.FC = () => {
             onChange={(val) => handleSettingUpdate(setting.key, val)}
             disabled={setting.isReadonly}
             style={{ width: '100%' }}
+            size="large"
           >
             {options?.map((option) => (
               <Option key={option.value} value={option.value}>
@@ -257,19 +348,23 @@ const Settings: React.FC = () => {
 
       case 'color':
         return (
-          <ColorPicker
-            value={value}
-            onChange={(color) => handleSettingUpdate(setting.key, color.toHexString())}
-            disabled={setting.isReadonly}
-            showText
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <ColorPicker
+              value={value}
+              onChange={(color) => handleSettingUpdate(setting.key, color.toHexString())}
+              disabled={setting.isReadonly}
+              showText
+              size="large"
+            />
+            <Text type="secondary" style={{ fontSize: '13px' }}>{value}</Text>
+          </div>
         );
 
       case 'password':
         return (
           <Input.Password
-            value={value}
-            onChange={(e) => handleSettingUpdate(setting.key, e.target.value)}
+            value={getDisplayValue(setting.key, value)}
+            onChange={(e) => handleLocalValueChange(setting.key, e.target.value)}
             disabled={setting.isReadonly}
           />
         );
@@ -278,8 +373,8 @@ const Settings: React.FC = () => {
         return (
           <Input
             type="email"
-            value={value}
-            onChange={(e) => handleSettingUpdate(setting.key, e.target.value)}
+            value={getDisplayValue(setting.key, value)}
+            onChange={(e) => handleLocalValueChange(setting.key, e.target.value)}
             disabled={setting.isReadonly}
           />
         );
@@ -288,8 +383,8 @@ const Settings: React.FC = () => {
         return (
           <Input
             type="url"
-            value={value}
-            onChange={(e) => handleSettingUpdate(setting.key, e.target.value)}
+            value={getDisplayValue(setting.key, value)}
+            onChange={(e) => handleLocalValueChange(setting.key, e.target.value)}
             disabled={setting.isReadonly}
           />
         );
@@ -311,11 +406,112 @@ const Settings: React.FC = () => {
           />
         );
 
+      case 'file':
+        return (
+          <div style={{ width: '100%' }}>
+            {value ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ 
+                  border: '1px solid #e8e8e8', 
+                  borderRadius: '6px', 
+                  padding: '8px',
+                  backgroundColor: '#fafafa',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: '120px',
+                  height: '60px',
+                }}>
+                  <Image
+                    src={`${BACKEND_BASE_URL}${value}`}
+                    alt={setting.name}
+                    style={{ maxWidth: '110px', maxHeight: '50px', objectFit: 'contain' }}
+                    fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+                    preview={true}
+                  />
+                </div>
+                <Upload
+                  accept="image/*"
+                  showUploadList={false}
+                  beforeUpload={(file) => {
+                    const isLt5M = file.size / 1024 / 1024 < 5;
+                    if (!isLt5M) {
+                      message.error('Image must be smaller than 5MB');
+                      return false;
+                    }
+                    const isImage = file.type.startsWith('image/');
+                    if (!isImage) {
+                      message.error('You can only upload image files');
+                      return false;
+                    }
+                    handleLogoUpload(file, setting.key);
+                    return false;
+                  }}
+                  disabled={setting.isReadonly}
+                >
+                  <Button 
+                    icon={<CloudUploadOutlined />} 
+                    loading={isUploading}
+                    disabled={setting.isReadonly}
+                  >
+                    Change
+                  </Button>
+                </Upload>
+                <Button
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => handleLogoRemove(setting.key)}
+                  disabled={setting.isReadonly}
+                >
+                  Remove
+                </Button>
+              </div>
+            ) : (
+              <Upload.Dragger
+                accept="image/*"
+                showUploadList={false}
+                beforeUpload={(file) => {
+                  const isLt5M = file.size / 1024 / 1024 < 5;
+                  if (!isLt5M) {
+                    message.error('Image must be smaller than 5MB');
+                    return false;
+                  }
+                  const isImage = file.type.startsWith('image/');
+                  if (!isImage) {
+                    message.error('You can only upload image files');
+                    return false;
+                  }
+                  handleLogoUpload(file, setting.key);
+                  return false;
+                }}
+                disabled={setting.isReadonly}
+                style={{
+                  background: '#fafafa',
+                  border: '1px dashed #d9d9d9',
+                  borderRadius: '6px',
+                }}
+              >
+                <div style={{ padding: '16px' }}>
+                  <PictureOutlined style={{ fontSize: '28px', color: '#2E5778', marginBottom: '8px' }} />
+                  <div>
+                    <Text strong style={{ display: 'block', fontSize: '14px', marginBottom: '4px' }}>
+                      Click or drag to upload
+                    </Text>
+                    <Text type="secondary" style={{ fontSize: '12px' }}>
+                      PNG, JPG, SVG (Max 5MB)
+                    </Text>
+                  </div>
+                </div>
+              </Upload.Dragger>
+            )}
+          </div>
+        );
+
       default:
         return (
           <Input
-            value={value}
-            onChange={(e) => handleSettingUpdate(setting.key, e.target.value)}
+            value={getDisplayValue(setting.key, value)}
+            onChange={(e) => handleLocalValueChange(setting.key, e.target.value)}
             disabled={setting.isReadonly}
           />
         );
@@ -326,75 +522,147 @@ const Settings: React.FC = () => {
   const renderSettingsGroup = (group: SettingsGroup) => (
     <Card
       key={group.id}
-      size="small"
       title={
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span>{group.name}</span>
-          <Badge count={group.settings.length} style={{ backgroundColor: '#f0f0f0', color: '#666' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '4px',
+            height: '20px',
+            background: 'linear-gradient(135deg, #2E5778 0%, #4A7090 100%)',
+            borderRadius: '2px'
+          }} />
+          <Text strong style={{ fontSize: '16px' }}>{group.name}</Text>
         </div>
       }
-      style={{ marginBottom: '16px' }}
+      style={{
+        marginBottom: '20px',
+        borderRadius: '8px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+        border: '1px solid #f0f0f0',
+        overflow: 'hidden'
+      }}
+      styles={{
+        header: {
+          background: 'linear-gradient(to right, #fafafa 0%, #ffffff 100%)',
+          borderBottom: '1px solid #f0f0f0',
+          padding: '12px 20px'
+        },
+        body: { padding: '20px' }
+      }}
     >
-      <Text type="secondary" style={{ display: 'block', marginBottom: '16px', fontSize: '13px' }}>
-        {group.description}
-      </Text>
+      {group.description && (
+        <Alert
+          message={group.description}
+          type="info"
+          showIcon
+          style={{
+            marginBottom: '16px',
+            border: 'none',
+            background: '#f6fbff'
+          }}
+        />
+      )}
       
-      <Row gutter={[16, 16]}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {group.settings.map((setting) => (
-          <Col span={24} key={setting.id}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                  <Text strong style={{ fontSize: '14px' }}>
-                    {setting.name}
+          <div
+            key={setting.key || setting.id}
+            style={{
+              padding: '16px',
+              background: '#fafafa',
+              borderRadius: '8px',
+              border: '1px solid #f0f0f0',
+              transition: 'all 0.3s'
+            }}
+          >
+            <Row gutter={[24, 16]}>
+              <Col xs={24} lg={10}>
+                <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <Text strong style={{ fontSize: '15px' }}>
+                      {setting.name}
+                    </Text>
+                    {setting.isRequired && (
+                      <Tag color="error" style={{ margin: 0 }}>Required</Tag>
+                    )}
+                    {setting.isSystem && (
+                      <Tag color="warning" style={{ margin: 0 }}>System</Tag>
+                    )}
+                    {setting.isReadonly && (
+                      <Tag color="default" style={{ margin: 0 }}>Read-only</Tag>
+                    )}
+                  </div>
+                  <Text type="secondary" style={{ fontSize: '13px', lineHeight: '1.6' }}>
+                    {setting.description}
                   </Text>
-                  {setting.isRequired && (
-                    <Tag color="red">Required</Tag>
-                  )}
-                  {setting.isSystem && (
-                    <Tag color="orange">System</Tag>
-                  )}
                 </div>
-                <Text type="secondary" style={{ fontSize: '12px', display: 'block' }}>
-                  {setting.description}
-                </Text>
-              </div>
+              </Col>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '200px' }}>
-                <div style={{ flex: 1 }}>
-                  {renderSettingInput(setting)}
+              <Col xs={24} lg={14}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                  <div style={{ flex: 1 }}>
+                    {renderSettingInput(setting)}
+                  </div>
+                  {setting.valueType !== 'file' && (
+                    <Tooltip title="Reset to default value">
+                      <Button
+                        type="default"
+                        icon={<ReloadOutlined />}
+                        onClick={() => handleResetSetting(setting.key)}
+                        disabled={setting.isSystem || setting.isReadonly || setting.value === setting.defaultValue}
+                        style={{
+                          height: '40px',
+                          opacity: setting.value === setting.defaultValue ? 0.5 : 1
+                        }}
+                      />
+                    </Tooltip>
+                  )}
                 </div>
-                <Tooltip title="Reset to default">
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<ReloadOutlined />}
-                    onClick={() => handleResetSetting(setting.key)}
-                    disabled={setting.isSystem || setting.value === setting.defaultValue}
-                  />
-                </Tooltip>
-              </div>
-            </div>
-          </Col>
+              </Col>
+            </Row>
+          </div>
         ))}
-      </Row>
+      </div>
     </Card>
   );
 
   // Render settings category
   const renderSettingsCategory = (category: SettingsCategory) => (
-    <div style={{ padding: '24px' }}>
-      <div style={{ marginBottom: '24px' }}>
-        <Title level={3} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {settingCategoryConfig[category.category as keyof typeof settingCategoryConfig]?.icon}
-          {category.name}
-        </Title>
-        <Text type="secondary" style={{ fontSize: '14px' }}>
-          {category.description}
-        </Text>
+    <div style={{ padding: '24px', background: '#ffffff' }}>
+      <div style={{
+        marginBottom: '24px',
+        paddingBottom: '16px',
+        borderBottom: '1px solid #f0f0f0'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            fontSize: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '44px',
+            height: '44px',
+            background: 'linear-gradient(135deg, #2E5778 0%, #4A7090 100%)',
+            borderRadius: '8px',
+            color: 'white'
+          }}>
+            {settingCategoryConfig[category.category as keyof typeof settingCategoryConfig]?.icon}
+          </div>
+          <div>
+            <Title level={3} style={{ margin: 0, marginBottom: '2px' }}>
+              {category.name}
+            </Title>
+            <Text type="secondary" style={{ fontSize: '13px' }}>
+              {category.description}
+            </Text>
+          </div>
+        </div>
       </div>
 
-      {category.groups.map(renderSettingsGroup)}
+      {category.groups.map((group: any) => (
+        <div key={group.id}>
+          {renderSettingsGroup(group)}
+        </div>
+      ))}
     </div>
   );
 
@@ -480,7 +748,7 @@ const Settings: React.FC = () => {
       width: 100,
       align: 'center',
       render: (_, record) => (
-        <Badge count={record.settings.length} style={{ backgroundColor: '#1890ff' }} />
+        <Badge count={record.settings.length} style={{ backgroundColor: '#2E5778' }} />
       ),
     },
     {
@@ -605,7 +873,7 @@ const Settings: React.FC = () => {
         <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
           <Col xs={24} sm={12} md={8}>
             <Card size="small" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', color: '#1890ff', marginBottom: '8px' }}>
+              <div style={{ fontSize: '24px', color: '#2E5778', marginBottom: '8px' }}>
                 <SettingOutlined />
               </div>
               <div style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '4px' }}>
@@ -657,27 +925,45 @@ const Settings: React.FC = () => {
       </div>
 
       {/* Main Settings Content */}
-      <Card style={{ borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+      <Card 
+        style={{ 
+          borderRadius: '16px', 
+          boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
+          border: 'none',
+          overflow: 'hidden'
+        }}
+        styles={{ body: { padding: 0 } }}
+      >
         <Tabs
           activeKey={activeTab}
           onChange={setActiveTab}
           type="card"
           size="large"
-        >
-          {settings?.map((category) => (
-            <TabPane
-              key={category.category}
-              tab={
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          tabBarStyle={{
+            margin: 0,
+            padding: '16px 24px 0',
+            background: 'linear-gradient(to bottom, #fafafa 0%, #ffffff 100%)',
+          }}
+          items={settings?.map((category) => ({
+            key: category.category,
+            label: (
+              <span style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '10px',
+                padding: '8px 16px',
+                fontSize: '15px',
+                fontWeight: 500
+              }}>
+                <span style={{ fontSize: '20px' }}>
                   {settingCategoryConfig[category.category as keyof typeof settingCategoryConfig]?.icon}
-                  {settingCategoryConfig[category.category as keyof typeof settingCategoryConfig]?.name}
                 </span>
-              }
-            >
-              {renderSettingsCategory(category)}
-            </TabPane>
-          ))}
-        </Tabs>
+                {settingCategoryConfig[category.category as keyof typeof settingCategoryConfig]?.name}
+              </span>
+            ),
+            children: renderSettingsCategory(category),
+          }))}
+        />
       </Card>
 
       {/* History Drawer */}
@@ -723,42 +1009,52 @@ const Settings: React.FC = () => {
         footer={null}
         width={800}
       >
-        <Tabs defaultActiveKey="create">
-          <TabPane tab="Create Backup" key="create">
-            <Form
-              form={backupForm}
-              layout="vertical"
-              onFinish={handleCreateBackup}
-              style={{ marginBottom: '24px' }}
-            >
-              <Form.Item
-                name="name"
-                label="Backup Name"
-                rules={[{ required: true, message: 'Please enter backup name' }]}
-              >
-                <Input placeholder="Enter backup name" />
-              </Form.Item>
-              <Form.Item name="description" label="Description">
-                <TextArea rows={3} placeholder="Optional description" />
-              </Form.Item>
-              <Form.Item>
-                <Button type="primary" htmlType="submit" loading={isCreatingBackup}>
-                  Create Backup
-                </Button>
-              </Form.Item>
-            </Form>
-          </TabPane>
-          
-          <TabPane tab="Existing Backups" key="existing">
-            <Table
-              columns={backupColumns}
-              dataSource={backups?.backups || []}
-              rowKey="id"
-              size="small"
-              pagination={false}
-            />
-          </TabPane>
-        </Tabs>
+        <Tabs
+          defaultActiveKey="create"
+          items={[
+            {
+              key: 'create',
+              label: 'Create Backup',
+              children: (
+                <Form
+                  form={backupForm}
+                  layout="vertical"
+                  onFinish={handleCreateBackup}
+                  style={{ marginBottom: '24px' }}
+                >
+                  <Form.Item
+                    name="name"
+                    label="Backup Name"
+                    rules={[{ required: true, message: 'Please enter backup name' }]}
+                  >
+                    <Input placeholder="Enter backup name" />
+                  </Form.Item>
+                  <Form.Item name="description" label="Description">
+                    <TextArea rows={3} placeholder="Optional description" />
+                  </Form.Item>
+                  <Form.Item>
+                    <Button type="primary" htmlType="submit" loading={isCreatingBackup}>
+                      Create Backup
+                    </Button>
+                  </Form.Item>
+                </Form>
+              ),
+            },
+            {
+              key: 'existing',
+              label: 'Existing Backups',
+              children: (
+                <Table
+                  columns={backupColumns}
+                  dataSource={backups?.backups || []}
+                  rowKey="id"
+                  size="small"
+                  pagination={false}
+                />
+              ),
+            },
+          ]}
+        />
       </Modal>
     </div>
   );
