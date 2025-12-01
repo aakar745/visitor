@@ -15,7 +15,7 @@ import {
   Checkbox,
   Badge,
   Empty,
-  message,
+  App,
   Dropdown,
   Tabs,
   Collapse,
@@ -42,12 +42,15 @@ import {
   ExperimentOutlined,
   BookOutlined,
   DatabaseOutlined,
+  EnvironmentOutlined,
+  FileExcelOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { MenuProps } from 'antd';
 import { format } from 'date-fns';
 import { useRoles, useRoleStats, useRoleMutations, usePermissionGroups, useRoleTemplates } from '../../hooks/useRoles';
 import { useFormCleanup } from '../../hooks/useFormCleanup';
+import { usePermissions } from '../../hooks/usePermissions';
 import type { 
   Role,
   CreateRoleRequest,
@@ -58,53 +61,92 @@ import type {
 
 const { Title, Text } = Typography;
 const { Option } = Select;
-const { Panel } = Collapse;
 const { TabPane } = Tabs;
 
-// Permission category configurations
-const permissionCategoryConfig = {
-  user_management: {
-    name: 'User Management',
-    icon: <TeamOutlined />,
+// Permission category configurations based on actual pages
+const permissionCategoryConfig: Record<string, any> = {
+  'Dashboard': {
+    name: 'Dashboard',
+    icon: <DatabaseOutlined />,
     color: '#1890ff',
-    description: 'Manage users, roles, and permissions'
+    description: 'Main dashboard and overview'
   },
-  visitor_management: {
-    name: 'Visitor Management',
-    icon: <UserOutlined />,
-    color: '#52c41a',
-    description: 'Handle visitor registration and check-ins'
-  },
-  exhibition_management: {
+  'Exhibition Management': {
     name: 'Exhibition Management',
     icon: <ExperimentOutlined />,
     color: '#722ed1',
     description: 'Create and manage exhibitions'
   },
-  reporting: {
-    name: 'Reporting & Analytics',
+  'Exhibitor Management': {
+    name: 'Exhibitor Management',
+    icon: <TeamOutlined />,
+    color: '#13c2c2',
+    description: 'Manage exhibitor links and QR codes'
+  },
+  'Visitor Management': {
+    name: 'Visitor Management',
+    icon: <UserOutlined />,
+    color: '#52c41a',
+    description: 'Handle visitor registration and management'
+  },
+  'Analytics': {
+    name: 'Analytics',
     icon: <BookOutlined />,
     color: '#fa541c',
-    description: 'Access reports and analytics'
+    description: 'View analytics dashboard with charts and insights'
   },
-  system_settings: {
+  'Exhibition Reports': {
+    name: 'Exhibition Reports',
+    icon: <FileExcelOutlined />,
+    color: '#722ed1',
+    description: 'View, filter, and export exhibition registration reports'
+  },
+  'User Management': {
+    name: 'User Management',
+    icon: <TeamOutlined />,
+    color: '#1890ff',
+    description: 'Manage system users'
+  },
+  'Role Management': {
+    name: 'Role Management',
+    icon: <SafetyOutlined />,
+    color: '#eb2f96',
+    description: 'Manage roles and permissions'
+  },
+  'Location Management': {
+    name: 'Location Management',
+    icon: <EnvironmentOutlined />,
+    color: '#2f54eb',
+    description: 'Manage countries, states, cities, pincodes'
+  },
+  'System Settings': {
     name: 'System Settings',
     icon: <SettingOutlined />,
     color: '#faad14',
     description: 'Configure system settings'
   },
-  security: {
-    name: 'Security',
+  'System Monitoring': {
+    name: 'System Monitoring',
     icon: <SecurityScanOutlined />,
     color: '#f5222d',
-    description: 'Security and audit functions'
+    description: 'Monitor system queues and logs'
   },
 };
 
-// Role color options
+// Role color options (unique colors only - no duplicates)
 const roleColors = [
-  '#1890ff', '#52c41a', '#722ed1', '#fa541c', '#faad14', '#f5222d',
-  '#13c2c2', '#eb2f96', '#1890ff', '#52c41a', '#722ed1', '#fa541c'
+  '#1890ff', // Blue
+  '#52c41a', // Green
+  '#722ed1', // Purple
+  '#fa541c', // Orange
+  '#faad14', // Gold
+  '#f5222d', // Red
+  '#13c2c2', // Cyan
+  '#eb2f96', // Magenta
+  '#2f54eb', // Geek Blue
+  '#a0d911', // Lime
+  '#fa8c16', // Volcano
+  '#096dd9', // Sky Blue
 ];
 
 // Role icon options
@@ -113,6 +155,9 @@ const roleIcons = [
 ];
 
 const Roles: React.FC = () => {
+  const { message } = App.useApp();
+  const { hasPermission } = usePermissions();
+  
   // State management
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<boolean | undefined>();
@@ -128,6 +173,28 @@ const Roles: React.FC = () => {
   
   // SECURITY FIX (BUG-019): Cleanup form on unmount
   useFormCleanup(form);
+
+  // Set form values when modal opens and after DOM is ready
+  React.useEffect(() => {
+    if (isRoleModalVisible && selectedRole) {
+      // Use setTimeout to ensure Collapse component is fully rendered
+      const timer = setTimeout(() => {
+        form.setFieldsValue({
+          name: selectedRole.name,
+          description: selectedRole.description,
+          color: selectedRole.color,
+          icon: selectedRole.icon,
+          permissions: selectedRole.permissions?.map((p: any) => p.id) || [],
+          isActive: selectedRole.isActive,
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    } else if (isRoleModalVisible && !selectedRole) {
+      // Reset form for new role creation
+      form.resetFields();
+    }
+    return undefined;
+  }, [isRoleModalVisible, selectedRole, form]);
 
   // Build filters
   const filters: RoleFilters = {
@@ -186,10 +253,36 @@ const Roles: React.FC = () => {
   };
 
   const handleFormSubmit = async (values: any) => {
+    // Transform permission IDs to full permission objects
+    const selectedPermissionIds = values.permissions || [];
+    const fullPermissions: any[] = [];
+    
+    // Extract full permission objects from permissionGroups
+    permissionGroups?.forEach((group: any) => {
+      group.permissions.forEach((perm: any) => {
+        if (selectedPermissionIds.includes(perm.id)) {
+          fullPermissions.push({
+            id: perm.id,
+            name: perm.name,
+            description: perm.description,
+            action: perm.action || perm.id.split('.')[1], // Extract action from ID
+            resource: perm.resource || perm.id.split('.')[0], // Extract resource from ID
+            category: group.category,
+          });
+        }
+      });
+    });
+
+    // Replace permission IDs with full permission objects
+    const roleData = {
+      ...values,
+      permissions: fullPermissions,
+    };
+
     if (selectedRole) {
-      await handleUpdateRole(values as UpdateRoleRequest);
+      await handleUpdateRole(roleData as UpdateRoleRequest);
     } else {
-      await handleCreateRole(values as CreateRoleRequest);
+      await handleCreateRole(roleData as CreateRoleRequest);
     }
   };
 
@@ -211,20 +304,20 @@ const Roles: React.FC = () => {
     }
   };
 
-  const handleDuplicateRole = async (roleId: string, newName: string) => {
+  const handleDuplicateRole = async (roleId: string, _newName: string) => {
     try {
-      await duplicateRole.mutateAsync({ roleId, newName });
-      message.success('Role duplicated successfully');
+      await duplicateRole(roleId);
+      message.success('Role duplicated successfully (placeholder)');
     } catch (error) {
       message.error('Failed to duplicate role');
     }
   };
 
-  const handleCreateFromTemplate = async (templateId: string, roleData: Partial<CreateRoleRequest>) => {
+  const handleCreateFromTemplate = async (templateId: string, _roleData: Partial<CreateRoleRequest>) => {
     try {
-      await createFromTemplate.mutateAsync({ templateId, roleData });
+      await createFromTemplate(templateId);
       setIsTemplateModalVisible(false);
-      message.success('Role created from template successfully');
+      message.success('Role created from template successfully (placeholder)');
     } catch (error) {
       message.error('Failed to create role from template');
     }
@@ -232,29 +325,17 @@ const Roles: React.FC = () => {
 
   const handleExport = async (format: 'csv' | 'excel' = 'excel') => {
     try {
-      await exportRoles.mutateAsync({ filters, format });
-      message.success(`Roles exported successfully as ${format.toUpperCase()}`);
+      await exportRoles(format);
+      message.success(`Roles exported successfully as ${format.toUpperCase()} (placeholder)`);
     } catch (error) {
       message.error('Failed to export roles');
     }
   };
 
   const openRoleModal = (role?: Role) => {
-    if (role) {
-      setSelectedRole(role);
-      form.setFieldsValue({
-        name: role.name,
-        description: role.description,
-        color: role.color,
-        icon: role.icon,
-        permissions: role.permissions.map(p => p.id),
-        isActive: role.isActive,
-      });
-    } else {
-      setSelectedRole(null);
-      form.resetFields();
-    }
+    setSelectedRole(role || null);
     setIsRoleModalVisible(true);
+    // Note: Form values will be set in useEffect after modal is visible
   };
 
   const openViewModal = (role: Role) => {
@@ -286,14 +367,20 @@ const Roles: React.FC = () => {
             {record.icon || '🛡️'}
           </div>
           <div>
-            <Text strong style={{ display: 'block', marginBottom: '2px', fontSize: '14px' }}>
-              {record.name}
-              {record.isSystemRole && (
-                <Tag color="gold" style={{ marginLeft: '8px' }}>
-                  System
+            <div style={{ marginBottom: '2px' }}>
+              <Text strong style={{ fontSize: '14px', marginRight: '8px' }}>
+                {record.name}
+              </Text>
+              {record.name === 'super_admin' && record.isSystemRole ? (
+                <Tag color="red" style={{ fontSize: '10px', padding: '0 4px' }}>
+                  👑 SUPER ADMIN (PROTECTED)
                 </Tag>
-              )}
-            </Text>
+              ) : record.isSystemRole ? (
+                <Tag color="gold" style={{ fontSize: '10px', padding: '0 4px' }}>
+                  SYSTEM ROLE
+                </Tag>
+              ) : null}
+            </div>
             <Text type="secondary" style={{ fontSize: '12px' }}>
               {record.description}
             </Text>
@@ -368,21 +455,35 @@ const Roles: React.FC = () => {
       width: 120,
       align: 'center',
       render: (_, record) => {
-        const menuItems: MenuProps['items'] = [
-          {
+        // 🔒 Check if this is the Super Admin role (protected)
+        const isSuperAdmin = record.name === 'super_admin' && record.isSystemRole;
+        
+        const menuItems: MenuProps['items'] = [];
+        
+        // View Details - requires roles.view permission
+        if (hasPermission('roles.view')) {
+          menuItems.push({
             key: 'view',
             icon: <EyeOutlined />,
             label: 'View Details',
             onClick: () => openViewModal(record),
-          },
-          {
+          });
+        }
+        
+        // Edit Role - requires roles.update permission
+        if (hasPermission('roles.update')) {
+          menuItems.push({
             key: 'edit',
             icon: <EditOutlined />,
             label: 'Edit Role',
             onClick: () => openRoleModal(record),
-            disabled: record.isSystemRole,
-          },
-          {
+            disabled: isSuperAdmin || record.isSystemRole, // 🔒 Super Admin & system roles cannot be edited
+          });
+        }
+        
+        // Duplicate Role - requires roles.duplicate permission
+        if (hasPermission('roles.duplicate')) {
+          menuItems.push({
             key: 'duplicate',
             icon: <CopyOutlined />,
             label: 'Duplicate Role',
@@ -390,29 +491,50 @@ const Roles: React.FC = () => {
               const newName = `${record.name} (Copy)`;
               handleDuplicateRole(record.id, newName);
             },
-          },
-          {
+          });
+        }
+        
+        // Divider
+        if (menuItems.length > 0 && hasPermission('roles.update')) {
+          menuItems.push({
             type: 'divider',
-          },
-          {
+          });
+        }
+        
+        // Toggle Status - requires roles.update permission
+        if (hasPermission('roles.update')) {
+          menuItems.push({
             key: 'toggle-status',
             icon: record.isActive ? <LockOutlined /> : <UnlockOutlined />,
             label: record.isActive ? 'Deactivate' : 'Activate',
             onClick: () => handleToggleStatus(record.id, !record.isActive),
-            disabled: record.isSystemRole,
-          },
-          {
+            disabled: isSuperAdmin || record.isSystemRole, // 🔒 Super Admin & system roles cannot be deactivated
+          });
+        }
+        
+        // Divider before delete
+        if (menuItems.length > 0 && hasPermission('roles.delete')) {
+          menuItems.push({
             type: 'divider',
-          },
-          {
+          });
+        }
+        
+        // Delete - requires roles.delete permission
+        if (hasPermission('roles.delete')) {
+          menuItems.push({
             key: 'delete',
             icon: <DeleteOutlined />,
             label: 'Delete Role',
             danger: true,
             onClick: () => handleDeleteRole(record.id),
-            disabled: record.isSystemRole || record.userCount > 0,
-          },
-        ];
+            disabled: isSuperAdmin || record.isSystemRole || record.userCount > 0, // 🔒 Super Admin & system roles cannot be deleted
+          });
+        }
+
+        // If no menu items, show "No actions"
+        if (menuItems.length === 0) {
+          return <Text type="secondary" style={{ fontSize: '12px' }}>No actions</Text>;
+        }
 
         return (
           <Dropdown
@@ -442,21 +564,20 @@ const Roles: React.FC = () => {
         label="Permissions"
         rules={[{ required: true, message: 'Please select at least one permission' }]}
       >
-        <Collapse>
-          {permissionGroups.map((group) => (
-            <Panel 
-              key={group.category}
-              header={
+        <Checkbox.Group style={{ width: '100%' }}>
+          <Collapse
+            items={permissionGroups.map((group: any) => ({
+              key: group.category,
+              label: (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {permissionCategoryConfig[group.category as PermissionCategory]?.icon}
                   <span>{permissionCategoryConfig[group.category as PermissionCategory]?.name || group.name}</span>
                   <Badge count={group.permissions.length} style={{ backgroundColor: '#f0f0f0', color: '#666' }} />
                 </div>
-              }
-            >
-              <Checkbox.Group style={{ width: '100%' }}>
+              ),
+              children: (
                 <Row gutter={[8, 8]}>
-                  {group.permissions.map((permission) => (
+                  {group.permissions.map((permission: any) => (
                     <Col span={12} key={permission.id}>
                       <Checkbox value={permission.id}>
                         <div>
@@ -471,10 +592,10 @@ const Roles: React.FC = () => {
                     </Col>
                   ))}
                 </Row>
-              </Checkbox.Group>
-            </Panel>
-          ))}
-        </Collapse>
+              ),
+            }))}
+          />
+        </Checkbox.Group>
       </Form.Item>
     );
   };
@@ -501,23 +622,27 @@ const Roles: React.FC = () => {
               >
                 Refresh
               </Button>
-              <Button
-                icon={<DownloadOutlined />}
-                size="middle"
-                style={{ borderRadius: '6px' }}
-                onClick={() => handleExport('excel')}
-                loading={isExporting}
-              >
-                Export
-              </Button>
-              <Button
-                icon={<ExperimentOutlined />}
-                size="middle"
-                style={{ borderRadius: '6px' }}
-                onClick={() => setIsTemplateModalVisible(true)}
-              >
-                Templates
-              </Button>
+              {hasPermission('roles.export') && (
+                <Button
+                  icon={<DownloadOutlined />}
+                  size="middle"
+                  style={{ borderRadius: '6px' }}
+                  onClick={() => handleExport('excel')}
+                  loading={isExporting}
+                >
+                  Export
+                </Button>
+              )}
+              {hasPermission('roles.view') && (
+                <Button
+                  icon={<ExperimentOutlined />}
+                  size="middle"
+                  style={{ borderRadius: '6px' }}
+                  onClick={() => setIsTemplateModalVisible(true)}
+                >
+                  Templates
+                </Button>
+              )}
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
@@ -746,11 +871,11 @@ const Roles: React.FC = () => {
               🛡️ System Roles
             </Title>
             <Text type="secondary" style={{ fontSize: '13px' }}>
-              {rolesData?.total || 0} roles • {rolesData?.roles.filter(r => r.isActive).length || 0} active
+              {rolesData?.total || 0} roles • {rolesData?.roles.filter((r: any) => r.isActive).length || 0} active
             </Text>
           </div>
           <Badge
-            count={`${rolesData?.roles.filter(r => r.isActive).length || 0} Active`}
+            count={`${rolesData?.roles.filter((r: any) => r.isActive).length || 0} Active`}
             style={{ backgroundColor: '#52c41a', borderRadius: '12px' }}
           />
         </div>
@@ -768,8 +893,8 @@ const Roles: React.FC = () => {
               total: rolesData?.total || 0,
               showSizeChanger: true,
               showQuickJumper: true,
-              showTotal: (total, range) =>
-                `Showing ${range[0]}-${range[1]} of ${total} roles`,
+            showTotal: (total: number, range: number[]) =>
+              `Showing ${range[0]}-${range[1]} of ${total} roles`,
               onChange: (page, size) => {
                 setCurrentPage(page);
                 setPageSize(size || 10);
@@ -798,9 +923,11 @@ const Roles: React.FC = () => {
                 </div>
               }
             >
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => openRoleModal()}>
-                Create Role
-              </Button>
+              {hasPermission('roles.create') && (
+                <Button type="primary" icon={<PlusOutlined />} onClick={() => openRoleModal()}>
+                  Create Role
+                </Button>
+              )}
             </Empty>
           </div>
         ) : null}
@@ -1037,7 +1164,7 @@ const Roles: React.FC = () => {
               
               <TabPane tab="Permissions" key="2">
                 <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                  {permissionGroups?.map((group) => {
+                  {permissionGroups?.map((group: any) => {
                     const rolePermissions = selectedRole.permissions.filter(
                       p => p.category === group.category
                     );
@@ -1100,7 +1227,7 @@ const Roles: React.FC = () => {
             <Empty description="No templates available" />
           ) : (
             <Row gutter={[16, 16]}>
-              {roleTemplates.filter(template => template).map((template) => (
+              {roleTemplates.filter((template: any) => template).map((template: any) => (
               <Col span={12} key={template.id}>
                 <Card
                   hoverable

@@ -8,6 +8,8 @@ import { Otp, OtpSchema } from '../../database/schemas/otp.schema';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { WhatsAppOtpService } from '../../services/whatsapp-otp.service';
+import { RedisLockService } from '../../common/services/redis-lock.service';
+import { OtpQueueModule } from '../otp-queue/otp-queue.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 
@@ -28,9 +30,10 @@ import { LocalStrategy } from './strategies/local.strategy';
       { name: User.name, schema: UserSchema },
       { name: Otp.name, schema: OtpSchema },
     ]),
+    OtpQueueModule, // ✅ OTP delivery queue (optional, gracefully degrades if Redis unavailable)
   ],
   controllers: [AuthController],
-  providers: [AuthService, WhatsAppOtpService, JwtStrategy, LocalStrategy],
+  providers: [AuthService, WhatsAppOtpService, RedisLockService, JwtStrategy, LocalStrategy],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

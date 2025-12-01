@@ -7,7 +7,7 @@ import {
   Typography,
   Spin,
   Empty,
-  message,
+  App,
 } from 'antd';
 import {
   UserOutlined,
@@ -17,6 +17,7 @@ import {
 } from '@ant-design/icons';
 import { exhibitionService } from '../../services/exhibitions/exhibitionService';
 import { globalVisitorService } from '../../services/globalVisitorService';
+import { usePermissions } from '../../hooks/usePermissions';
 import type { Exhibition } from '../../types/exhibitions';
 import type { ExhibitionRegistrationStats } from '../../types';
 
@@ -31,6 +32,8 @@ interface DashboardStats {
 }
 
 const Dashboard: React.FC = () => {
+  const { message } = App.useApp();
+  const { hasPermission } = usePermissions();
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(false);
   const [exhibitions, setExhibitions] = useState<Exhibition[]>([]);
@@ -84,48 +87,80 @@ const Dashboard: React.FC = () => {
     try {
       setStatsLoading(true);
 
-      // Fetch exhibition statistics
-      const exhibitionStats: ExhibitionRegistrationStats = await globalVisitorService.getExhibitionStats(exhibitionId);
+      // Check permissions before making API calls
+      const canViewReports = hasPermission('reports.view');
+      const canViewExhibitions = hasPermission('exhibitions.view');
 
-      // Fetch today's registrations (we'll get all registrations and filter by today)
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayISO = today.toISOString();
-      
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowISO = tomorrow.toISOString();
+      let exhibitionStats: ExhibitionRegistrationStats | null = null;
+      let todayRegistrationsCount = 0;
+      let todayCheckInsCount = 0;
 
-      // Get today's registrations
-      const todayRegistrationsResponse = await globalVisitorService.getExhibitionRegistrations(exhibitionId, {
-        page: 1,
-        limit: 1, // We only need the count
-        dateRange: {
-          start: todayISO,
-          end: tomorrowISO,
-        },
-      });
+      // Only fetch stats if user has permission
+      if (canViewReports || canViewExhibitions) {
+        try {
+          exhibitionStats = await globalVisitorService.getExhibitionStats(exhibitionId);
+        } catch (error: any) {
+          // Silently handle 403 errors - user doesn't have permission
+          if (error?.response?.status !== 403) {
+            console.error('Error fetching exhibition stats:', error);
+          }
+        }
+      }
 
-      // Get today's check-ins
-      const todayCheckInsResponse = await globalVisitorService.getExhibitionRegistrations(exhibitionId, {
-        page: 1,
-        limit: 1, // We only need the count
-        checkInStatus: 'checked-in',
-        dateRange: {
-          start: todayISO,
-          end: tomorrowISO,
-        },
-      });
+      // Only fetch today's registrations if user has reports.view permission
+      if (canViewReports) {
+        try {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const todayISO = today.toISOString();
+          
+          const tomorrow = new Date(today);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          const tomorrowISO = tomorrow.toISOString();
+
+          // Get today's registrations
+          const todayRegistrationsResponse = await globalVisitorService.getExhibitionRegistrations(exhibitionId, {
+            page: 1,
+            limit: 1,
+            dateRange: {
+              start: todayISO,
+              end: tomorrowISO,
+            },
+          });
+
+          // Get today's check-ins
+          const todayCheckInsResponse = await globalVisitorService.getExhibitionRegistrations(exhibitionId, {
+            page: 1,
+            limit: 1,
+            checkInStatus: 'checked-in',
+            dateRange: {
+              start: todayISO,
+              end: tomorrowISO,
+            },
+          });
+
+          todayRegistrationsCount = todayRegistrationsResponse.pagination?.total || 0;
+          todayCheckInsCount = todayCheckInsResponse.pagination?.total || 0;
+        } catch (error: any) {
+          // Silently handle 403 errors - user doesn't have permission
+          if (error?.response?.status !== 403) {
+            console.error('Error fetching today registrations:', error);
+          }
+        }
+      }
 
       setStats({
-        todayRegistrations: todayRegistrationsResponse.pagination?.total || 0,
-        totalRegistrations: exhibitionStats.totalRegistrations || 0,
-        todayCheckIns: todayCheckInsResponse.pagination?.total || 0,
-        totalCheckIns: exhibitionStats.checkInCount || 0,
+        todayRegistrations: todayRegistrationsCount,
+        totalRegistrations: exhibitionStats?.totalRegistrations || 0,
+        todayCheckIns: todayCheckInsCount,
+        totalCheckIns: exhibitionStats?.checkInCount || 0,
       });
-    } catch (error) {
-      console.error('Error fetching exhibition stats:', error);
-      message.error('Failed to load statistics');
+    } catch (error: any) {
+      console.error('Error in fetchExhibitionStats:', error);
+      // Don't show error message for permission issues
+      if (error?.response?.status !== 403) {
+        message.error('Failed to load statistics');
+      }
       setStats({
         todayRegistrations: 0,
         totalRegistrations: 0,

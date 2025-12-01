@@ -29,11 +29,18 @@ export class AuthController {
     @Body() loginDto: LoginDto,
     @Res({ passthrough: true }) response: Response,
   ) {
+    console.log(`[LOGIN CONTROLLER] Login request for: ${loginDto.email}`);
+    
     const result = await this.authService.login(loginDto);
+    
+    console.log(`[LOGIN CONTROLLER] Login service completed, user role:`, JSON.stringify(result.user.role));
     
     // Set httpOnly cookies for production security
     const isProduction = this.configService.get('NODE_ENV') === 'production';
     const cookieDomain = this.configService.get('COOKIE_DOMAIN'); // e.g., '.aakarvisitors.in' for subdomain sharing
+    
+    console.log(`[LOGIN CONTROLLER] Cookie settings - isProduction: ${isProduction}, domain: ${cookieDomain || 'undefined'}`);
+    
     const cookieOptions = {
       httpOnly: true,
       secure: isProduction, // Only send over HTTPS in production
@@ -47,9 +54,11 @@ export class AuthController {
       ...cookieOptions,
       maxAge: 15 * 60 * 1000, // 15 minutes
     });
+    console.log(`[LOGIN CONTROLLER] AccessToken cookie set (15min expiry)`);
 
     // Set refresh token cookie (longer expiry)
     response.cookie('refreshToken', result.refreshToken, cookieOptions);
+    console.log(`[LOGIN CONTROLLER] RefreshToken cookie set (7day expiry)`);
 
     // Set fresh CSRF token on login (consistent with token refresh)
     const csrfToken = generateCsrfToken();
@@ -60,7 +69,10 @@ export class AuthController {
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       domain: cookieDomain || undefined, // Share across subdomains if configured
     });
+    console.log(`[LOGIN CONTROLLER] CSRF token cookie set`);
 
+    console.log(`[LOGIN CONTROLLER] All cookies set, returning response`);
+    
     // Also return tokens in response body for development/localStorage fallback
     return result;
   }

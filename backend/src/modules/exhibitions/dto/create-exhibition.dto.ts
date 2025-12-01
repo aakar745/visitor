@@ -168,6 +168,11 @@ export class InterestOptionDto {
   @IsBoolean()
   isActive: boolean;
 
+  @ApiProperty({ description: 'Whether selecting at least one interest from this category is mandatory', example: false, default: false })
+  @IsBoolean()
+  @IsOptional()
+  required: boolean = false;
+
   @ApiProperty({ description: 'Display order', example: 1, default: 0 })
   @IsNumber()
   @Min(0)
@@ -207,7 +212,8 @@ export class CustomFieldDto {
 
   @ApiProperty({ description: 'Whether field is required', example: true, default: false })
   @IsBoolean()
-  required: boolean;
+  @IsOptional() // ✅ Make optional so default: false works properly
+  required: boolean = false;
 
   @ApiPropertyOptional({ description: 'Options for select/radio/checkbox fields', type: [String] })
   @IsArray()

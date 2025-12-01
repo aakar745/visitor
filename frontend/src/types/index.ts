@@ -70,6 +70,7 @@ export interface InterestOption {
   category: string;
   description?: string;
   isActive: boolean;
+  required?: boolean; // ✅ NEW: Whether selecting this interest is mandatory
   order: number;
 }
 

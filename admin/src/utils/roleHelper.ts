@@ -1,4 +1,6 @@
-type RoleType = string | { name: string; _id?: string; [key: string]: any };
+import type { RoleObject } from '../types/users';
+
+type RoleType = string | RoleObject;
 
 /**
  * Get role name from role object or string

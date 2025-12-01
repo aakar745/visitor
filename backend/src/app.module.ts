@@ -29,12 +29,14 @@ import { HealthModule } from './modules/health/health.module';
 import { VisitorImportsModule } from './modules/visitor-imports/visitor-imports.module';
 import { KioskModule } from './modules/kiosk/kiosk.module';
 import { PrintQueueModule } from './modules/print-queue/print-queue.module';
+import { OtpQueueModule } from './modules/otp-queue/otp-queue.module';
 import { MeilisearchModule } from './modules/meilisearch/meilisearch.module';
 
 // Guards
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { CsrfGuard } from './common/guards/csrf.guard';
+import { PermissionsGuard } from './common/guards/permissions.guard';
 
 @Module({
   imports: [
@@ -101,6 +103,7 @@ import { CsrfGuard } from './common/guards/csrf.guard';
     VisitorImportsModule,
     KioskModule,
     PrintQueueModule,
+    OtpQueueModule,
   ],
   providers: [
     // Global guards - order matters!
@@ -111,6 +114,10 @@ import { CsrfGuard } from './common/guards/csrf.guard';
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard, // Authentication - use @Public() to bypass
+    },
+    {
+      provide: APP_GUARD,
+      useClass: PermissionsGuard, // Permission checking - checks user permissions after authentication
     },
     {
       provide: APP_GUARD,

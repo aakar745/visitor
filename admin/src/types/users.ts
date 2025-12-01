@@ -21,6 +21,29 @@ export const UserStatus = {
 
 export type UserStatus = typeof UserStatus[keyof typeof UserStatus];
 
+// Role Object (when populated from backend)
+export interface RoleObject {
+  _id: string;
+  id?: string;
+  name: string;
+  description?: string;
+  permissions?: Array<{
+    id: string;
+    name: string;
+    description?: string;
+    action?: string;
+    resource?: string;
+    category?: string;
+  }>;
+  color?: string;
+  icon?: string;
+  isSystemRole?: boolean;
+  isActive?: boolean;
+  userCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 // Extended User Interface
 export interface UserProfile {
   id: string;
@@ -28,12 +51,9 @@ export interface UserProfile {
   name: string;
   firstName?: string;
   lastName?: string;
-  phone?: string;
   avatar?: string;
-  role: UserRole;
+  role: UserRole | RoleObject;  // Can be string or populated object
   status: UserStatus;
-  department?: string;
-  position?: string;
   lastLoginAt?: string;
   emailVerifiedAt?: string;
   permissions: string[];
@@ -47,20 +67,14 @@ export interface CreateUserRequest {
   email: string;
   password: string;
   role: UserRole;
-  phone?: string;
-  department?: string;
-  position?: string;
   permissions?: string[];
 }
 
 export interface UpdateUserRequest {
   name?: string;
   email?: string;
-  phone?: string;
   role?: UserRole;
   status?: UserStatus;
-  department?: string;
-  position?: string;
   permissions?: string[];
 }
 

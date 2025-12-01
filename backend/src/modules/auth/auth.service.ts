@@ -6,6 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { Otp, OtpDocument, OtpType } from '../../database/schemas/otp.schema';
 import { WhatsAppOtpService } from '../../services/whatsapp-otp.service';
+import { RedisLockService } from '../../common/services/redis-lock.service';
 import { normalizePhoneNumberE164 } from '../../common/utils/sanitize.util';
 import { LoginDto } from './dto/login.dto';
 
@@ -19,23 +20,49 @@ export class AuthService {
     @InjectModel(Otp.name) private otpModel: Model<OtpDocument>,
     private jwtService: JwtService,
     private whatsAppOtpService: WhatsAppOtpService,
+    private redisLockService: RedisLockService,
   ) {}
 
   async login(loginDto: LoginDto) {
+    this.logger.log(`[LOGIN START] Email: ${loginDto.email}`);
+    
     const user = await this.validateUser(loginDto.email, loginDto.password);
     
     if (!user) {
+      this.logger.warn(`[LOGIN FAILED] Invalid credentials for: ${loginDto.email}`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const payload = { sub: user._id, email: user.email, role: user.role };
+    this.logger.log(`[LOGIN SUCCESS] User validated: ${user.email}, ID: ${user._id}, Role: ${JSON.stringify(user.role)}`);
+
+    // ✅ FIX: Only include role ID in JWT to keep token size small
+    // Full role with permissions will be fetched when needed via JWT strategy
+    const roleId = typeof user.role === 'object' && (user.role as any)._id 
+      ? (user.role as any)._id.toString() 
+      : user.role.toString();
+    
+    const payload = { 
+      sub: user._id, 
+      email: user.email, 
+      role: roleId // Only role ID, not full role object
+    };
+    this.logger.debug(`[JWT PAYLOAD] ${JSON.stringify(payload)}`);
     
     // Generate new tokens
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
     
+    this.logger.log(`[TOKENS GENERATED] AccessToken length: ${accessToken.length}, RefreshToken length: ${refreshToken.length}`);
+    
+    if (accessToken.length > 4000) {
+      this.logger.warn(`[TOKEN SIZE WARNING] Token size (${accessToken.length} chars) is large but should fit in cookie (4KB browser limit = ~4000 chars)`);
+    } else {
+      this.logger.log(`[TOKEN SIZE OK] Token size (${accessToken.length} chars) is within safe limits for cookies`);
+    }
+    
     // Store refresh token in user document
     await this.storeRefreshToken(user._id.toString(), refreshToken);
+    this.logger.debug(`[REFRESH TOKEN STORED] User: ${user._id}`);
     
     // Update last login info
     await this.userModel.findByIdAndUpdate(user._id, {
@@ -44,12 +71,14 @@ export class AuthService {
       lockedUntil: null, // Clear any account lock
     });
     
+    this.logger.log(`[LOGIN COMPLETE] User: ${user.email}, returning tokens and user data`);
+    
     return {
       user: {
         id: user._id,
         email: user.email,
         name: user.name,
-        role: user.role,
+        role: user.role, // Return full role in response body (not in JWT)
       },
       accessToken,
       refreshToken,
@@ -60,10 +89,25 @@ export class AuthService {
     const MAX_LOGIN_ATTEMPTS = 5;
     const LOCK_TIME = 15 * 60 * 1000; // 15 minutes in milliseconds
 
+    this.logger.debug(`[VALIDATE USER] Looking up: ${email}`);
     const user = await this.userModel.findOne({ email }).select('+password').populate('role');
     
     if (!user) {
+      this.logger.warn(`[VALIDATE USER] User not found: ${email}`);
       return null;
+    }
+    
+    this.logger.debug(`[VALIDATE USER] Found user: ${email}, Status: ${user.status}, IsActive: ${user.isActive}, Role: ${JSON.stringify(user.role)}`);
+    this.logger.debug(`[VALIDATE USER] Role type: ${typeof user.role}, Is Object: ${typeof user.role === 'object'}, Has _id: ${(user.role as any)?._id ? 'YES' : 'NO'}`);
+    
+    if (user.role && typeof user.role === 'object' && (user.role as any)._id) {
+      this.logger.debug(`[VALIDATE USER] Populated Role Details - ID: ${(user.role as any)._id}, Name: ${(user.role as any).name || 'N/A'}`);
+    }
+
+    // Check if account is inactive or deactivated
+    if (!user.isActive || user.status === 'inactive') {
+      this.logger.warn(`Login attempt for inactive account: ${email}. Status: ${user.status}, IsActive: ${user.isActive}`);
+      throw new UnauthorizedException('Your account has been deactivated. Please contact the administrator for assistance.');
     }
 
     // Check if account is locked
@@ -313,6 +357,15 @@ export class AuthService {
   /**
    * Send OTP via WhatsApp using Interakt API
    * Creates OTP record in database and sends via WhatsApp
+   * 
+   * ✅ FIX (RACE CONDITION): Uses distributed locking to prevent concurrent OTP requests
+   * This ensures only ONE OTP can be sent per phone number at a time, even across multiple server instances.
+   * 
+   * Benefits:
+   * - Prevents duplicate OTP delivery under high load
+   * - Saves API costs (Interakt charges per message)
+   * - Prevents user confusion from multiple OTP codes
+   * - Thread-safe across multiple backend instances
    */
   async sendWhatsAppOTP(phoneNumber: string) {
     try {
@@ -324,56 +377,74 @@ export class AuthService {
       // Normalize phone number to E.164 format (international support)
       const normalizedPhone = normalizePhoneNumberE164(phoneNumber);
 
-      // Check if there's a recent OTP request (rate limiting)
-      const recentOtp = await this.otpModel.findOne({
-        phoneNumber: normalizedPhone,
-        type: OtpType.WHATSAPP,
-        createdAt: { $gte: new Date(Date.now() - 60000) }, // Last 1 minute
-      });
+      // ✅ FIX: Acquire distributed lock to prevent race conditions
+      // This prevents multiple concurrent requests from creating duplicate OTPs
+      const lockKey = `otp:send:${normalizedPhone}`;
+      const lockAcquired = await this.redisLockService.acquireLock(lockKey, 10000); // 10-second lock
 
-      if (recentOtp) {
+      if (!lockAcquired) {
+        this.logger.warn(`[OTP] Concurrent request blocked for ${normalizedPhone}`);
         throw new BadRequestException(
-          'OTP already sent. Please wait 1 minute before requesting again.',
+          'An OTP request is already in progress. Please wait a moment.',
         );
       }
 
-      // Invalidate any existing unverified OTPs for this phone number
-      await this.otpModel.updateMany(
-        {
+      try {
+        // Check if there's a recent OTP request (rate limiting)
+        // ✅ This query is now optimized with compound index: { phoneNumber: 1, type: 1, createdAt: -1 }
+        const recentOtp = await this.otpModel.findOne({
           phoneNumber: normalizedPhone,
           type: OtpType.WHATSAPP,
-          isVerified: false,
-        },
-        {
-          $set: { expiresAt: new Date() }, // Expire immediately
-        },
-      );
+          createdAt: { $gte: new Date(Date.now() - 60000) }, // Last 1 minute
+        });
 
-      // Send OTP via WhatsApp
-      const result = await this.whatsAppOtpService.sendAutoOTP(normalizedPhone);
+        if (recentOtp) {
+          throw new BadRequestException(
+            'OTP already sent. Please wait 1 minute before requesting again.',
+          );
+        }
 
-      if (!result.success) {
-        throw new BadRequestException(result.message);
+        // Invalidate any existing unverified OTPs for this phone number
+        await this.otpModel.updateMany(
+          {
+            phoneNumber: normalizedPhone,
+            type: OtpType.WHATSAPP,
+            isVerified: false,
+          },
+          {
+            $set: { expiresAt: new Date() }, // Expire immediately
+          },
+        );
+
+        // Send OTP via WhatsApp
+        const result = await this.whatsAppOtpService.sendAutoOTP(normalizedPhone);
+
+        if (!result.success) {
+          throw new BadRequestException(result.message);
+        }
+
+        // Store OTP in database
+        const otpRecord = await this.otpModel.create({
+          phoneNumber: normalizedPhone,
+          code: result.otpCode,
+          type: OtpType.WHATSAPP,
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+          messageId: result.messageId,
+        });
+
+        this.logger.log(
+          `WhatsApp OTP sent to ${normalizedPhone}. Record ID: ${otpRecord._id}`,
+        );
+
+        return {
+          success: true,
+          message: 'OTP sent successfully via WhatsApp',
+          expiresIn: 600, // 10 minutes in seconds
+        };
+      } finally {
+        // ✅ Always release lock, even if operation fails
+        await this.redisLockService.releaseLock(lockKey);
       }
-
-      // Store OTP in database
-      const otpRecord = await this.otpModel.create({
-        phoneNumber: normalizedPhone,
-        code: result.otpCode,
-        type: OtpType.WHATSAPP,
-        expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
-        messageId: result.messageId,
-      });
-
-      this.logger.log(
-        `WhatsApp OTP sent to ${normalizedPhone}. Record ID: ${otpRecord._id}`,
-      );
-
-      return {
-        success: true,
-        message: 'OTP sent successfully via WhatsApp',
-        expiresIn: 600, // 10 minutes in seconds
-      };
     } catch (error) {
       this.logger.error(`Failed to send WhatsApp OTP: ${error.message}`);
       throw error;
@@ -383,6 +454,14 @@ export class AuthService {
   /**
    * Verify WhatsApp OTP
    * Validates OTP code and marks as verified
+   * 
+   * ✅ FIX (RACE CONDITION): Uses atomic findOneAndUpdate to prevent attempt bypass
+   * This ensures the max 5-attempt limit cannot be circumvented by concurrent requests.
+   * 
+   * Benefits:
+   * - Single database query (better performance)
+   * - Thread-safe (no race conditions)
+   * - Prevents brute-force attacks via concurrent requests
    */
   async verifyWhatsAppOTP(phoneNumber: string, code: string) {
     try {
@@ -398,62 +477,90 @@ export class AuthService {
       // Normalize phone number to E.164 format (international support)
       const normalizedPhone = normalizePhoneNumberE164(phoneNumber);
 
-      // Find the most recent unverified OTP
+      // ✅ FIX: Atomic verification with correct code
+      // This query is now optimized with compound index: { phoneNumber: 1, type: 1, isVerified: 1, expiresAt: 1 }
+      const verifiedOtp = await this.otpModel.findOneAndUpdate(
+        {
+          phoneNumber: normalizedPhone,
+          type: OtpType.WHATSAPP,
+          code: code, // ✅ Verify code atomically
+          isVerified: false,
+          expiresAt: { $gt: new Date() }, // Not expired
+          attempts: { $lt: 5 }, // ✅ Check attempts limit atomically
+        },
+        {
+          $set: {
+            isVerified: true,
+            verifiedAt: new Date(),
+          },
+          $inc: { attempts: 1 }, // Increment even on success for audit trail
+        },
+        {
+          new: true,
+          sort: { createdAt: -1 }, // Most recent first
+        },
+      );
+
+      // If verifiedOtp is null, code was wrong, expired, or max attempts reached
+      if (verifiedOtp) {
+        this.logger.log(`WhatsApp OTP verified successfully for ${normalizedPhone}`);
+        
+        return {
+          success: true,
+          message: 'OTP verified successfully',
+          phoneNumber: normalizedPhone,
+          verified: true,
+        };
+      }
+
+      // ✅ FIX: Handle failed verification - check reason and increment attempts
+      // Find the OTP to check why verification failed
       const otpRecord = await this.otpModel.findOne({
         phoneNumber: normalizedPhone,
         type: OtpType.WHATSAPP,
         isVerified: false,
-        expiresAt: { $gt: new Date() }, // Not expired
-      }).sort({ createdAt: -1 }); // Most recent first
+        expiresAt: { $gt: new Date() },
+      }).sort({ createdAt: -1 });
 
       if (!otpRecord) {
         throw new BadRequestException('OTP not found or expired. Please request a new OTP.');
       }
 
-      // Check attempts (max 5 attempts)
+      // Check if max attempts reached
       if (otpRecord.attempts >= 5) {
+        // Expire the OTP
         await this.otpModel.updateOne(
           { _id: otpRecord._id },
-          { $set: { expiresAt: new Date() } }, // Expire immediately
+          { $set: { expiresAt: new Date() } },
         );
         throw new BadRequestException(
           'Maximum verification attempts exceeded. Please request a new OTP.',
         );
       }
 
-      // Verify OTP code
-      if (otpRecord.code !== code) {
-        // Increment attempts
-        await this.otpModel.updateOne(
-          { _id: otpRecord._id },
-          { $inc: { attempts: 1 } },
-        );
+      // Wrong code - increment attempts atomically
+      const updatedOtp = await this.otpModel.findOneAndUpdate(
+        {
+          _id: otpRecord._id,
+          attempts: { $lt: 5 }, // Double-check to prevent race condition
+        },
+        {
+          $inc: { attempts: 1 },
+        },
+        { new: true },
+      );
 
-        const remainingAttempts = 5 - (otpRecord.attempts + 1);
+      if (!updatedOtp) {
         throw new BadRequestException(
-          `Invalid OTP code. ${remainingAttempts} attempt(s) remaining.`,
+          'Maximum verification attempts exceeded. Please request a new OTP.',
         );
       }
 
-      // Mark as verified
-      await this.otpModel.updateOne(
-        { _id: otpRecord._id },
-        {
-          $set: {
-            isVerified: true,
-            verifiedAt: new Date(),
-          },
-        },
+      const remainingAttempts = 5 - updatedOtp.attempts;
+      throw new BadRequestException(
+        `Invalid OTP code. ${remainingAttempts} attempt(s) remaining.`,
       );
 
-      this.logger.log(`WhatsApp OTP verified successfully for ${normalizedPhone}`);
-
-      return {
-        success: true,
-        message: 'OTP verified successfully',
-        phoneNumber: normalizedPhone,
-        verified: true,
-      };
     } catch (error) {
       this.logger.error(`Failed to verify WhatsApp OTP: ${error.message}`);
       throw error;

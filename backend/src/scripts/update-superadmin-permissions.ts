@@ -1,16 +1,24 @@
-import { Role } from '../schemas/role.schema';
+import { NestFactory } from '@nestjs/core';
+import { Model } from 'mongoose';
+import { AppModule } from '../app.module';
+import { Role } from '../database/schemas/role.schema';
+import { getModelToken } from '@nestjs/mongoose';
 
-// Only Super Admin role is predefined with all system permissions
-// All other roles should be created custom with specific permissions
-export const defaultRoles: Partial<Role>[] = [
-  {
-    name: 'super_admin',
-    description: 'Super Administrator with full system access',
-    color: '#ef4444',
-    icon: '👑',
-    isSystemRole: true,
-    isActive: true,
-    permissions: [
+/**
+ * Migration Script: Update Super Admin Role Permissions
+ * 
+ * This script updates the super_admin role with all 57 new permissions
+ * organized across 11 categories.
+ */
+async function updateSuperAdminPermissions() {
+  console.log('🔄 Starting Super Admin permissions update...\n');
+
+  const app = await NestFactory.createApplicationContext(AppModule);
+  const roleModel = app.get<Model<Role>>(getModelToken(Role.name));
+
+  try {
+    // All 58 permissions for Super Admin (added users.reset_password)
+    const allPermissions = [
       // Dashboard
       { id: 'dashboard.view', name: 'View Dashboard', description: 'Access main dashboard', action: 'view', resource: 'dashboard', category: 'Dashboard' },
       
@@ -35,6 +43,8 @@ export const defaultRoles: Partial<Role>[] = [
       
       // Visitor Management
       { id: 'visitors.view', name: 'View Visitors', description: 'View visitor list', action: 'view', resource: 'visitors', category: 'Visitor Management' },
+      { id: 'visitors.create', name: 'Register Visitors', description: 'Register visitors', action: 'create', resource: 'visitors', category: 'Visitor Management' },
+      { id: 'visitors.update', name: 'Edit Visitors', description: 'Edit visitor information', action: 'update', resource: 'visitors', category: 'Visitor Management' },
       { id: 'visitors.delete', name: 'Delete Visitors', description: 'Remove visitors', action: 'delete', resource: 'visitors', category: 'Visitor Management' },
       { id: 'visitors.import', name: 'Import Visitors', description: 'Bulk import visitors', action: 'import', resource: 'visitors', category: 'Visitor Management' },
       { id: 'visitors.export', name: 'Export Visitors', description: 'Export visitor data', action: 'export', resource: 'visitors', category: 'Visitor Management' },
@@ -86,7 +96,52 @@ export const defaultRoles: Partial<Role>[] = [
       // System Monitoring
       { id: 'system.monitor', name: 'Queue Monitor', description: 'Monitor system queues', action: 'monitor', resource: 'system', category: 'System Monitoring' },
       { id: 'system.logs', name: 'View Logs', description: 'Access system logs', action: 'logs', resource: 'system', category: 'System Monitoring' },
-    ],
-  },
-];
+    ];
+
+    // Find and update Super Admin role
+    const superAdmin = await roleModel.findOne({ name: 'super_admin', isSystemRole: true });
+
+    if (!superAdmin) {
+      console.error('❌ Super Admin role not found!');
+      await app.close();
+      process.exit(1);
+    }
+
+    console.log(`📋 Current permissions: ${superAdmin.permissions.length}`);
+    console.log(`📋 New permissions: ${allPermissions.length}\n`);
+
+    // Update permissions
+    const result = await roleModel.findByIdAndUpdate(
+      superAdmin._id,
+      { permissions: allPermissions },
+      { new: true }
+    );
+
+    console.log('✅ Super Admin permissions updated successfully!');
+    console.log(`✅ Total permissions: ${result?.permissions.length}\n`);
+
+    // Display permissions by category
+    const categories = [...new Set(allPermissions.map(p => p.category))];
+    console.log('📊 Permissions by Category:');
+    categories.forEach(category => {
+      const count = allPermissions.filter(p => p.category === category).length;
+      console.log(`   ${category}: ${count} permissions`);
+    });
+
+    console.log('\n🎉 Migration completed successfully!');
+
+  } catch (error) {
+    console.error('❌ Error updating Super Admin permissions:', error);
+    throw error;
+  } finally {
+    await app.close();
+  }
+}
+
+updateSuperAdminPermissions()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
 

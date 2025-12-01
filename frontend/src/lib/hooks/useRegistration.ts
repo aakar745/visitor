@@ -30,6 +30,14 @@ export function useCreateRegistration() {
       // Clear draft after successful submission
       clearDraft();
 
+      // Check if response data exists
+      if (!data) {
+        console.error('[Registration Success] No response data received');
+        toast.error('Registration may have been successful. Please check your email or contact support.');
+        router.push('/');
+        return;
+      }
+
       // Check if registration object exists
       if (!data.registration || !data.registration._id) {
         console.error('[Registration Success] Missing registration data:', data);

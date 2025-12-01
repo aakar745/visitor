@@ -117,6 +117,17 @@ api.interceptors.response.use(
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // ✅ FIX: Don't try to refresh token on login/refresh endpoint failures
+      // If login fails (wrong password), we shouldn't try to refresh the token
+      const isLoginOrRefreshEndpoint = 
+        originalRequest.url?.includes('/auth/login') || 
+        originalRequest.url?.includes('/auth/refresh');
+      
+      if (isLoginOrRefreshEndpoint) {
+        // Let the error pass through to show proper login error
+        return Promise.reject(error);
+      }
+
       // Mark this request as retried FIRST to prevent loops
       originalRequest._retry = true;
 
@@ -173,20 +184,35 @@ api.interceptors.response.use(
 
         // Retry original request (cookie will be sent automatically)
         return api(originalRequest);
-      } catch (refreshError) {
+      } catch (refreshError: any) {
         // CRITICAL: Reset flag FIRST to allow new requests
         isRefreshing = false;
 
         // Process queue with error
         processQueue(refreshError, null);
 
+        // Extract error message from the refresh error
+        const errorMessage = refreshError?.response?.data?.message || '';
+        const isDeactivated = errorMessage.toLowerCase().includes('deactivated') || 
+                              errorMessage.toLowerCase().includes('inactive');
+
         // Refresh failed, logout user
         store.dispatch(clearAuth());
-        store.dispatch(addNotification({
-          type: 'error',
-          message: 'Session Expired',
-          description: 'Please login again to continue.',
-        }));
+        
+        // Show appropriate error message
+        if (isDeactivated) {
+          store.dispatch(addNotification({
+            type: 'error',
+            message: 'Account Deactivated',
+            description: 'Your account has been deactivated. Please contact the administrator for assistance.',
+          }));
+        } else {
+          store.dispatch(addNotification({
+            type: 'error',
+            message: 'Session Expired',
+            description: 'Please login again to continue.',
+          }));
+        }
         
         // Clear any remaining queue items (safety measure)
         clearQueue();
@@ -203,18 +229,20 @@ api.interceptors.response.use(
     /**
      * SECURITY FIX (BUG-017): Handle 403 Forbidden errors
      * 
+     * 403 errors indicate authorization failure (user is authenticated but lacks permission)
+     * These should NOT log the user out - only 401 errors should trigger logout.
+     * 
      * 403 errors can indicate:
-     * 1. CSRF token missing/invalid - DON'T logout, just show error
-     * 2. User's permissions have been revoked - DO logout
-     * 3. Role has been changed/downgraded - DO logout
-     * 4. Account has been deactivated - DO logout
+     * 1. CSRF token missing/invalid - Show error and let user retry
+     * 2. User lacks specific permission - Show error, user stays logged in
+     * 3. Resource access denied - Show error, user stays logged in
      */
     if (error.response?.status === 403) {
       const errorMessage = error.response.data?.message || '';
       
-      // Check if this is a CSRF error - don't logout for these
+      // Check if this is a CSRF error
       const isCsrfError = errorMessage.toLowerCase().includes('csrf') || 
-                          errorMessage.toLowerCase().includes('token');
+                          errorMessage.toLowerCase().includes('token mismatch');
       
       if (isCsrfError) {
         // CSRF error - show notification but don't logout
@@ -223,26 +251,12 @@ api.interceptors.response.use(
           message: 'Security Token Error',
           description: 'Your security token has expired. Please refresh the page and try again.',
         }));
-        
-        return Promise.reject(error);
-      }
-      
-      // Real permission error - logout user
-      store.dispatch(clearAuth());
-      
-      // Show specific message for permission issues
-      store.dispatch(addNotification({
-        type: 'error',
-        message: 'Access Denied',
-        description: errorMessage || 'You do not have permission to access this resource. Please contact your administrator.',
-      }));
-      
-      // Clear queue and redirect to login
-      clearQueue();
-      
-      // Only redirect if not already on login page
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      } else {
+        // Permission error - show notification but DON'T logout
+        // The user is still authenticated, they just don't have permission for this specific action
+        console.warn('Permission denied:', errorMessage);
+        // Don't show notification for every 403 - let the component handle it
+        // This prevents notification spam when loading dashboards with multiple API calls
       }
       
       return Promise.reject(error);
@@ -293,7 +307,10 @@ api.interceptors.response.use(
     }
 
     // Handle other error responses (when we got a response from server)
-    if (error.response?.data?.message) {
+    // Skip showing notification for login errors (handled by login component)
+    const isLoginEndpoint = error.config?.url?.includes('/auth/login');
+    
+    if (error.response?.data?.message && !isLoginEndpoint) {
       store.dispatch(addNotification({
         type: 'error',
         message: 'Error',

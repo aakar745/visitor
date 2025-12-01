@@ -46,15 +46,15 @@ class UserService {
     await api.delete(`${API_ENDPOINTS.USERS.BASE}/${id}`);
   }
 
+  // Reset user password (Admin only - no current password required)
+  async resetUserPassword(id: string, passwordData: { newPassword: string; confirmPassword: string }): Promise<{ message: string }> {
+    const response = await api.patch(`${API_ENDPOINTS.USERS.BASE}/${id}/reset-password`, passwordData);
+    return response.data;
+  }
+
   // Change user password
   async changeUserPassword(id: string, passwordData: ChangePasswordRequest): Promise<void> {
     await api.put(`${API_ENDPOINTS.USERS.BASE}/${id}/password`, passwordData);
-  }
-
-  // Reset user password
-  async resetUserPassword(id: string): Promise<{ temporaryPassword: string }> {
-    const response = await api.post(`${API_ENDPOINTS.USERS.BASE}/${id}/reset-password`);
-    return response.data.data;
   }
 
   // Activate/Deactivate user

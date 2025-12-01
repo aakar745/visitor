@@ -18,6 +18,7 @@ import { Request } from 'express';
 import { ExhibitorsService } from './exhibitors.service';
 import { CreateExhibitorDto, UpdateExhibitorDto, QueryExhibitorDto } from './dto';
 import { Exhibitor } from '../../database/schemas/exhibitor.schema';
+import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 
 @ApiTags('Exhibitors')
 @ApiBearerAuth()
@@ -29,6 +30,7 @@ export class ExhibitorsController {
    * Create a new exhibitor
    */
   @Post()
+  @RequirePermissions('exhibitors.create')
   @ApiOperation({ summary: 'Create a new exhibitor' })
   @ApiResponse({ status: 201, description: 'Exhibitor created successfully', type: Exhibitor })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
@@ -44,6 +46,7 @@ export class ExhibitorsController {
    * Get all exhibitors with pagination and filters
    */
   @Get()
+  @RequirePermissions('exhibitors.view')
   @ApiOperation({ summary: 'Get all exhibitors with pagination and filters' })
   @ApiResponse({ status: 200, description: 'Exhibitors retrieved successfully' })
   async findAll(@Query() query: QueryExhibitorDto): Promise<{
@@ -68,6 +71,7 @@ export class ExhibitorsController {
    * Get single exhibitor by ID
    */
   @Get(':id')
+  @RequirePermissions('exhibitors.view')
   @ApiOperation({ summary: 'Get exhibitor by ID' })
   @ApiParam({ name: 'id', description: 'Exhibitor ID' })
   @ApiResponse({ status: 200, description: 'Exhibitor retrieved successfully', type: Exhibitor })
@@ -80,6 +84,7 @@ export class ExhibitorsController {
    * Get exhibitor statistics
    */
   @Get(':id/stats')
+  @RequirePermissions('exhibitors.view')
   @ApiOperation({ summary: 'Get exhibitor statistics' })
   @ApiParam({ name: 'id', description: 'Exhibitor ID' })
   @ApiResponse({ status: 200, description: 'Statistics retrieved successfully' })
@@ -92,6 +97,7 @@ export class ExhibitorsController {
    * Check slug availability
    */
   @Get('check-slug')
+  @RequirePermissions('exhibitors.view', 'exhibitors.create', 'exhibitors.update')
   @ApiOperation({ summary: 'Check if slug is available' })
   @ApiResponse({ status: 200, description: 'Slug availability checked' })
   async checkSlugAvailability(
@@ -116,6 +122,7 @@ export class ExhibitorsController {
    * Update exhibitor
    */
   @Put(':id')
+  @RequirePermissions('exhibitors.update')
   @ApiOperation({ summary: 'Update exhibitor' })
   @ApiParam({ name: 'id', description: 'Exhibitor ID' })
   @ApiResponse({ status: 200, description: 'Exhibitor updated successfully', type: Exhibitor })
@@ -133,6 +140,7 @@ export class ExhibitorsController {
    * Toggle exhibitor status
    */
   @Patch(':id/status')
+  @RequirePermissions('exhibitors.toggle')
   @ApiOperation({ summary: 'Toggle exhibitor status' })
   @ApiParam({ name: 'id', description: 'Exhibitor ID' })
   @ApiResponse({ status: 200, description: 'Status updated successfully', type: Exhibitor })
@@ -150,6 +158,7 @@ export class ExhibitorsController {
    * Bulk toggle exhibitor status
    */
   @Post('bulk/toggle-status')
+  @RequirePermissions('exhibitors.toggle')
   @ApiOperation({ summary: 'Bulk toggle exhibitor status' })
   @ApiResponse({ status: 200, description: 'Statuses updated successfully' })
   async bulkToggleStatus(
@@ -166,6 +175,7 @@ export class ExhibitorsController {
    * Bulk delete exhibitors
    */
   @Post('bulk/delete')
+  @RequirePermissions('exhibitors.delete')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Bulk delete exhibitors' })
   @ApiResponse({ status: 200, description: 'Exhibitors deleted successfully' })
@@ -181,6 +191,7 @@ export class ExhibitorsController {
    * Delete exhibitor
    */
   @Delete(':id')
+  @RequirePermissions('exhibitors.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete exhibitor' })
   @ApiParam({ name: 'id', description: 'Exhibitor ID' })

@@ -146,7 +146,11 @@ const EditExhibition: React.FC = () => {
       setBadgeLogo(data.badgeLogo || null);
       setBannerImage(data.bannerImage || null);
       setPricingTiers(data.pricingTiers || []);
+      
+      // ✅ DEBUG: Log custom fields to verify required flag is present
+      console.log('[EditExhibition] Loaded custom fields from backend:', data.customFields);
       setCustomFields(data.customFields || []);
+      
       setInterestOptions(data.interestOptions || []);
 
     } catch (error) {
@@ -270,14 +274,23 @@ const EditExhibition: React.FC = () => {
             <Col xs={24} md={12}>
               <Form.Item
                 name="tagline"
-                label="Tagline"
+                label="Tagline / Exhibition Code"
+                tooltip="Used in registration numbers (e.g., 'ABSE' → REG-ABSE-01122025-000001). For best results, use short codes like 'ABSE' or 'TECH2025'. Longer text will be abbreviated."
                 rules={[
                   { required: true, message: 'Tagline is required' },
                   { min: 3, message: 'Tagline must be at least 3 characters' },
                   { max: 100, message: 'Tagline must be less than 100 characters' }
                 ]}
+                extra={
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    💡 Tip: Use short codes (2-10 chars) like "ABSE" for cleaner registration numbers
+                  </Text>
+                }
               >
-                <Input placeholder="e.g., Innovation Awaits You" size="middle" />
+                <Input 
+                  placeholder="e.g., ABSE or Aakar Beauty Salon Expo" 
+                  size="middle"
+                />
               </Form.Item>
             </Col>
 

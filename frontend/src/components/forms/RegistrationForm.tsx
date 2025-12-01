@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Card } from '@/components/ui/card';
@@ -12,7 +12,7 @@ import { CustomFieldsSection } from './CustomFieldsSection';
 import { useCreateRegistration, useVisitorLookup } from '@/lib/hooks/useRegistration';
 import { useFormAutosave, useLoadDraft } from '@/lib/hooks/useFormAutosave';
 import { useDebounce } from '@/lib/hooks/useDebounce';
-import { registrationFormSchema } from '@/lib/validation/registration.schema';
+import { createDynamicRegistrationSchema } from '@/lib/validation/registration.schema';
 import { AlertCircle, Save, CheckCircle2, Lock } from 'lucide-react';
 import type { Exhibition, Exhibitor, RegistrationFormData } from '@/types';
 import { toast } from 'sonner';
@@ -74,9 +74,17 @@ export function RegistrationForm({ exhibition, exhibitor }: RegistrationFormProp
     referralCode?: string;
   };
 
+  // ✅ Create dynamic validation schema based on exhibition's custom fields and interest options
+  // This ensures required fields and required interests are properly validated
+  const validationSchema = useMemo(() => {
+    const customFields = exhibition.customFields || [];
+    const interestOptions = exhibition.interestOptions || [];
+    return createDynamicRegistrationSchema(customFields, interestOptions);
+  }, [exhibition.customFields, exhibition.interestOptions]);
+
   // Form setup
   const form = useForm<DynamicRegistrationFormData>({
-    resolver: zodResolver(registrationFormSchema) as any,
+    resolver: zodResolver(validationSchema) as any,
     defaultValues: {
       exhibitionId: exhibitionId,
       exhibitorId: exhibitorId,
@@ -489,23 +497,21 @@ export function RegistrationForm({ exhibition, exhibitor }: RegistrationFormProp
   };
 
   // Log form errors (only once when errors change)
-  const prevErrorsRef = useRef<string>('');
-  
+  // Log validation errors for debugging (removed generic toast notification)
   useEffect(() => {
-    const currentErrors = JSON.stringify(form.formState.errors);
-    
-    if (Object.keys(form.formState.errors).length > 0 && currentErrors !== prevErrorsRef.current) {
+    if (Object.keys(form.formState.errors).length > 0) {
       console.log('[Form Validation Errors]:', form.formState.errors);
       console.log('[Form Values]:', form.getValues());
       
-      // Show specific error messages
-      const errorFields = Object.keys(form.formState.errors);
-      toast.error('Please fill in all required fields correctly', {
-        description: `Missing or invalid: ${errorFields.join(', ')}`,
-        duration: 5000,
-      });
-      
-      prevErrorsRef.current = currentErrors;
+      // Scroll to first error field for better UX
+      const firstErrorField = Object.keys(form.formState.errors)[0];
+      if (firstErrorField) {
+        // Find the field element and scroll to it
+        const errorElement = document.querySelector(`[name*="${firstErrorField}"]`);
+        if (errorElement) {
+          errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
     }
   }, [form.formState.errors, form]);
 

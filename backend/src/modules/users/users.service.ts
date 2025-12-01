@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { CreateUserDto, UpdateUserDto, QueryUserDto, ChangePasswordDto } from './dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { sanitizeSearch } from '../../common/utils/sanitize.util';
 import { sanitizePagination, calculatePaginationMeta } from '../../common/constants/pagination.constants';
 
@@ -114,6 +115,13 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
+    // 🔒 SUPER ADMIN PROTECTION: Prevent editing Super Admin user details
+    if (existingUser.email === 'admin@visitor-system.com') {
+      throw new BadRequestException(
+        'Super Admin user cannot be edited. Only password can be changed via the Change Password feature.'
+      );
+    }
+
     // Validate update data
     const sanitizedUpdate = await this.validateAndSanitizeUpdate(id, updateUserDto);
     
@@ -186,12 +194,100 @@ export class UsersService {
     return { message: 'Password changed successfully. Please login again with your new password.' };
   }
 
-  async remove(id: string) {
-    const user = await this.userModel.findByIdAndDelete(id).exec();
+  /**
+   * Reset user password by admin (no current password required)
+   * This should only be accessible to Super Admin
+   */
+  async resetPassword(id: string, resetPasswordDto: ResetPasswordDto): Promise<{ message: string }> {
+    // Validate passwords match
+    if (resetPasswordDto.newPassword !== resetPasswordDto.confirmPassword) {
+      throw new BadRequestException('New password and confirmation do not match');
+    }
+
+    // Find user
+    const user = await this.userModel.findById(id).select('+password').exec();
     
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
+
+    // Check if trying to reset Super Admin password
+    if (user.email === 'admin@visitor-system.com') {
+      throw new BadRequestException(
+        'Cannot reset Super Admin password via this method. Super Admin must change their own password.'
+      );
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(resetPasswordDto.newPassword, 10);
+
+    // Update password and related security fields
+    await this.userModel.findByIdAndUpdate(id, {
+      password: hashedPassword,
+      passwordChangedAt: new Date(),
+      refreshTokens: [], // Revoke all refresh tokens for security
+      loginAttempts: 0, // Reset failed login attempts counter
+      lockedUntil: null, // Unlock account if it was locked
+    }).exec();
+
+    this.logger.log(
+      `Password reset by admin for user ${id} (${user.email}). ` +
+      `Login attempts reset and account unlocked (if locked).`
+    );
+    
+    return { message: 'Password reset successfully. User can now login with the new password.' };
+  }
+
+  /**
+   * Toggle user status (active/inactive)
+   */
+  async toggleStatus(id: string, status: 'active' | 'inactive') {
+    this.logger.log(`Toggling status for user: ${id} to ${status}`);
+    
+    // Check if user exists
+    const user = await this.userModel.findById(id).exec();
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+    
+    // 🔒 SUPER ADMIN PROTECTION: Prevent deactivating Super Admin user
+    if (user.email === 'admin@visitor-system.com' && status === 'inactive') {
+      throw new BadRequestException(
+        'Super Admin user cannot be deactivated. This user is protected and required for system administration.'
+      );
+    }
+    
+    // Update status
+    const updatedUser = await this.userModel
+      .findByIdAndUpdate(
+        id,
+        { status, isActive: status === 'active' },
+        { new: true }
+      )
+      .populate('role')
+      .exec();
+    
+    this.logger.log(`User ${id} status updated to ${status}`);
+    return updatedUser;
+  }
+
+  async remove(id: string) {
+    // Check if user exists first
+    const user = await this.userModel.findById(id).exec();
+    
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    // 🔒 SUPER ADMIN PROTECTION: Prevent deleting Super Admin user
+    if (user.email === 'admin@visitor-system.com') {
+      throw new BadRequestException(
+        'Super Admin user cannot be deleted. This user is protected and required for system administration.'
+      );
+    }
+    
+    // Proceed with deletion
+    await this.userModel.findByIdAndDelete(id).exec();
     
     this.logger.log(`User ${id} deleted successfully`);
     return { message: 'User deleted successfully', id };

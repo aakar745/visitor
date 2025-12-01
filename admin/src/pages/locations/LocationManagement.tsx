@@ -33,6 +33,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import locationService, { type BulkImportData } from '../../services/locationService';
 import type { Country, State, City, Pincode } from '../../services/locationService';
+import { usePermissions } from '../../hooks/usePermissions';
 import CountryModal from './components/CountryModal';
 import StateModal from './components/StateModal';
 import CityModal from './components/CityModal';
@@ -42,6 +43,7 @@ import PincodeModal from './components/PincodeModal';
 
 const LocationManagement: React.FC = () => {
   const { message } = App.useApp();
+  const { hasPermission } = usePermissions();
   
   // ==========================================================================
   // STATE
@@ -365,6 +367,7 @@ const LocationManagement: React.FC = () => {
         <Switch
           checked={isActive}
           onChange={(checked) => handleToggleActive('country', record._id, checked)}
+          disabled={!hasPermission('locations.toggle')}
         />
       ),
     },
@@ -372,30 +375,43 @@ const LocationManagement: React.FC = () => {
       title: 'Actions',
       key: 'actions',
       width: 150,
-      render: (_, record: Country) => (
-        <Space>
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => {
-              setEditingCountry(record);
-              setCountryModalVisible(true);
-            }}
-          >
-            Edit
-          </Button>
-          <Popconfirm
-            title="Are you sure you want to delete this country?"
-            onConfirm={() => handleDelete('country', record._id)}
-            okText="Yes"
-            cancelText="No"
-          >
-            <Button type="link" danger icon={<DeleteOutlined />}>
-              Delete
-            </Button>
-          </Popconfirm>
-        </Space>
-      ),
+      render: (_, record: Country) => {
+        const canUpdate = hasPermission('locations.update');
+        const canDelete = hasPermission('locations.delete');
+        
+        if (!canUpdate && !canDelete) {
+          return <span style={{ color: '#8c8c8c', fontSize: '12px' }}>No actions</span>;
+        }
+        
+        return (
+          <Space>
+            {canUpdate && (
+              <Button
+                type="link"
+                icon={<EditOutlined />}
+                onClick={() => {
+                  setEditingCountry(record);
+                  setCountryModalVisible(true);
+                }}
+              >
+                Edit
+              </Button>
+            )}
+            {canDelete && (
+              <Popconfirm
+                title="Are you sure you want to delete this country?"
+                onConfirm={() => handleDelete('country', record._id)}
+                okText="Yes"
+                cancelText="No"
+              >
+                <Button type="link" danger icon={<DeleteOutlined />}>
+                  Delete
+                </Button>
+              </Popconfirm>
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -438,6 +454,7 @@ const LocationManagement: React.FC = () => {
         <Switch
           checked={isActive}
           onChange={(checked) => handleToggleActive('state', record._id, checked)}
+          disabled={!hasPermission('locations.toggle')}
         />
       ),
     },
@@ -445,28 +462,41 @@ const LocationManagement: React.FC = () => {
       title: 'Actions',
       key: 'actions',
       width: 150,
-      render: (_, record: State) => (
-        <Space>
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => {
-              setEditingState(record);
-              setStateModalVisible(true);
-            }}
-          >
-            Edit
-          </Button>
-          <Popconfirm
-            title="Are you sure you want to delete this state?"
-            onConfirm={() => handleDelete('state', record._id)}
-          >
-            <Button type="link" danger icon={<DeleteOutlined />}>
-              Delete
-            </Button>
-          </Popconfirm>
-        </Space>
-      ),
+      render: (_, record: State) => {
+        const canUpdate = hasPermission('locations.update');
+        const canDelete = hasPermission('locations.delete');
+        
+        if (!canUpdate && !canDelete) {
+          return <span style={{ color: '#8c8c8c', fontSize: '12px' }}>No actions</span>;
+        }
+        
+        return (
+          <Space>
+            {canUpdate && (
+              <Button
+                type="link"
+                icon={<EditOutlined />}
+                onClick={() => {
+                  setEditingState(record);
+                  setStateModalVisible(true);
+                }}
+              >
+                Edit
+              </Button>
+            )}
+            {canDelete && (
+              <Popconfirm
+                title="Are you sure you want to delete this state?"
+                onConfirm={() => handleDelete('state', record._id)}
+              >
+                <Button type="link" danger icon={<DeleteOutlined />}>
+                  Delete
+                </Button>
+              </Popconfirm>
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -503,6 +533,7 @@ const LocationManagement: React.FC = () => {
         <Switch
           checked={isActive}
           onChange={(checked) => handleToggleActive('city', record._id, checked)}
+          disabled={!hasPermission('locations.toggle')}
         />
       ),
     },
@@ -510,28 +541,41 @@ const LocationManagement: React.FC = () => {
       title: 'Actions',
       key: 'actions',
       width: 150,
-      render: (_, record: City) => (
-        <Space>
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => {
-              setEditingCity(record);
-              setCityModalVisible(true);
-            }}
-          >
-            Edit
-          </Button>
-          <Popconfirm
-            title="Are you sure you want to delete this city?"
-            onConfirm={() => handleDelete('city', record._id)}
-          >
-            <Button type="link" danger icon={<DeleteOutlined />}>
-              Delete
-            </Button>
-          </Popconfirm>
-        </Space>
-      ),
+      render: (_, record: City) => {
+        const canUpdate = hasPermission('locations.update');
+        const canDelete = hasPermission('locations.delete');
+        
+        if (!canUpdate && !canDelete) {
+          return <span style={{ color: '#8c8c8c', fontSize: '12px' }}>No actions</span>;
+        }
+        
+        return (
+          <Space>
+            {canUpdate && (
+              <Button
+                type="link"
+                icon={<EditOutlined />}
+                onClick={() => {
+                  setEditingCity(record);
+                  setCityModalVisible(true);
+                }}
+              >
+                Edit
+              </Button>
+            )}
+            {canDelete && (
+              <Popconfirm
+                title="Are you sure you want to delete this city?"
+                onConfirm={() => handleDelete('city', record._id)}
+              >
+                <Button type="link" danger icon={<DeleteOutlined />}>
+                  Delete
+                </Button>
+              </Popconfirm>
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -574,6 +618,7 @@ const LocationManagement: React.FC = () => {
         <Switch
           checked={isActive}
           onChange={(checked) => handleToggleActive('pincode', record._id, checked)}
+          disabled={!hasPermission('locations.toggle')}
         />
       ),
     },
@@ -581,28 +626,41 @@ const LocationManagement: React.FC = () => {
       title: 'Actions',
       key: 'actions',
       width: 150,
-      render: (_, record: Pincode) => (
-        <Space>
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => {
-              setEditingPincode(record);
-              setPincodeModalVisible(true);
-            }}
-          >
-            Edit
-          </Button>
-          <Popconfirm
-            title="Are you sure you want to delete this PIN code?"
-            onConfirm={() => handleDelete('pincode', record._id)}
-          >
-            <Button type="link" danger icon={<DeleteOutlined />}>
-              Delete
-            </Button>
-          </Popconfirm>
-        </Space>
-      ),
+      render: (_, record: Pincode) => {
+        const canUpdate = hasPermission('locations.update');
+        const canDelete = hasPermission('locations.delete');
+        
+        if (!canUpdate && !canDelete) {
+          return <span style={{ color: '#8c8c8c', fontSize: '12px' }}>No actions</span>;
+        }
+        
+        return (
+          <Space>
+            {canUpdate && (
+              <Button
+                type="link"
+                icon={<EditOutlined />}
+                onClick={() => {
+                  setEditingPincode(record);
+                  setPincodeModalVisible(true);
+                }}
+              >
+                Edit
+              </Button>
+            )}
+            {canDelete && (
+              <Popconfirm
+                title="Are you sure you want to delete this PIN code?"
+                onConfirm={() => handleDelete('pincode', record._id)}
+              >
+                <Button type="link" danger icon={<DeleteOutlined />}>
+                  Delete
+                </Button>
+              </Popconfirm>
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -658,22 +716,28 @@ const LocationManagement: React.FC = () => {
         title="Location Management"
         extra={
           <Space>
-            <Button
-              icon={<DownloadOutlined />}
-              onClick={() => locationService.downloadCSVTemplate()}
-            >
-              Download Template
-            </Button>
-            <Upload
-              accept=".csv"
-              showUploadList={false}
-              beforeUpload={handleFileUpload}
-            >
-              <Button icon={<UploadOutlined />}>Bulk Import</Button>
-            </Upload>
-            <Button icon={<DownloadOutlined />} onClick={handleExport} loading={loading}>
-              Export All
-            </Button>
+            {hasPermission('locations.view') && (
+              <Button
+                icon={<DownloadOutlined />}
+                onClick={() => locationService.downloadCSVTemplate()}
+              >
+                Download Template
+              </Button>
+            )}
+            {hasPermission('locations.import') && (
+              <Upload
+                accept=".csv"
+                showUploadList={false}
+                beforeUpload={handleFileUpload}
+              >
+                <Button icon={<UploadOutlined />}>Bulk Import</Button>
+              </Upload>
+            )}
+            {hasPermission('locations.export') && (
+              <Button icon={<DownloadOutlined />} onClick={handleExport} loading={loading}>
+                Export All
+              </Button>
+            )}
           </Space>
         }
       >
@@ -699,18 +763,20 @@ const LocationManagement: React.FC = () => {
                         <Button type="primary" icon={<SearchOutlined />} onClick={() => loadCountries()} />
                       </Space.Compact>
                     </Col>
-                    <Col>
-                      <Button
-                        type="primary"
-                        icon={<PlusOutlined />}
-                        onClick={() => {
-                          setEditingCountry(null);
-                          setCountryModalVisible(true);
-                        }}
-                      >
-                        Add Country
-                      </Button>
-                    </Col>
+                    {hasPermission('locations.create') && (
+                      <Col>
+                        <Button
+                          type="primary"
+                          icon={<PlusOutlined />}
+                          onClick={() => {
+                            setEditingCountry(null);
+                            setCountryModalVisible(true);
+                          }}
+                        >
+                          Add Country
+                        </Button>
+                      </Col>
+                    )}
                   </Row>
                   <Table
                     columns={countryColumns}
@@ -740,20 +806,22 @@ const LocationManagement: React.FC = () => {
                         <Button type="primary" icon={<SearchOutlined />} onClick={() => loadStates()} />
                       </Space.Compact>
                     </Col>
-                    <Col>
-                      <Button
-                        type="primary"
-                        icon={<PlusOutlined />}
-                        onClick={() => {
-                          setEditingState(null);
-                          setStateModalVisible(true);
-                        }}
-                        disabled={!dropdownDataLoaded}
-                        loading={!dropdownDataLoaded}
-                      >
-                        Add State
-                      </Button>
-                    </Col>
+                    {hasPermission('locations.create') && (
+                      <Col>
+                        <Button
+                          type="primary"
+                          icon={<PlusOutlined />}
+                          onClick={() => {
+                            setEditingState(null);
+                            setStateModalVisible(true);
+                          }}
+                          disabled={!dropdownDataLoaded}
+                          loading={!dropdownDataLoaded}
+                        >
+                          Add State
+                        </Button>
+                      </Col>
+                    )}
                   </Row>
                   <Table
                     columns={stateColumns}
@@ -783,20 +851,22 @@ const LocationManagement: React.FC = () => {
                         <Button type="primary" icon={<SearchOutlined />} onClick={() => loadCities()} />
                       </Space.Compact>
                     </Col>
-                    <Col>
-                      <Button
-                        type="primary"
-                        icon={<PlusOutlined />}
-                        onClick={() => {
-                          setEditingCity(null);
-                          setCityModalVisible(true);
-                        }}
-                        disabled={!dropdownDataLoaded}
-                        loading={!dropdownDataLoaded}
-                      >
-                        Add City
-                      </Button>
-                    </Col>
+                    {hasPermission('locations.create') && (
+                      <Col>
+                        <Button
+                          type="primary"
+                          icon={<PlusOutlined />}
+                          onClick={() => {
+                            setEditingCity(null);
+                            setCityModalVisible(true);
+                          }}
+                          disabled={!dropdownDataLoaded}
+                          loading={!dropdownDataLoaded}
+                        >
+                          Add City
+                        </Button>
+                      </Col>
+                    )}
                   </Row>
                   <Table
                     columns={cityColumns}
@@ -826,20 +896,22 @@ const LocationManagement: React.FC = () => {
                         <Button type="primary" icon={<SearchOutlined />} onClick={() => loadPincodes()} />
                       </Space.Compact>
                     </Col>
-                    <Col>
-                      <Button
-                        type="primary"
-                        icon={<PlusOutlined />}
-                        onClick={() => {
-                          setEditingPincode(null);
-                          setPincodeModalVisible(true);
-                        }}
-                        disabled={!dropdownDataLoaded}
-                        loading={!dropdownDataLoaded}
-                      >
-                        Add PIN Code
-                      </Button>
-                    </Col>
+                    {hasPermission('locations.create') && (
+                      <Col>
+                        <Button
+                          type="primary"
+                          icon={<PlusOutlined />}
+                          onClick={() => {
+                            setEditingPincode(null);
+                            setPincodeModalVisible(true);
+                          }}
+                          disabled={!dropdownDataLoaded}
+                          loading={!dropdownDataLoaded}
+                        >
+                          Add PIN Code
+                        </Button>
+                      </Col>
+                    )}
                   </Row>
                   <Table
                     columns={pincodeColumns}

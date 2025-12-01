@@ -45,14 +45,28 @@ export function useFormCleanup(
         if (!f) return;
         
         try {
+          // Check if form instance is still valid and connected
+          const formInstance = f.getInternalHooks?.('RC_FORM_INTERNAL_HOOKS');
+          if (!formInstance) {
+            // Form is not connected or already destroyed
+            return;
+          }
+          
           if (clearErrors) {
             // Clear validation errors without resetting values
-            const fieldsError = f.getFieldsError();
-            const resetErrors = fieldsError.map((field) => ({
-              name: field.name,
-              errors: [],
-            }));
-            f.setFields(resetErrors);
+            try {
+              const fieldsError = f.getFieldsError();
+              const resetErrors = fieldsError.map((field) => ({
+                name: field.name,
+                errors: [],
+              }));
+              // Avoid circular reference warning in dev mode
+              if (resetErrors.length > 0) {
+                f.setFields(resetErrors);
+              }
+            } catch (e) {
+              // Ignore circular reference warnings in React Strict Mode
+            }
           }
           
           if (resetOnUnmount) {
@@ -61,7 +75,7 @@ export function useFormCleanup(
           }
         } catch (error) {
           // Silently fail - form might already be destroyed
-          console.debug('Form cleanup error (can be ignored):', error);
+          // This can happen in React Strict Mode during development
         }
       });
     };
@@ -92,9 +106,13 @@ export function useModalFormCleanup(
     // When modal closes (visible changes to false), reset form
     if (!isVisible) {
       try {
-        form.resetFields();
+        // Check if form instance is still valid
+        const formInstance = form.getInternalHooks?.('RC_FORM_INTERNAL_HOOKS');
+        if (formInstance) {
+          form.resetFields();
+        }
       } catch (error) {
-        console.debug('Modal form cleanup error (can be ignored):', error);
+        // Silently fail - this can happen in React Strict Mode
       }
     }
   }, [form, isVisible]);

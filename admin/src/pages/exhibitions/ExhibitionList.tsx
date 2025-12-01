@@ -20,6 +20,7 @@ import {
 } from 'antd';
 import './ExhibitionList.css';
 import { useMessage } from '../../hooks/useMessage';
+import { usePermissions } from '../../hooks/usePermissions';
 import {
   PlusOutlined,
   SearchOutlined,
@@ -60,6 +61,7 @@ const BACKEND_URL = API_BASE_URL.replace(/\/api\/v\d+$/, '');
 const ExhibitionList: React.FC = () => {
   const navigate = useNavigate();
   const message = useMessage();
+  const { hasPermission } = usePermissions();
   const [loading, setLoading] = useState(false);
   const [allExhibitions, setAllExhibitions] = useState<Exhibition[]>([]);
   const [filters, setFilters] = useState<ExhibitionFilters>({});
@@ -251,76 +253,110 @@ const ExhibitionList: React.FC = () => {
     // Handle both id and _id (backend returns _id, frontend type uses id)
     const exhibitionId = exhibition.id || (exhibition as any)._id;
     
-    const items = [
-      {
+    const items = [];
+
+    // View - Always visible if user has view permission
+    if (hasPermission('exhibitions.view')) {
+      items.push({
         key: 'view',
         icon: <EyeOutlined />,
         label: 'View Details',
         onClick: () => navigate(`/exhibitions/${exhibitionId}`)
-      },
-      {
+      });
+    }
+
+    // Edit - Only if user has update permission
+    if (hasPermission('exhibitions.update')) {
+      items.push({
         key: 'edit',
         icon: <EditOutlined />,
         label: 'Edit Exhibition',
         onClick: () => navigate(`/exhibitions/edit/${exhibitionId}`)
-      },
-      {
+      });
+    }
+
+    // Duplicate - Only if user has duplicate permission
+    if (hasPermission('exhibitions.duplicate')) {
+      items.push({
         key: 'duplicate',
         icon: <CopyOutlined />,
         label: 'Duplicate',
         onClick: () => handleDuplicate(exhibition)
-      },
-      {
+      });
+    }
+
+    // Add divider if we have any items
+    if (items.length > 0) {
+      items.push({
         key: 'divider-1',
         type: 'divider' as const,
-      },
-      {
+      });
+    }
+
+    // Copy link and QR - Only if user has copylink or qrcode permission
+    if (hasPermission('exhibitions.copylink')) {
+      items.push({
         key: 'copy-link',
         icon: <LinkOutlined />,
         label: 'Copy Registration Link',
         onClick: () => handleCopyLink(exhibition)
-      },
-      {
+      });
+    }
+
+    if (hasPermission('exhibitions.qrcode')) {
+      items.push({
         key: 'qr-code',
         icon: <QrcodeOutlined />,
         label: 'Show QR Code',
         onClick: () => handleShowQR(exhibition)
-      },
-      {
-        key: 'divider-2',
-        type: 'divider' as const,
-      },
-    ];
-
-    // Publish/Unpublish options
-    if (isDraft) {
-      items.push({
-        key: 'publish',
-        icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
-        label: 'Publish Exhibition',
-        onClick: () => handleStatusUpdate(exhibitionId, 'active'),
-      });
-    } else {
-      items.push({
-        key: 'unpublish',
-        icon: <ClockCircleOutlined />,
-        label: 'Unpublish (Move to Draft)',
-        onClick: () => handleStatusUpdate(exhibitionId, 'draft'),
       });
     }
 
-    items.push(
-      {
+    // Add divider before publish/unpublish
+    if (items.length > 0 && hasPermission('exhibitions.publish')) {
+      items.push({
+        key: 'divider-2',
+        type: 'divider' as const,
+      });
+    }
+
+    // Publish/Unpublish options - Only if user has publish permission
+    if (hasPermission('exhibitions.publish')) {
+      if (isDraft) {
+        items.push({
+          key: 'publish',
+          icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
+          label: 'Publish Exhibition',
+          onClick: () => handleStatusUpdate(exhibitionId, 'active'),
+        });
+      } else {
+        items.push({
+          key: 'unpublish',
+          icon: <ClockCircleOutlined />,
+          label: 'Unpublish (Move to Draft)',
+          onClick: () => handleStatusUpdate(exhibitionId, 'draft'),
+        });
+      }
+    }
+
+    // Add divider before delete
+    if (items.length > 0 && hasPermission('exhibitions.delete')) {
+      items.push({
         key: 'divider-3',
         type: 'divider' as const,
-      },
-      {
+      });
+    }
+
+    // Delete - Only if user has delete permission
+    if (hasPermission('exhibitions.delete')) {
+      items.push({
         key: 'delete',
-        icon: <DeleteOutlined style={{ color: '#ff4d4f' }} />,
-        label: 'Delete',
-        onClick: () => handleDelete(exhibition)
-      }
-    );
+        icon: <DeleteOutlined />,
+        label: 'Delete Exhibition',
+        danger: true,
+        onClick: () => handleDelete(exhibitionId),
+      });
+    }
 
     return items;
   };
@@ -534,15 +570,17 @@ const ExhibitionList: React.FC = () => {
             Create and manage exhibitions with registration, pricing, and visitor management
           </Text>
         </div>
-        <Button 
-          type="primary" 
-          icon={<PlusOutlined />} 
-          size="large"
-          onClick={() => navigate('/exhibitions/create')}
-          style={{ height: '44px', borderRadius: '8px', fontWeight: 500 }}
-        >
-          Create Exhibition
-        </Button>
+        {hasPermission('exhibitions.create') && (
+          <Button 
+            type="primary" 
+            icon={<PlusOutlined />} 
+            size="large"
+            onClick={() => navigate('/exhibitions/create')}
+            style={{ height: '44px', borderRadius: '8px', fontWeight: 500 }}
+          >
+            Create Exhibition
+          </Button>
+        )}
       </div>
 
       {/* Statistics Cards */}

@@ -27,6 +27,7 @@ import {
   Spin,
 } from 'antd';
 import { useMessage } from '../../hooks/useMessage';
+import { usePermissions } from '../../hooks/usePermissions';
 import { convertImageToBase64, downloadQRCode, generateQRFilename, QR_CONFIG } from '../../utils/qrCodeUtils';
 import { useExhibitions } from '../../hooks/useExhibitions';
 import { useExhibitorsByExhibition, useExhibitorMutations } from '../../hooks/useExhibitors';
@@ -62,6 +63,7 @@ const BACKEND_URL = API_BASE_URL.replace(/\/api\/v\d+$/, '');
 
 const ExhibitorLinks: React.FC = () => {
   const message = useMessage();
+  const { hasPermission } = usePermissions();
   const [selectedExhibition, setSelectedExhibition] = useState<string | undefined>();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [qrModalVisible, setQrModalVisible] = useState(false);
@@ -306,36 +308,55 @@ const ExhibitorLinks: React.FC = () => {
     }
   };
 
-  const getActionMenu = (exhibitor: Exhibitor): MenuProps => ({
-    items: [
-      {
+  const getActionMenu = (exhibitor: Exhibitor): MenuProps => {
+    const items: any[] = [];
+
+    // Copy Link - Requires exhibitors.view
+    if (hasPermission('exhibitors.view')) {
+      items.push({
         key: 'copy',
         icon: <CopyOutlined />,
         label: 'Copy Link',
         onClick: () => handleCopyLink(exhibitor),
-      },
-      {
+      });
+    }
+
+    // QR Code - Requires exhibitors.qrcode
+    if (hasPermission('exhibitors.qrcode')) {
+      items.push({
         key: 'qr',
         icon: <QrcodeOutlined />,
         label: 'Download QR Code',
         onClick: () => handleGenerateQR(exhibitor),
-      },
-      {
+      });
+    }
+
+    // Edit - Requires exhibitors.update
+    if (hasPermission('exhibitors.update')) {
+      items.push({
         key: 'edit',
         icon: <EditOutlined />,
         label: 'Edit',
         onClick: () => handleEditExhibitor(exhibitor),
-      },
-      {
+      });
+    }
+
+    // Add divider if we have items and delete permission
+    if (items.length > 0 && hasPermission('exhibitors.delete')) {
+      items.push({
         type: 'divider',
-      },
-      {
+      });
+    }
+
+    // Delete - Requires exhibitors.delete
+    if (hasPermission('exhibitors.delete')) {
+      const exhibitorId = exhibitor.id || (exhibitor as any)._id;
+      items.push({
         key: 'delete',
         icon: <DeleteOutlined />,
         label: 'Delete',
         danger: true,
         onClick: () => {
-          const exhibitorId = exhibitor.id || (exhibitor as any)._id;
           Modal.confirm({
             title: 'Delete Exhibitor',
             content: `Are you sure you want to delete "${exhibitor.name}"? This action cannot be undone.`,
@@ -345,9 +366,11 @@ const ExhibitorLinks: React.FC = () => {
             onOk: () => handleDeleteExhibitor(exhibitorId),
           });
         },
-      },
-    ],
-  });
+      });
+    }
+
+    return { items };
+  };
 
   const columns: ColumnsType<Exhibitor> = [
     {
@@ -476,30 +499,48 @@ const ExhibitorLinks: React.FC = () => {
       align: 'right',
       fixed: 'right',
       width: 150,
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="Copy Link">
-            <Button
-              type="primary"
-              ghost
-              size="small"
-              icon={<CopyOutlined />}
-              onClick={() => handleCopyLink(record)}
-            />
-          </Tooltip>
-          <Tooltip title="Edit">
-            <Button
-              type="default"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => handleEditExhibitor(record)}
-            />
-          </Tooltip>
-          <Dropdown menu={getActionMenu(record)} trigger={['click']}>
-            <Button type="text" size="small" icon={<MoreOutlined />} />
-          </Dropdown>
-        </Space>
-      ),
+      render: (_, record) => {
+        const actionMenu = getActionMenu(record);
+        const hasMenuItems = actionMenu.items && actionMenu.items.length > 0;
+        const canCopyLink = hasPermission('exhibitors.view');
+        const canEdit = hasPermission('exhibitors.update');
+
+        // If user has NO permissions at all, show empty space
+        if (!canCopyLink && !canEdit && !hasMenuItems) {
+          return <Text type="secondary">No actions</Text>;
+        }
+
+        return (
+          <Space size="small">
+            {canCopyLink && (
+              <Tooltip title="Copy Link">
+                <Button
+                  type="primary"
+                  ghost
+                  size="small"
+                  icon={<CopyOutlined />}
+                  onClick={() => handleCopyLink(record)}
+                />
+              </Tooltip>
+            )}
+            {canEdit && (
+              <Tooltip title="Edit">
+                <Button
+                  type="default"
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={() => handleEditExhibitor(record)}
+                />
+              </Tooltip>
+            )}
+            {hasMenuItems && (
+              <Dropdown menu={actionMenu} trigger={['click']}>
+                <Button type="text" size="small" icon={<MoreOutlined />} />
+              </Dropdown>
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -654,14 +695,16 @@ const ExhibitorLinks: React.FC = () => {
             </Space>
           }
           extra={
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={handleAddExhibitor}
-              size="large"
-            >
-              Add Exhibitor
-            </Button>
+            hasPermission('exhibitors.create') && (
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={handleAddExhibitor}
+                size="large"
+              >
+                Add Exhibitor
+              </Button>
+            )
           }
         >
           {/* Search and Filter Bar */}

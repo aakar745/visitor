@@ -16,6 +16,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@ne
 import { VisitorsService, QueryVisitorDto, CreateVisitorDto, UpdateVisitorDto } from './visitors.service';
 import { GlobalVisitor } from '../../database/schemas/global-visitor.schema';
 import { ExhibitionRegistration } from '../../database/schemas/exhibition-registration.schema';
+import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 
 @ApiTags('Visitors')
 @ApiBearerAuth()
@@ -28,6 +29,7 @@ export class VisitorsController {
    * Searches by name, phone, email, company
    */
   @Get('search/autocomplete')
+  @RequirePermissions('visitors.search')
   @ApiOperation({ summary: 'Fast visitor search with MeiliSearch autocomplete' })
   @ApiResponse({ status: 200, description: 'Search results retrieved successfully' })
   async searchAutocomplete(
@@ -56,6 +58,7 @@ export class VisitorsController {
    * Get all visitors with pagination and filters
    */
   @Get()
+  @RequirePermissions('visitors.view')
   @ApiOperation({ summary: 'Get all visitors with pagination and filters' })
   @ApiResponse({ status: 200, description: 'Visitors retrieved successfully' })
   async findAll(
@@ -83,6 +86,7 @@ export class VisitorsController {
    * Get visitor statistics
    */
   @Get('statistics')
+  @RequirePermissions('visitors.view')
   @ApiOperation({ summary: 'Get visitor statistics' })
   @ApiResponse({ status: 200, description: 'Statistics retrieved successfully' })
   async getStatistics(): Promise<{
@@ -109,6 +113,7 @@ export class VisitorsController {
    * ⚠️ IMPORTANT: Must be defined BEFORE /:id route
    */
   @Get('export')
+  @RequirePermissions('visitors.export')
   @ApiOperation({ 
     summary: 'Export all global visitors to CSV/Excel',
     description: 'Streams visitor data with dynamic field discovery. Handles large datasets efficiently.'
@@ -142,6 +147,7 @@ export class VisitorsController {
    * Get single visitor by ID
    */
   @Get(':id')
+  @RequirePermissions('visitors.view')
   @ApiOperation({ summary: 'Get visitor by ID' })
   @ApiParam({ name: 'id', description: 'Visitor ID' })
   @ApiResponse({ status: 200, description: 'Visitor retrieved successfully', type: GlobalVisitor })
@@ -154,6 +160,7 @@ export class VisitorsController {
    * Get visitor's registrations
    */
   @Get(':id/registrations')
+  @RequirePermissions('visitors.view')
   @ApiOperation({ summary: 'Get visitor registrations' })
   @ApiParam({ name: 'id', description: 'Visitor ID' })
   @ApiResponse({ status: 200, description: 'Registrations retrieved successfully' })
@@ -201,6 +208,7 @@ export class VisitorsController {
    * Delete visitor (CASCADE: also deletes all registrations)
    */
   @Delete(':id')
+  @RequirePermissions('visitors.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ 
     summary: 'Delete visitor with cascade deletion',
@@ -218,6 +226,7 @@ export class VisitorsController {
    * Bulk delete visitors (CASCADE: also deletes all registrations)
    */
   @Post('bulk-delete')
+  @RequirePermissions('visitors.bulk')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
     summary: 'Bulk delete visitors with cascade deletion',

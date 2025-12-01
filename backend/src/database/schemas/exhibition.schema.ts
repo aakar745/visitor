@@ -99,6 +99,9 @@ export class InterestOption {
   @Prop({ default: true })
   isActive: boolean;
 
+  @Prop({ default: false })
+  required: boolean; // ✅ NEW: Allow marking interest selection as mandatory
+
   @Prop({ default: 0 })
   order: number;
 }

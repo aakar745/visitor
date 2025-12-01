@@ -75,6 +75,35 @@ export class RegistrationsService {
       throw new BadRequestException('Exhibition is not accepting registrations');
     }
 
+    // ✅ VALIDATE REQUIRED CUSTOM FIELDS
+    // Check that all required custom fields are provided
+    if (exhibition.customFields && exhibition.customFields.length > 0) {
+      const customFieldData = dto.customFieldData || {};
+      const missingFields: string[] = [];
+      
+      for (const field of exhibition.customFields) {
+        if (field.required) {
+          const fieldValue = customFieldData[field.name];
+          
+          // Check if field is missing or empty
+          if (fieldValue === undefined || fieldValue === null || fieldValue === '') {
+            missingFields.push(field.label || field.name);
+          }
+          
+          // Special validation for arrays (checkbox fields)
+          if (Array.isArray(fieldValue) && fieldValue.length === 0) {
+            missingFields.push(field.label || field.name);
+          }
+        }
+      }
+      
+      if (missingFields.length > 0) {
+        throw new BadRequestException(
+          `The following required fields are missing: ${missingFields.join(', ')}`
+        );
+      }
+    }
+
     // Extract standard fields from customFieldData if not provided at top level
     // This handles cases where frontend sends all data in customFieldData
     if (dto.customFieldData && typeof dto.customFieldData === 'object') {
@@ -482,8 +511,8 @@ export class RegistrationsService {
       }
     }
 
-    // 7. Generate unique registration number
-    const registrationNumber = await this.generateUniqueRegistrationNumber(dto.exhibitionId);
+    // 7. Generate unique registration number using exhibition tagline
+    const registrationNumber = await this.generateUniqueRegistrationNumber(exhibition);
 
     // 8. Clean customFieldData - remove both standard visitor fields AND global dynamic fields
     // Only exhibition-specific fields should remain in registration.customFieldData
@@ -1085,16 +1114,102 @@ export class RegistrationsService {
   }
 
   /**
-   * Generate unique registration number
-   * Format: REG-DDMMYYYY-NNNNNN (e.g., REG-10112025-000001)
+   * Sanitize exhibition tagline to create a registration code
+   * 
+   * ✅ Human-readable (uses actual exhibition tagline)
+   * ✅ Clean and safe (alphanumeric only, uppercase)
+   * ✅ Flexible (handles both short codes and long taglines)
+   * 
+   * Logic:
+   * 1. Remove special characters, keep only alphanumeric
+   * 2. Convert to uppercase
+   * 3. If already short (2-10 chars), use as-is
+   * 4. If longer, create abbreviation from first letters of words
+   * 5. Limit to 10 characters max
+   * 
+   * @param tagline - Exhibition tagline
+   * @returns Sanitized registration code (2-10 chars, uppercase, alphanumeric)
+   * 
+   * @example
+   * sanitizeTaglineToCode('ABSE') // Returns: 'ABSE'
+   * sanitizeTaglineToCode('Aakar Beauty Salon Expo') // Returns: 'ABSE'
+   * sanitizeTaglineToCode('Innovation Awaits You') // Returns: 'IAY'
+   * sanitizeTaglineToCode('Tech Expo 2025') // Returns: 'TE2025'
+   * sanitizeTaglineToCode('Annual Beauty & Wellness') // Returns: 'ABW'
    */
+  private sanitizeTaglineToCode(tagline: string): string {
+    if (!tagline || typeof tagline !== 'string') {
+      throw new BadRequestException('Invalid exhibition tagline');
+    }
+
+    // Remove special characters, keep only alphanumeric and spaces
+    let cleaned = tagline
+      .replace(/[^a-zA-Z0-9\s]/g, '')
+      .trim()
+      .toUpperCase();
+
+    if (!cleaned) {
+      throw new BadRequestException('Exhibition tagline must contain alphanumeric characters');
+    }
+
+    // If already short (2-10 chars without spaces), use as-is
+    const withoutSpaces = cleaned.replace(/\s+/g, '');
+    if (withoutSpaces.length >= 2 && withoutSpaces.length <= 10) {
+      return withoutSpaces;
+    }
+
+    // If longer, create abbreviation from first letters of words
+    const words = cleaned.split(/\s+/);
+    
+    if (words.length >= 2) {
+      // Multi-word: Take first letter of each word
+      let abbreviation = words
+        .map(word => word.charAt(0))
+        .join('')
+        .substring(0, 10); // Max 10 chars
+      
+      // If abbreviation is too short (< 2 chars), add more letters
+      if (abbreviation.length < 2) {
+        abbreviation = withoutSpaces.substring(0, 10);
+      }
+      
+      return abbreviation;
+    }
+
+    // Single long word: Take first 10 characters
+    return withoutSpaces.substring(0, 10);
+  }
+
   /**
    * Generate unique registration number using atomic counter
+   * 
    * ✅ RACE CONDITION SAFE - Uses MongoDB's findOneAndUpdate with $inc
-   * Format: REG-{DDMMYYYY}-{SEQUENCE}
-   * Example: REG-12112025-000001
+   * ✅ PER-EXHIBITION COUNTER - Each exhibition has separate sequence
+   * ✅ DAILY RESET - Counter resets at midnight for each exhibition
+   * ✅ HUMAN READABLE - Uses exhibition tagline as code
+   * 
+   * Format: REG-{TAGLINE_CODE}-{DDMMYYYY}-{SEQUENCE}
+   * 
+   * Examples:
+   * - Tagline: "ABSE" → REG-ABSE-01122025-000001
+   * - Tagline: "Aakar Beauty Salon Expo" → REG-ABSE-01122025-000001
+   * - Tagline: "Innovation Awaits You" → REG-IAY-01122025-000001
+   * 
+   * Benefits:
+   * - Immediately identify which exhibition from registration number
+   * - Human-readable (ABSE instead of 691D9D)
+   * - Per-exhibition analytics easier
+   * - Each exhibition starts from 1 daily
+   * - No number collisions between exhibitions
+   * 
+   * @param exhibition - Exhibition object with tagline
+   * @returns Unique registration number
    */
-  private async generateUniqueRegistrationNumber(exhibitionId: string): Promise<string> {
+  private async generateUniqueRegistrationNumber(exhibition: ExhibitionDocument): Promise<string> {
+    if (!exhibition || !exhibition.tagline) {
+      throw new BadRequestException('Exhibition tagline is required for registration number generation');
+    }
+
     const today = new Date();
     
     // Format date as DDMMYYYY
@@ -1103,24 +1218,40 @@ export class RegistrationsService {
     const year = today.getFullYear();
     const dateStr = `${day}${month}${year}`; // DDMMYYYY
     
-    // ATOMIC OPERATION: Increment counter for today's date
-    // findOneAndUpdate with $inc is atomic and thread-safe
+    // Sanitize tagline to create registration code
+    const taglineCode = this.sanitizeTaglineToCode(exhibition.tagline);
+    
+    // ATOMIC OPERATION: Increment counter for this exhibition + today's date
+    // findOneAndUpdate with $inc is atomic and thread-safe across all server instances
+    // Compound query: (exhibitionTagline + date) ensures separate counters per exhibition per day
+    // 
+    // ✅ RACE CONDITION PROTECTION:
+    // Even with 1000 concurrent registrations for same exhibition:
+    // - Each request gets unique sequence number
+    // - No duplicate registration numbers
+    // - No race conditions
+    // - Works across multiple backend server instances
     const counter = await this.counterModel.findOneAndUpdate(
-      { date: dateStr }, // Find counter for today
+      { 
+        exhibitionTagline: taglineCode,  // Separate counter per exhibition (using tagline)
+        date: dateStr,                   // Separate counter per day
+      },
       { 
         $inc: { sequence: 1 }, // Atomically increment sequence
       },
       { 
-        new: true, // Return updated document
-        upsert: true, // Create if doesn't exist (first registration of the day)
+        new: true,                    // Return updated document
+        upsert: true,                 // Create if doesn't exist (first registration of this exhibition today)
         setDefaultsOnInsert: true,
       }
     );
 
-    // Format: REG-12112025-000001
-    const registrationNumber = `REG-${dateStr}-${counter.sequence.toString().padStart(6, '0')}`;
+    // Format: REG-ABSE-01122025-000001
+    const registrationNumber = `REG-${taglineCode}-${dateStr}-${counter.sequence.toString().padStart(6, '0')}`;
     
-    this.logger.log(`[Registration Number] Generated: ${registrationNumber} (Atomic Counter: ${counter.sequence})`);
+    this.logger.log(
+      `[Registration Number] Generated: ${registrationNumber} for exhibition "${exhibition.name}" (Code: ${taglineCode}, Counter: ${counter.sequence})`
+    );
     
     return registrationNumber;
   }

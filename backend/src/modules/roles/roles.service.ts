@@ -44,57 +44,115 @@ export class RolesService {
   }
 
   async getPermissionGroups() {
-    // Return permission groups organized by category
+    // Return permission groups organized by actual pages and functionalities
     return [
       {
-        category: 'User Management',
+        category: 'Dashboard',
         permissions: [
-          { id: 'users.view', name: 'View Users', description: 'View user list and details' },
-          { id: 'users.create', name: 'Create Users', description: 'Create new users' },
-          { id: 'users.update', name: 'Update Users', description: 'Edit user information' },
-          { id: 'users.delete', name: 'Delete Users', description: 'Remove users from system' },
-        ],
-      },
-      {
-        category: 'Role Management',
-        permissions: [
-          { id: 'roles.view', name: 'View Roles', description: 'View roles and permissions' },
-          { id: 'roles.create', name: 'Create Roles', description: 'Create new roles' },
-          { id: 'roles.update', name: 'Update Roles', description: 'Edit role permissions' },
-          { id: 'roles.delete', name: 'Delete Roles', description: 'Remove roles' },
+          { id: 'dashboard.view', name: 'View Dashboard', description: 'Access main dashboard and overview statistics', action: 'view', resource: 'dashboard' },
         ],
       },
       {
         category: 'Exhibition Management',
         permissions: [
-          { id: 'exhibitions.view', name: 'View Exhibitions', description: 'View exhibition list' },
-          { id: 'exhibitions.create', name: 'Create Exhibitions', description: 'Create new exhibitions' },
-          { id: 'exhibitions.update', name: 'Update Exhibitions', description: 'Edit exhibitions' },
-          { id: 'exhibitions.delete', name: 'Delete Exhibitions', description: 'Remove exhibitions' },
+          { id: 'exhibitions.view', name: 'View Exhibitions', description: 'View exhibition list and details', action: 'view', resource: 'exhibitions' },
+          { id: 'exhibitions.create', name: 'Create Exhibitions', description: 'Create new exhibitions', action: 'create', resource: 'exhibitions' },
+          { id: 'exhibitions.update', name: 'Edit Exhibitions', description: 'Edit exhibition information', action: 'update', resource: 'exhibitions' },
+          { id: 'exhibitions.delete', name: 'Delete Exhibitions', description: 'Remove exhibitions from system', action: 'delete', resource: 'exhibitions' },
+          { id: 'exhibitions.duplicate', name: 'Duplicate Exhibitions', description: 'Duplicate existing exhibitions', action: 'duplicate', resource: 'exhibitions' },
+          { id: 'exhibitions.publish', name: 'Publish/Unpublish', description: 'Change exhibition status (draft/active)', action: 'publish', resource: 'exhibitions' },
+          { id: 'exhibitions.qrcode', name: 'Generate QR Codes', description: 'Generate and download QR codes', action: 'qrcode', resource: 'exhibitions' },
+          { id: 'exhibitions.copylink', name: 'Copy Registration Links', description: 'Copy registration URLs', action: 'copylink', resource: 'exhibitions' },
+          { id: 'exhibitions.export', name: 'Export Exhibitions', description: 'Export exhibition data', action: 'export', resource: 'exhibitions' },
+        ],
+      },
+      {
+        category: 'Exhibitor Management',
+        permissions: [
+          { id: 'exhibitors.view', name: 'View Exhibitors', description: 'View exhibitor links and details', action: 'view', resource: 'exhibitors' },
+          { id: 'exhibitors.create', name: 'Create Exhibitors', description: 'Create new exhibitor links', action: 'create', resource: 'exhibitors' },
+          { id: 'exhibitors.update', name: 'Edit Exhibitors', description: 'Edit exhibitor information', action: 'update', resource: 'exhibitors' },
+          { id: 'exhibitors.delete', name: 'Delete Exhibitors', description: 'Remove exhibitor links', action: 'delete', resource: 'exhibitors' },
+          { id: 'exhibitors.qrcode', name: 'Generate QR Codes', description: 'Generate exhibitor QR codes', action: 'qrcode', resource: 'exhibitors' },
+          { id: 'exhibitors.toggle', name: 'Enable/Disable Links', description: 'Toggle exhibitor link status', action: 'toggle', resource: 'exhibitors' },
         ],
       },
       {
         category: 'Visitor Management',
         permissions: [
-          { id: 'visitors.view', name: 'View Visitors', description: 'View visitor list' },
-          { id: 'visitors.create', name: 'Create Visitors', description: 'Register new visitors' },
-          { id: 'visitors.update', name: 'Update Visitors', description: 'Edit visitor information' },
-          { id: 'visitors.delete', name: 'Delete Visitors', description: 'Remove visitors' },
-          { id: 'visitors.checkin', name: 'Check-in Visitors', description: 'Check-in visitors' },
-          { id: 'visitors.checkout', name: 'Check-out Visitors', description: 'Check-out visitors' },
-        ],
-      },
-      {
-        category: 'System Settings',
-        permissions: [
-          { id: 'settings.view', name: 'View Settings', description: 'View system settings' },
-          { id: 'settings.update', name: 'Update Settings', description: 'Modify system settings' },
+          { id: 'visitors.view', name: 'View Visitors', description: 'View visitor list and details', action: 'view', resource: 'visitors' },
+          { id: 'visitors.delete', name: 'Delete Visitors', description: 'Remove visitor records', action: 'delete', resource: 'visitors' },
+          { id: 'visitors.import', name: 'Import Visitors', description: 'Bulk import visitors from CSV/Excel', action: 'import', resource: 'visitors' },
+          { id: 'visitors.export', name: 'Export Visitors', description: 'Export visitor data to CSV/Excel', action: 'export', resource: 'visitors' },
+          { id: 'visitors.search', name: 'Advanced Search', description: 'Use advanced search and filters', action: 'search', resource: 'visitors' },
+          { id: 'visitors.bulk', name: 'Bulk Operations', description: 'Perform bulk actions on visitors', action: 'bulk', resource: 'visitors' },
         ],
       },
       {
         category: 'Analytics',
         permissions: [
-          { id: 'analytics.view', name: 'View Analytics', description: 'View reports and analytics' },
+          { id: 'analytics.view', name: 'View Analytics Dashboard', description: 'Access analytics dashboard with charts and insights', action: 'view', resource: 'analytics' },
+          { id: 'analytics.export', name: 'Export Analytics', description: 'Export analytics data', action: 'export', resource: 'analytics' },
+        ],
+      },
+      {
+        category: 'Exhibition Reports',
+        permissions: [
+          { id: 'reports.view', name: 'View Exhibition Reports', description: 'Access exhibition-specific registration reports', action: 'view', resource: 'reports' },
+          { id: 'reports.filter', name: 'Filter Reports', description: 'Use advanced filters (type, timing, payment, dates)', action: 'filter', resource: 'reports' },
+          { id: 'reports.search', name: 'Search Registrations', description: 'Search visitors in reports', action: 'search', resource: 'reports' },
+          { id: 'reports.export', name: 'Export Reports', description: 'Export registration data (Excel/CSV)', action: 'export', resource: 'reports' },
+          { id: 'reports.delete', name: 'Delete Registrations', description: 'Remove visitor registrations from exhibitions', action: 'delete', resource: 'reports' },
+          { id: 'reports.details', name: 'View Registration Details', description: 'View detailed visitor information', action: 'details', resource: 'reports' },
+        ],
+      },
+      {
+        category: 'User Management',
+        permissions: [
+          { id: 'users.view', name: 'View Users', description: 'View system users and details', action: 'view', resource: 'users' },
+          { id: 'users.create', name: 'Create Users', description: 'Add new system users', action: 'create', resource: 'users' },
+          { id: 'users.update', name: 'Edit Users', description: 'Edit user information and roles', action: 'update', resource: 'users' },
+          { id: 'users.reset_password', name: 'Reset User Password', description: 'Reset password for any user (Super Admin only)', action: 'reset_password', resource: 'users' },
+          { id: 'users.delete', name: 'Delete Users', description: 'Remove users from system', action: 'delete', resource: 'users' },
+          { id: 'users.export', name: 'Export Users', description: 'Export user data', action: 'export', resource: 'users' },
+        ],
+      },
+      {
+        category: 'Role Management',
+        permissions: [
+          { id: 'roles.view', name: 'View Roles', description: 'View roles and permissions', action: 'view', resource: 'roles' },
+          { id: 'roles.create', name: 'Create Roles', description: 'Create custom roles', action: 'create', resource: 'roles' },
+          { id: 'roles.update', name: 'Edit Roles', description: 'Edit role permissions', action: 'update', resource: 'roles' },
+          { id: 'roles.delete', name: 'Delete Roles', description: 'Remove custom roles', action: 'delete', resource: 'roles' },
+          { id: 'roles.duplicate', name: 'Duplicate Roles', description: 'Duplicate existing roles', action: 'duplicate', resource: 'roles' },
+          { id: 'roles.export', name: 'Export Roles', description: 'Export role configurations', action: 'export', resource: 'roles' },
+        ],
+      },
+      {
+        category: 'Location Management',
+        permissions: [
+          { id: 'locations.view', name: 'View Locations', description: 'View countries, states, cities, pincodes', action: 'view', resource: 'locations' },
+          { id: 'locations.create', name: 'Create Locations', description: 'Add new location data', action: 'create', resource: 'locations' },
+          { id: 'locations.update', name: 'Edit Locations', description: 'Edit location information', action: 'update', resource: 'locations' },
+          { id: 'locations.delete', name: 'Delete Locations', description: 'Remove location data', action: 'delete', resource: 'locations' },
+          { id: 'locations.import', name: 'Import Locations', description: 'Bulk import location data', action: 'import', resource: 'locations' },
+          { id: 'locations.export', name: 'Export Locations', description: 'Export location data', action: 'export', resource: 'locations' },
+          { id: 'locations.toggle', name: 'Enable/Disable', description: 'Toggle location status', action: 'toggle', resource: 'locations' },
+        ],
+      },
+      {
+        category: 'System Settings',
+        permissions: [
+          { id: 'settings.view', name: 'View Settings', description: 'View system configuration', action: 'view', resource: 'settings' },
+          { id: 'settings.update', name: 'Update Settings', description: 'Modify system settings', action: 'update', resource: 'settings' },
+          { id: 'settings.kiosk', name: 'Kiosk Settings', description: 'Manage kiosk mode settings', action: 'kiosk', resource: 'settings' },
+        ],
+      },
+      {
+        category: 'System Monitoring',
+        permissions: [
+          { id: 'system.monitor', name: 'Queue Monitor', description: 'Monitor system queues and jobs', action: 'monitor', resource: 'system' },
+          { id: 'system.logs', name: 'View Logs', description: 'Access system logs', action: 'logs', resource: 'system' },
         ],
       },
     ];
@@ -214,7 +272,14 @@ export class RolesService {
       throw new NotFoundException(`Role with ID ${id} not found`);
     }
     
-    // Prevent updating system roles
+    // 🔒 SUPER ADMIN PROTECTION: Prevent updating Super Admin role
+    if (role.name === 'super_admin' && role.isSystemRole) {
+      throw new BadRequestException(
+        'Super Admin role cannot be modified. This role is protected and maintains full system access.'
+      );
+    }
+    
+    // Prevent updating other system roles
     if (role.isSystemRole) {
       throw new BadRequestException('System roles cannot be modified');
     }
@@ -229,7 +294,14 @@ export class RolesService {
       throw new NotFoundException(`Role with ID ${id} not found`);
     }
     
-    // Prevent deleting system roles
+    // 🔒 SUPER ADMIN PROTECTION: Prevent deleting Super Admin role
+    if (role.name === 'super_admin' && role.isSystemRole) {
+      throw new BadRequestException(
+        'Super Admin role cannot be deleted. This role is protected and required for system administration.'
+      );
+    }
+    
+    // Prevent deleting other system roles
     if (role.isSystemRole) {
       throw new BadRequestException('System roles cannot be deleted');
     }

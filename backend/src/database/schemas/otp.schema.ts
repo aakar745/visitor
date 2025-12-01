@@ -54,3 +54,10 @@ OtpSchema.index({ phoneNumber: 1, type: 1 });
 OtpSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // Auto-delete expired OTPs
 OtpSchema.index({ createdAt: -1 });
 
+// ✅ FIX: Compound index for rate-limiting query (prevents full collection scan under high load)
+// This index optimizes the "Check if there's a recent OTP request" query in sendWhatsAppOTP()
+OtpSchema.index({ phoneNumber: 1, type: 1, createdAt: -1 });
+
+// ✅ FIX: Compound index for verification query (optimizes findOne in verifyWhatsAppOTP)
+OtpSchema.index({ phoneNumber: 1, type: 1, isVerified: 1, expiresAt: 1 });
+

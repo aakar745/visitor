@@ -54,45 +54,106 @@ const FIELD_TYPES = [
 // Complete form templates - Full registration forms
 const FORM_TEMPLATES = [
   {
-    id: 'basic',
-    name: '🎯 Basic Registration',
-    description: 'Essential fields for simple events',
-    icon: '📝',
-    fields: [
-      { name: 'phone', label: 'Phone Number', type: 'phone' as const, required: true, placeholder: '+91 98765 43210', order: 0 },
-      { name: 'company', label: 'Company Name', type: 'text' as const, required: false, placeholder: 'Enter your company name', order: 1 },
-    ]
-  },
-  {
-    id: 'business',
-    name: '💼 Business Conference',
-    description: 'Professional event with company details',
-    icon: '🏢',
-    fields: [
-      { name: 'phone', label: 'Phone Number', type: 'phone' as const, required: true, placeholder: '+91 98765 43210', order: 0 },
-      { name: 'company', label: 'Company Name', type: 'text' as const, required: true, placeholder: 'Enter your company name', order: 1 },
-      { name: 'designation', label: 'Designation', type: 'text' as const, required: true, placeholder: 'e.g., Manager, Director', order: 2 },
-      { name: 'industry', label: 'Industry', type: 'select' as const, required: true, placeholder: 'Select your industry', 
-        options: ['Technology', 'Finance', 'Healthcare', 'Manufacturing', 'Retail', 'Other'], order: 3 },
-    ]
-  },
-  {
     id: 'exhibition',
     name: '🎪 Exhibition/Trade Show',
     description: 'Complete visitor details with location and contact',
     icon: '🎨',
     fields: [
-      { name: 'full_name', label: 'Full Name', type: 'text' as const, required: true, placeholder: 'Enter full name', order: 0 },
-      { name: 'company', label: 'Company Name', type: 'text' as const, required: true, placeholder: 'Enter your company name', order: 1 },
-      { name: 'phone', label: 'Phone No.', type: 'phone' as const, required: true, placeholder: '+91 98765 43210', order: 2 },
-      { name: 'address', label: 'Address', type: 'textarea' as const, required: true, placeholder: 'Enter complete address', order: 3 },
+      { 
+        name: 'full_name', 
+        label: 'Full Name', 
+        type: 'text' as const, 
+        required: true, 
+        placeholder: 'Enter full name', 
+        order: 0 
+      },
+      { 
+        name: 'company', 
+        label: 'Company Name', 
+        type: 'text' as const, 
+        required: true, 
+        placeholder: 'Enter your company name', 
+        order: 1 
+      },
+      { 
+        name: 'phone', 
+        label: 'Phone No.', 
+        type: 'phone' as const, 
+        required: true, 
+        placeholder: '+91 98765 43210', 
+        order: 2 
+      },
+      { 
+        name: 'address', 
+        label: 'Address', 
+        type: 'textarea' as const, 
+        required: true, 
+        placeholder: 'Enter complete address', 
+        order: 3 
+      },
+      { 
+        name: 'pin_code', 
+        label: 'Pin Code', 
+        type: 'api_select' as const, 
+        required: true, 
+        placeholder: 'Enter PIN code',
+        displayMode: 'input' as const, // Text input with autocomplete
+        options: [], // No fallback options, pure API-driven
+        apiConfig: {
+          endpoint: '/api/locations/pincodes',
+          valueField: 'pincode',
+          labelField: 'pincode',
+          searchable: true,
+          cacheKey: 'pincodes_list'
+        },
+        validation: { 
+          pattern: '^[0-9]{6}$',
+          minLength: 6,
+          maxLength: 6
+        },
+        order: 4 
+      },
+      { 
+        name: 'city', 
+        label: 'City', 
+        type: 'api_select' as const, 
+        required: true, 
+        placeholder: 'Enter or select city',
+        displayMode: 'input' as const, // Text input with autocomplete
+        apiConfig: {
+          endpoint: '/api/locations/cities',
+          valueField: 'id',
+          labelField: 'name',
+          dependsOn: 'pin_code', // City auto-filled from pincode
+          searchable: true,
+          cacheKey: 'cities_list'
+        },
+        order: 5 
+      },
+      { 
+        name: 'state', 
+        label: 'State', 
+        type: 'api_select' as const, 
+        required: true, 
+        placeholder: 'Select state',
+        displayMode: 'input' as const, // Text input with autocomplete
+        apiConfig: {
+          endpoint: '/api/locations/states',
+          valueField: 'id',
+          labelField: 'name',
+          dependsOn: 'pin_code', // State auto-filled from pincode
+          searchable: true,
+          cacheKey: 'states_list'
+        },
+        order: 6 
+      },
       { 
         name: 'country', 
         label: 'Country', 
         type: 'api_select' as const, 
         required: true, 
         placeholder: 'Select country',
-        displayMode: 'select' as const,
+        displayMode: 'select' as const, // Dropdown
         options: ['India', 'United States', 'United Kingdom', 'UAE', 'Singapore', 'Other'], // Fallback options
         apiConfig: {
           endpoint: '/api/locations/countries',
@@ -101,61 +162,17 @@ const FORM_TEMPLATES = [
           searchable: true,
           cacheKey: 'countries_list'
         },
-        order: 4 
+        order: 7 
       },
       { 
-        name: 'state', 
-        label: 'State', 
-        type: 'api_select' as const, 
-        required: true, 
-        placeholder: 'Select state',
-        displayMode: 'input' as const, // Text input for now, will become dropdown when API is ready
-        apiConfig: {
-          endpoint: '/api/locations/states',
-          valueField: 'id',
-          labelField: 'name',
-          dependsOn: 'country', // State depends on selected country
-          searchable: true,
-          cacheKey: 'states_list'
-        },
-        order: 5 
+        name: 'how_did_you_find_us', 
+        label: 'How Did You Find Us', 
+        type: 'select' as const, 
+        required: false, 
+        placeholder: 'Select source',
+        options: ['Google Search', 'Social Media', 'Friend Referral', 'Email', 'Advertisement', 'Other'],
+        order: 8 
       },
-      { 
-        name: 'city', 
-        label: 'City', 
-        type: 'api_select' as const, 
-        required: true, 
-        placeholder: 'Enter or select city',
-        displayMode: 'input' as const, // Text input for now, will become autocomplete when API is ready
-        apiConfig: {
-          endpoint: '/api/locations/cities',
-          valueField: 'id',
-          labelField: 'name',
-          dependsOn: 'state', // City depends on selected state
-          searchable: true,
-          cacheKey: 'cities_list'
-        },
-        order: 6 
-      },
-      { name: 'pin_code', label: 'Pin Code', type: 'text' as const, required: true, placeholder: '110001', 
-        validation: { pattern: '^[0-9]{6}$' }, order: 7 },
-      { name: 'how_to_reach', label: 'How to Reach', type: 'textarea' as const, required: false, placeholder: 'Directions or landmarks', order: 8 },
-    ]
-  },
-  {
-    id: 'detailed',
-    name: '📋 Complete Registration',
-    description: 'Full details including address',
-    icon: '📊',
-    fields: [
-      { name: 'phone', label: 'Phone Number', type: 'phone' as const, required: true, placeholder: '+91 98765 43210', order: 0 },
-      { name: 'company', label: 'Company Name', type: 'text' as const, required: true, placeholder: 'Enter your company name', order: 1 },
-      { name: 'designation', label: 'Designation', type: 'text' as const, required: true, placeholder: 'e.g., Manager, Director', order: 2 },
-      { name: 'city', label: 'City', type: 'text' as const, required: true, placeholder: 'Enter city', order: 3 },
-      { name: 'state', label: 'State/Province', type: 'text' as const, required: true, placeholder: 'Enter state', order: 4 },
-      { name: 'pincode', label: 'Pincode/ZIP', type: 'text' as const, required: true, placeholder: '110001', 
-        validation: { pattern: '^[0-9]{6}$' }, order: 5 },
-      { name: 'address', label: 'Full Address', type: 'textarea' as const, required: false, placeholder: 'Enter complete address', order: 6 },
     ]
   },
 ];
@@ -241,19 +258,31 @@ const FIELD_TEMPLATES = [
   {
     name: 'pin_code',
     label: 'Pin Code',
-    type: 'text' as const,
+    type: 'api_select' as const,
     required: true,
-    placeholder: '110001',
+    placeholder: 'Enter PIN code',
+    displayMode: 'input' as const,
+    options: [],
+    apiConfig: {
+      endpoint: '/api/locations/pincodes',
+      valueField: 'pincode',
+      labelField: 'pincode',
+      searchable: true,
+      cacheKey: 'pincodes_list'
+    },
     validation: {
-      pattern: '^[0-9]{6}$'
+      pattern: '^[0-9]{6}$',
+      minLength: 6,
+      maxLength: 6
     },
   },
   {
-    name: 'how_to_reach',
-    label: 'How to Reach',
-    type: 'textarea' as const,
+    name: 'how_did_you_find_us',
+    label: 'How Did You Find Us',
+    type: 'select' as const,
     required: false,
-    placeholder: 'Directions or landmarks',
+    placeholder: 'Select source',
+    options: ['Google Search', 'Social Media', 'Friend Referral', 'Email', 'Advertisement', 'Other'],
   },
   {
     name: 'designation',
@@ -276,6 +305,8 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ value = [], onChange }) => {
   }, [value]);
 
   const updateFields = (newFields: Omit<CustomField, 'id'>[]) => {
+    // ✅ DEBUG: Log fields to verify required flag is preserved
+    console.log('[FormBuilder] Updating fields:', newFields);
     setFields(newFields);
     onChange?.(newFields);
   };
@@ -291,6 +322,7 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ value = [], onChange }) => {
     const field = fields[index];
     form.setFieldsValue({
       ...field,
+      required: field.required || false, // ✅ Explicitly set required for Switch component
       options: field.options?.join(', '),
       // Load API configuration if present
       apiConfig: field.apiConfig || undefined,
@@ -300,11 +332,15 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ value = [], onChange }) => {
   };
 
   const handleSaveField = (values: any) => {
+    // ✅ DEBUG: Log form values to check required flag
+    console.log('[FormBuilder] Saving field with values:', values);
+    console.log('[FormBuilder] Required value:', values.required);
+    
     const newField: Omit<CustomField, 'id'> = {
       name: values.name,
       label: values.label,
       type: values.type,
-      required: values.required || false,
+      required: values.required === true, // ✅ Explicit boolean conversion
       placeholder: values.placeholder,
       options: ['select', 'radio', 'checkbox', 'api_select'].includes(values.type) 
         ? values.options?.split(',').map((opt: string) => opt.trim()).filter(Boolean)
@@ -1017,28 +1053,30 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ value = [], onChange }) => {
             }}
           </Form.Item>
 
-          <Form.Item
-            name="required"
-            valuePropName="checked"
-          >
-            <div style={{ 
-              padding: '12px 16px', 
-              background: '#fafafa', 
-              borderRadius: '8px',
-              border: '1px solid #e8e8e8'
-            }}>
-              <Space>
+          <div style={{ 
+            padding: '12px 16px', 
+            background: '#fafafa', 
+            borderRadius: '8px',
+            border: '1px solid #e8e8e8'
+          }}>
+            <Space align="start">
+              <Form.Item
+                name="required"
+                valuePropName="checked"
+                initialValue={false}
+                style={{ marginBottom: 0 }}
+              >
                 <Switch />
-                <div>
-                  <Text strong>Make this field required</Text>
-                  <br />
-                  <Text type="secondary" style={{ fontSize: '12px' }}>
-                    Visitors must fill this field to complete registration
-                  </Text>
-                </div>
-              </Space>
-            </div>
-          </Form.Item>
+              </Form.Item>
+              <div>
+                <Text strong>Make this field required</Text>
+                <br />
+                <Text type="secondary" style={{ fontSize: '12px' }}>
+                  Visitors must fill this field to complete registration
+                </Text>
+              </div>
+            </Space>
+          </div>
 
           <Card 
             title={<Text strong>Validation Rules (Optional)</Text>}

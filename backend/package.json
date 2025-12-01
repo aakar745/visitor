@@ -23,10 +23,12 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed": "ts-node -r tsconfig-paths/register src/database/seeds/run-seed.ts",
+    "update:superadmin": "ts-node -r tsconfig-paths/register src/scripts/update-superadmin-permissions.ts",
     "migrate:exhibitions": "ts-node -r tsconfig-paths/register src/scripts/migrate-exhibition-subdocuments.ts",
     "sync:meilisearch": "ts-node -r tsconfig-paths/register src/scripts/sync-meilisearch.ts",
     "sync:visitors": "ts-node -r tsconfig-paths/register src/scripts/sync-visitors-meilisearch.ts",
     "fix:exhibitions": "ts-node -r tsconfig-paths/register src/scripts/fix-registered-exhibitions.ts",
+    "fix:indexes": "ts-node -r tsconfig-paths/register src/scripts/fix-registration-counter-indexes.ts",
     "generate:secrets": "node scripts/generate-secrets.js",
     "setup:env": "node scripts/generate-secrets.js"
   },

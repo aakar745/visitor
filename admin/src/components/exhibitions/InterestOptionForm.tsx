@@ -90,6 +90,7 @@ const InterestOptionForm: React.FC<InterestOptionFormProps> = ({
     // Set default values
     form.setFieldsValue({
       isActive: true,
+      required: false,
       order: value.length + 1,
     });
     setIsModalVisible(true);
@@ -102,6 +103,7 @@ const InterestOptionForm: React.FC<InterestOptionFormProps> = ({
       category: option.category,
       description: option.description,
       isActive: option.isActive,
+      required: option.required || false,
       order: option.order,
     });
     setIsModalVisible(true);
@@ -271,6 +273,11 @@ const InterestOptionForm: React.FC<InterestOptionFormProps> = ({
                     <Tag color={getCategoryColor(option.category)} style={{ margin: 0 }}>
                       {getCategoryLabel(option.category)}
                     </Tag>
+                    {option.required && (
+                      <Tag color="red" style={{ margin: 0 }}>
+                        Required
+                      </Tag>
+                    )}
                     {!option.isActive && (
                       <Tag color="default" style={{ margin: 0 }}>
                         Hidden
@@ -363,7 +370,7 @@ const InterestOptionForm: React.FC<InterestOptionFormProps> = ({
           </Form.Item>
 
           <Row gutter={[16, 0]}>
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item
                 label="Display Order"
                 name="order"
@@ -378,16 +385,31 @@ const InterestOptionForm: React.FC<InterestOptionFormProps> = ({
                 />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item
                 label="Status"
                 name="isActive"
                 valuePropName="checked"
-                extra="Only active options are shown to visitors"
+                extra="Show to visitors"
               >
                 <Switch
                   checkedChildren="Active"
                   unCheckedChildren="Hidden"
+                  size="default"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                label="Required"
+                name="required"
+                valuePropName="checked"
+                initialValue={false}
+                extra="Visitors must select"
+              >
+                <Switch
+                  checkedChildren="Yes"
+                  unCheckedChildren="No"
                   size="default"
                 />
               </Form.Item>

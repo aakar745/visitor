@@ -29,6 +29,7 @@ import { ExhibitorsService } from '../exhibitors/exhibitors.service';
 import { QueryExhibitorDto } from '../exhibitors/dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { SkipCsrf } from '../../common/decorators/skip-csrf.decorator';
+import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 
 @ApiTags('Exhibitions')
 @ApiBearerAuth()
@@ -44,6 +45,7 @@ export class ExhibitionsController {
    * Create a new exhibition
    */
   @Post()
+  @RequirePermissions('exhibitions.create')
   @ApiOperation({ summary: 'Create a new exhibition' })
   @ApiResponse({ status: 201, description: 'Exhibition created successfully', type: Exhibition })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
@@ -93,6 +95,7 @@ export class ExhibitionsController {
    * Get exhibition statistics
    */
   @Get('statistics')
+  @RequirePermissions('exhibitions.view')
   @ApiOperation({ summary: 'Get exhibition statistics' })
   @ApiResponse({ status: 200, description: 'Statistics retrieved successfully' })
   async getStatistics(): Promise<{
@@ -117,6 +120,7 @@ export class ExhibitionsController {
    * Get single exhibition by ID
    */
   @Get(':id')
+  @RequirePermissions('exhibitions.view')
   @ApiOperation({ summary: 'Get exhibition by ID' })
   @ApiParam({ name: 'id', description: 'Exhibition ID' })
   @ApiResponse({ status: 200, description: 'Exhibition retrieved successfully', type: Exhibition })
@@ -143,6 +147,7 @@ export class ExhibitionsController {
    * Get exhibition analytics
    */
   @Get(':id/analytics')
+  @RequirePermissions('exhibitions.view')
   @ApiOperation({ summary: 'Get exhibition analytics' })
   @ApiParam({ name: 'id', description: 'Exhibition ID' })
   @ApiResponse({ status: 200, description: 'Analytics retrieved successfully' })
@@ -155,6 +160,7 @@ export class ExhibitionsController {
    * Get exhibition registration statistics
    */
   @Get(':id/stats')
+  @RequirePermissions('exhibitions.view', 'reports.view')
   @ApiOperation({ summary: 'Get exhibition registration statistics' })
   @ApiParam({ name: 'id', description: 'Exhibition ID' })
   @ApiResponse({ status: 200, description: 'Statistics retrieved successfully' })
@@ -167,6 +173,7 @@ export class ExhibitionsController {
    * Get registrations for a specific exhibition
    */
   @Get(':id/registrations')
+  @RequirePermissions('reports.view', 'reports.search')
   @ApiOperation({ summary: 'Get registrations for an exhibition' })
   @ApiParam({ name: 'id', description: 'Exhibition ID' })
   @ApiQuery({ name: 'page', description: 'Page number', required: false })
@@ -212,6 +219,7 @@ export class ExhibitionsController {
    * Handles millions of records efficiently without memory overflow
    */
   @Get(':id/export')
+  @RequirePermissions('reports.export', 'exhibitions.export')
   @ApiOperation({ summary: 'Export exhibition registrations (streaming for large datasets)' })
   @ApiParam({ name: 'id', description: 'Exhibition ID' })
   @ApiQuery({ name: 'format', description: 'Export format', required: true, enum: ['csv', 'excel'] })
@@ -262,6 +270,7 @@ export class ExhibitionsController {
    * Update exhibition
    */
   @Put(':id')
+  @RequirePermissions('exhibitions.update')
   @ApiOperation({ summary: 'Update exhibition' })
   @ApiParam({ name: 'id', description: 'Exhibition ID' })
   @ApiResponse({ status: 200, description: 'Exhibition updated successfully', type: Exhibition })
@@ -280,6 +289,7 @@ export class ExhibitionsController {
    * Update exhibition status
    */
   @Patch(':id/status')
+  @RequirePermissions('exhibitions.publish')
   @ApiOperation({ summary: 'Update exhibition status' })
   @ApiParam({ name: 'id', description: 'Exhibition ID' })
   @ApiResponse({ status: 200, description: 'Status updated successfully', type: Exhibition })
@@ -297,6 +307,7 @@ export class ExhibitionsController {
    * Duplicate exhibition
    */
   @Post(':id/duplicate')
+  @RequirePermissions('exhibitions.duplicate')
   @ApiOperation({ summary: 'Duplicate an existing exhibition' })
   @ApiParam({ name: 'id', description: 'Exhibition ID to duplicate' })
   @ApiResponse({ status: 201, description: 'Exhibition duplicated successfully', type: Exhibition })
@@ -314,6 +325,7 @@ export class ExhibitionsController {
    * Upload exhibition file (logo, banner, badge-logo)
    */
   @Post('upload')
+  @RequirePermissions('exhibitions.create', 'exhibitions.update')
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload exhibition file (logo, banner, badge-logo)' })
@@ -363,6 +375,7 @@ export class ExhibitionsController {
    * Get exhibitors for an exhibition
    */
   @Get(':id/exhibitors')
+  @RequirePermissions('exhibitors.view')
   @ApiOperation({ summary: 'Get exhibitors for an exhibition' })
   @ApiParam({ name: 'id', description: 'Exhibition ID' })
   @ApiResponse({ status: 200, description: 'Exhibitors retrieved successfully' })
@@ -401,6 +414,7 @@ export class ExhibitionsController {
    * Delete exhibition
    */
   @Delete(':id')
+  @RequirePermissions('exhibitions.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete exhibition' })
   @ApiParam({ name: 'id', description: 'Exhibition ID' })
@@ -425,6 +439,7 @@ export class ExhibitionsController {
    * Protected: Requires authentication (admin only)
    */
   @Post('update-statuses')
+  @RequirePermissions('exhibitions.update', 'exhibitions.publish')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
     summary: 'Manually update all exhibition statuses',

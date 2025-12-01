@@ -47,6 +47,7 @@ import { formatDate, formatTime, formatDateRangeShort } from '../../utils/dateFo
 import { toBackendDate } from '../../utils/dayjs';
 import { globalVisitorService } from '../../services/globalVisitorService';
 import { exhibitionService } from '../../services/exhibitions/exhibitionService';
+import { usePermissions } from '../../hooks/usePermissions';
 import type {
   VisitorWithRegistration,
   ExhibitionRegistrationStats
@@ -69,6 +70,8 @@ interface FilterOptions {
 }
 
 const ExhibitionReports: React.FC = () => {
+  const { hasPermission } = usePermissions();
+  
   // State management
   const [loading, setLoading] = useState(false);
   const [exhibitions, setExhibitions] = useState<Exhibition[]>([]);
@@ -1037,57 +1040,74 @@ const ExhibitionReports: React.FC = () => {
       width: 140,
       align: 'center',
       fixed: 'right',
-      render: (_: any, record: VisitorWithRegistration) => (
-        <Space size="small">
-          <Tooltip title="View Details">
-            <Button
-              type="text"
-              size="small"
-              icon={<EyeOutlined />}
-              onClick={() => showVisitorDetails(record)}
-              style={{ color: '#1890ff' }}
-            />
-          </Tooltip>
-          <Tooltip title="Download Badge">
-            <Button
-              type="text"
-              size="small"
-              icon={<DownloadOutlined />}
-              onClick={() => downloadBadge(record)}
-              style={{ color: '#52c41a' }}
-            />
-          </Tooltip>
-          <Popconfirm
-            title="Remove from Exhibition"
-            description={
-              <div style={{ maxWidth: '280px' }}>
-                <p style={{ marginBottom: '8px' }}>
-                  Remove <strong>{record.name}</strong> from this exhibition?
-                </p>
-                <p style={{ fontSize: '12px', color: '#8c8c8c', marginBottom: 0 }}>
-                  • Visitor stays in global database<br />
-                  • Can re-register for this exhibition<br />
-                  • Other exhibition registrations unaffected
-                </p>
-              </div>
-            }
-            onConfirm={() => handleDeleteRegistration(record)}
-            okText="Yes, Remove"
-            cancelText="Cancel"
-            okButtonProps={{ danger: true }}
-            icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
-          >
-            <Tooltip title="Remove from Exhibition">
-              <Button
-                type="text"
-                size="small"
-                icon={<DeleteOutlined />}
-                style={{ color: '#ff4d4f' }}
-              />
-            </Tooltip>
-          </Popconfirm>
-        </Space>
-      ),
+      render: (_: any, record: VisitorWithRegistration) => {
+        const canViewDetails = hasPermission('reports.details');
+        const canExport = hasPermission('reports.export');
+        const canDelete = hasPermission('reports.delete');
+        
+        // If user has no actions, show empty
+        if (!canViewDetails && !canExport && !canDelete) {
+          return <Text type="secondary" style={{ fontSize: '12px' }}>No actions</Text>;
+        }
+
+        return (
+          <Space size="small">
+            {canViewDetails && (
+              <Tooltip title="View Details">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<EyeOutlined />}
+                  onClick={() => showVisitorDetails(record)}
+                  style={{ color: '#1890ff' }}
+                />
+              </Tooltip>
+            )}
+            {canExport && (
+              <Tooltip title="Download Badge">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<DownloadOutlined />}
+                  onClick={() => downloadBadge(record)}
+                  style={{ color: '#52c41a' }}
+                />
+              </Tooltip>
+            )}
+            {canDelete && (
+              <Popconfirm
+                title="Remove from Exhibition"
+                description={
+                  <div style={{ maxWidth: '280px' }}>
+                    <p style={{ marginBottom: '8px' }}>
+                      Remove <strong>{record.name}</strong> from this exhibition?
+                    </p>
+                    <p style={{ fontSize: '12px', color: '#8c8c8c', marginBottom: 0 }}>
+                      • Visitor stays in global database<br />
+                      • Can re-register for this exhibition<br />
+                      • Other exhibition registrations unaffected
+                    </p>
+                  </div>
+                }
+                onConfirm={() => handleDeleteRegistration(record)}
+                okText="Yes, Remove"
+                cancelText="Cancel"
+                okButtonProps={{ danger: true }}
+                icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
+              >
+                <Tooltip title="Remove from Exhibition">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<DeleteOutlined />}
+                    style={{ color: '#ff4d4f' }}
+                  />
+                </Tooltip>
+              </Popconfirm>
+            )}
+          </Space>
+        );
+      },
     });
 
     return cols;
@@ -1663,51 +1683,57 @@ const ExhibitionReports: React.FC = () => {
                   </Text>
                 </div>
                 <Space size="small" wrap>
-                  <Tooltip title={
-                    isExporting ? 'Exporting...' : 
-                    totalRecords === 0 ? 'No data available for export' : 
-                    `Export ${totalRecords.toLocaleString()} record${totalRecords === 1 ? '' : 's'} as Excel`
-                  }>
-                    <Button 
-                      icon={<FileExcelOutlined />}
-                      onClick={() => handleExportData('excel')}
-                      loading={isExporting}
-                      disabled={isExporting || totalRecords === 0}
-                      style={{ borderRadius: '6px', color: '#52c41a', borderColor: '#52c41a' }}
+                  {hasPermission('reports.export') && (
+                    <>
+                      <Tooltip title={
+                        isExporting ? 'Exporting...' : 
+                        totalRecords === 0 ? 'No data available for export' : 
+                        `Export ${totalRecords.toLocaleString()} record${totalRecords === 1 ? '' : 's'} as Excel`
+                      }>
+                        <Button 
+                          icon={<FileExcelOutlined />}
+                          onClick={() => handleExportData('excel')}
+                          loading={isExporting}
+                          disabled={isExporting || totalRecords === 0}
+                          style={{ borderRadius: '6px', color: '#52c41a', borderColor: '#52c41a' }}
+                          size="middle"
+                        >
+                          Excel
+                        </Button>
+                      </Tooltip>
+                      <Tooltip title={
+                        isExporting ? 'Exporting...' : 
+                        totalRecords === 0 ? 'No data available for export' : 
+                        `Export ${totalRecords.toLocaleString()} record${totalRecords === 1 ? '' : 's'} as CSV`
+                      }>
+                        <Button 
+                          icon={<DownloadOutlined />}
+                          onClick={() => handleExportData('csv')}
+                          loading={isExporting}
+                          disabled={isExporting || totalRecords === 0}
+                          style={{ borderRadius: '6px' }}
+                          size="middle"
+                        >
+                          CSV
+                        </Button>
+                      </Tooltip>
+                    </>
+                  )}
+                  {hasPermission('reports.filter') && (
+                    <Button
+                      icon={<FilterOutlined />}
+                      onClick={() => {
+                        setFilters({});
+                        setSearchTerm('');
+                        setSelectedVisitorId(null);
+                      }}
+                      disabled={isExporting}
                       size="middle"
-                    >
-                      Excel
-                    </Button>
-                  </Tooltip>
-                  <Tooltip title={
-                    isExporting ? 'Exporting...' : 
-                    totalRecords === 0 ? 'No data available for export' : 
-                    `Export ${totalRecords.toLocaleString()} record${totalRecords === 1 ? '' : 's'} as CSV`
-                  }>
-                    <Button 
-                      icon={<DownloadOutlined />}
-                      onClick={() => handleExportData('csv')}
-                      loading={isExporting}
-                      disabled={isExporting || totalRecords === 0}
                       style={{ borderRadius: '6px' }}
-                      size="middle"
                     >
-                      CSV
+                      Clear All
                     </Button>
-                  </Tooltip>
-                  <Button
-                    icon={<FilterOutlined />}
-                    onClick={() => {
-                      setFilters({});
-                      setSearchTerm('');
-                      setSelectedVisitorId(null);
-                    }}
-                    disabled={isExporting}
-                    size="middle"
-                    style={{ borderRadius: '6px' }}
-                  >
-                    Clear All
-                  </Button>
+                  )}
                 </Space>
               </Col>
             </Row>

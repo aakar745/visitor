@@ -42,12 +42,11 @@ async function bootstrap() {
       createdRoles = await roleModel.find().lean();
     }
 
-    // Find admin role
+    // Find super admin role
     const adminRole = createdRoles.find((r) => r.name === 'super_admin');
-    const regularAdminRole = createdRoles.find((r) => r.name === 'admin');
 
     if (!adminRole) {
-      throw new Error('Admin role not found!');
+      throw new Error('Super Admin role not found!');
     }
 
     // Seed Default Users (if not exists)
@@ -64,18 +63,6 @@ async function bootstrap() {
           role: adminRole._id,
           status: 'active',
           isActive: true,
-          department: 'IT',
-          position: 'System Administrator',
-        },
-        {
-          name: 'Admin User',
-          email: 'admin@example.com',
-          password: await bcrypt.hash('admin123', 10),
-          role: regularAdminRole?._id || adminRole._id,
-          status: 'active',
-          isActive: true,
-          department: 'Management',
-          position: 'Administrator',
         },
       ];
 
@@ -105,13 +92,7 @@ async function bootstrap() {
       console.log('│  Email:    admin@visitor-system.com     │');
       console.log('│  Password: Admin@123                    │');
       console.log('└─────────────────────────────────────────┘\n');
-      console.log('┌─────────────────────────────────────────┐');
-      console.log('│  Admin Account                          │');
-      console.log('├─────────────────────────────────────────┤');
-      console.log('│  Email:    admin@example.com            │');
-      console.log('│  Password: admin123                     │');
-      console.log('└─────────────────────────────────────────┘\n');
-      console.log('⚠️  Please change these passwords after first login!\n');
+      console.log('⚠️  Please change this password after first login!\n');
     }
 
   } catch (error) {

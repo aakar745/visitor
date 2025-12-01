@@ -17,6 +17,7 @@ import {
   Badge,
   Empty,
   message,
+  Alert,
 } from 'antd';
 import {
   UserOutlined,
@@ -29,7 +30,6 @@ import {
   LockOutlined,
   UnlockOutlined,
   MailOutlined,
-  PhoneOutlined,
   EyeOutlined,
   DownloadOutlined,
   ReloadOutlined,
@@ -37,13 +37,20 @@ import {
   SafetyOutlined,
   TeamOutlined,
   UserAddOutlined,
+  CrownOutlined,
+  KeyOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { MenuProps } from 'antd';
 import { format } from 'date-fns';
+import { useEffect } from 'react';
 import { useUsers, useUserStats, useUserMutations } from '../../hooks/useUsers';
+import { useRoles } from '../../hooks/useRoles';
 import { useFormCleanup } from '../../hooks/useFormCleanup';
+import { usePermissions } from '../../hooks/usePermissions';
 import { getRoleName } from '../../utils/roleHelper';
+import api from '../../services/api';
+import type { Role } from '../../services/roleService';
 import type { 
   UserProfile, 
   CreateUserRequest, 
@@ -56,38 +63,35 @@ import type {
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-// Role configurations
-const roleConfig = {
-  super_admin: { 
-    color: 'purple', 
-    icon: '👑', 
-    name: 'Super Admin',
-    description: 'Full system access'
-  },
-  admin: { 
-    color: 'red', 
-    icon: '🛡️', 
-    name: 'Admin',
-    description: 'Administrative access'
-  },
-  manager: { 
-    color: 'blue', 
-    icon: '👨‍💼', 
-    name: 'Manager',
-    description: 'Management access'
-  },
-  employee: { 
-    color: 'green', 
-    icon: '👤', 
-    name: 'Employee',
-    description: 'Employee access'
-  },
-  viewer: { 
-    color: 'default', 
-    icon: '👁️', 
-    name: 'Viewer',
-    description: 'View-only access'
-  },
+// Helper to get role display info from populated role object or role ID
+const getRoleDisplayInfo = (userRole: any, rolesList?: Role[]) => {
+  // If role is populated object, use it directly
+  if (typeof userRole === 'object' && userRole?._id) {
+    return {
+      color: userRole.color || 'default',
+      icon: userRole.icon || '👤',
+      name: userRole.name || 'User',
+    };
+  }
+  
+  // If role is ID string, lookup in roles list
+  if (typeof userRole === 'string' && rolesList) {
+    const roleData = rolesList.find(r => r._id === userRole || r.id === userRole);
+    if (roleData) {
+      return {
+        color: roleData.color || 'default',
+        icon: roleData.icon || '👤',
+        name: roleData.name || 'User',
+      };
+    }
+  }
+  
+  // Fallback
+  return {
+    color: 'default',
+    icon: '👤',
+    name: getRoleName(userRole),
+  };
 };
 
 // Status configurations
@@ -99,6 +103,8 @@ const statusConfig = {
 };
 
 const Users: React.FC = () => {
+  const { hasPermission } = usePermissions();
+  
   // State management
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | undefined>();
@@ -109,12 +115,35 @@ const Users: React.FC = () => {
   const [isUserModalVisible, setIsUserModalVisible] = useState(false);
   const [isViewModalVisible, setIsViewModalVisible] = useState(false);
   const [isInviteModalVisible, setIsInviteModalVisible] = useState(false);
+  const [isPasswordResetModalVisible, setIsPasswordResetModalVisible] = useState(false);
+  const [resetPasswordUser, setResetPasswordUser] = useState<UserProfile | null>(null);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [form] = Form.useForm();
   const [inviteForm] = Form.useForm();
+  const [passwordResetForm] = Form.useForm();
   
   // SECURITY FIX (BUG-019): Cleanup forms on unmount
-  useFormCleanup([form, inviteForm]);
+  useFormCleanup([form, inviteForm, passwordResetForm]);
+
+  // Sync form values when selectedUser changes and modal is visible
+  useEffect(() => {
+    if (isUserModalVisible && selectedUser) {
+      // Extract role ID - handle both string and object formats
+      const roleId = typeof selectedUser.role === 'string' 
+        ? selectedUser.role 
+        : selectedUser.role._id || selectedUser.role.id;
+      
+      const formValues = {
+        name: selectedUser.name,
+        email: selectedUser.email,
+        role: roleId,
+        status: selectedUser.status,
+      };
+      form.setFieldsValue(formValues);
+    } else if (isUserModalVisible && !selectedUser) {
+      form.resetFields();
+    }
+  }, [isUserModalVisible, selectedUser, form]);
 
   // Build filters
   const filters: UserFilters = {
@@ -131,6 +160,7 @@ const Users: React.FC = () => {
   });
 
   const { data: stats } = useUserStats();
+  const { data: roles, isLoading: rolesLoading } = useRoles();
 
   const {
     createUser,
@@ -146,9 +176,9 @@ const Users: React.FC = () => {
   } = useUserMutations();
 
   // Handlers
-  const handleCreateUser = async (values: CreateUserRequest) => {
+  const handleCreateUser = async (values: any) => {
     try {
-      await createUser.mutateAsync(values);
+      await createUser.mutateAsync(values as CreateUserRequest);
       setIsUserModalVisible(false);
       form.resetFields();
       message.success('User created successfully');
@@ -157,10 +187,12 @@ const Users: React.FC = () => {
     }
   };
 
-  const handleUpdateUser = async (values: UpdateUserRequest) => {
+  const handleUpdateUser = async (values: any) => {
     if (!selectedUser) return;
     try {
-      await updateUser.mutateAsync({ id: selectedUser.id, data: values });
+      // Remove email from update payload (email cannot be changed)
+      const { email, ...updateData } = values;
+      await updateUser.mutateAsync({ id: selectedUser.id, data: updateData as UpdateUserRequest });
       setIsUserModalVisible(false);
       setSelectedUser(null);
       form.resetFields();
@@ -188,6 +220,19 @@ const Users: React.FC = () => {
     }
   };
 
+  const handleResetPassword = async (values: { newPassword: string; confirmPassword: string }) => {
+    if (!resetPasswordUser) return;
+    try {
+      await api.patch(`/users/${resetPasswordUser.id}/reset-password`, values);
+      setIsPasswordResetModalVisible(false);
+      setResetPasswordUser(null);
+      passwordResetForm.resetFields();
+      message.success('Password reset successfully. User can now login with the new password.');
+    } catch (error: any) {
+      message.error(error.response?.data?.message || 'Failed to reset password');
+    }
+  };
+
   const handleSendInvitation = async (values: { email: string; role: string }) => {
     try {
       await sendInvitation.mutateAsync({ email: values.email, role: values.role });
@@ -209,22 +254,9 @@ const Users: React.FC = () => {
   };
 
   const openUserModal = (user?: UserProfile) => {
-    if (user) {
-      setSelectedUser(user);
-      form.setFieldsValue({
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: getRoleName(user.role),
-        status: user.status,
-        department: user.department,
-        position: user.position,
-      });
-    } else {
-      setSelectedUser(null);
-      form.resetFields();
-    }
+    setSelectedUser(user || null);
     setIsUserModalVisible(true);
+    // Form values will be set by useEffect
   };
 
   const openViewModal = (user: UserProfile) => {
@@ -238,58 +270,54 @@ const Users: React.FC = () => {
       title: 'User',
       key: 'user',
       width: 280,
-      render: (_, record) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Avatar 
-            size={40}
-            src={record.avatar}
-            icon={!record.avatar && <UserOutlined />}
-            style={{ backgroundColor: record.avatar ? undefined : '#1890ff' }}
-          />
-          <div>
-            <Text strong style={{ display: 'block', marginBottom: '2px', fontSize: '14px' }}>
-              {record.name}
-            </Text>
-            <div style={{ fontSize: '12px', color: '#8c8c8c', marginBottom: '2px' }}>
-              <MailOutlined style={{ marginRight: '4px' }} />
-              {record.email}
-            </div>
-            {record.phone && (
-              <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
-                <PhoneOutlined style={{ marginRight: '4px' }} />
-                {record.phone}
+      render: (_, record) => {
+        const isSuperAdmin = record.email === 'admin@visitor-system.com';
+        
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Avatar 
+              size={40}
+              src={record.avatar}
+              icon={!record.avatar && <UserOutlined />}
+              style={{ backgroundColor: record.avatar ? undefined : '#1890ff' }}
+            />
+            <div>
+              <div style={{ marginBottom: '2px' }}>
+                <Text strong style={{ fontSize: '14px', marginRight: '8px' }}>
+                  {record.name}
+                </Text>
+                {isSuperAdmin && (
+                  <Tag color="red" style={{ fontSize: '10px', padding: '0 4px' }}>
+                    👑 SUPER ADMIN
+                  </Tag>
+                )}
               </div>
-            )}
+              <div style={{ fontSize: '12px', color: '#8c8c8c', marginBottom: '2px' }}>
+                <MailOutlined style={{ marginRight: '4px' }} />
+                {record.email}
+              </div>
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
-      title: 'Role & Department',
+      title: 'Role',
       key: 'role',
       width: 180,
-      render: (_, record) => (
-        <div>
-          <div style={{ marginBottom: '6px' }}>
+      render: (_, record) => {
+        const roleInfo = getRoleDisplayInfo(record.role, roles);
+        return (
+          <div>
             <Tag 
-              color={roleConfig[getRoleName(record.role) as keyof typeof roleConfig]?.color || 'default'}
+              color={roleInfo.color}
               style={{ borderRadius: '6px', fontWeight: 500 }}
             >
-              {roleConfig[getRoleName(record.role) as keyof typeof roleConfig]?.icon} {roleConfig[getRoleName(record.role) as keyof typeof roleConfig]?.name || getRoleName(record.role).toUpperCase()}
+              {roleInfo.icon} {roleInfo.name}
             </Tag>
           </div>
-          {record.department && (
-            <Text type="secondary" style={{ fontSize: '12px', display: 'block' }}>
-              🏢 {record.department}
-            </Text>
-          )}
-          {record.position && (
-            <Text type="secondary" style={{ fontSize: '11px' }}>
-              📋 {record.position}
-            </Text>
-          )}
-        </div>
-      ),
+        );
+      },
     },
     {
       title: 'Status & Activity',
@@ -344,23 +372,42 @@ const Users: React.FC = () => {
       width: 120,
       align: 'center',
       render: (_, record) => {
-        const menuItems: MenuProps['items'] = [
-          {
+        // 🔒 Check if this is the Super Admin user (protected)
+        const isSuperAdmin = record.email === 'admin@visitor-system.com';
+        
+        const menuItems: MenuProps['items'] = [];
+        
+        // View Details - requires users.view permission
+        if (hasPermission('users.view')) {
+          menuItems.push({
             key: 'view',
             icon: <EyeOutlined />,
             label: 'View Details',
             onClick: () => openViewModal(record),
-          },
-          {
+          });
+        }
+        
+        // Edit User - requires users.update permission
+        if (hasPermission('users.update')) {
+          menuItems.push({
             key: 'edit',
             icon: <EditOutlined />,
             label: 'Edit User',
             onClick: () => openUserModal(record),
-          },
-          {
+            disabled: isSuperAdmin, // 🔒 Super Admin cannot be edited
+          });
+        }
+        
+        // Divider if we have items
+        if (menuItems.length > 0 && hasPermission('users.update')) {
+          menuItems.push({
             type: 'divider',
-          },
-          {
+          });
+        }
+        
+        // Toggle Status - requires users.update permission
+        if (hasPermission('users.update')) {
+          menuItems.push({
             key: 'toggle-status',
             icon: record.status === 'active' ? <LockOutlined /> : <UnlockOutlined />,
             label: record.status === 'active' ? 'Deactivate' : 'Activate',
@@ -368,18 +415,47 @@ const Users: React.FC = () => {
               record.id, 
               record.status === 'active' ? 'inactive' : 'active'
             ),
-          },
-          {
+            disabled: isSuperAdmin, // 🔒 Super Admin status cannot be changed
+          });
+        }
+        
+        // Reset Password - requires users.reset_password permission
+        if (hasPermission('users.reset_password')) {
+          menuItems.push({
+            key: 'reset-password',
+            icon: <KeyOutlined />,
+            label: 'Reset Password',
+            onClick: () => {
+              setResetPasswordUser(record);
+              setIsPasswordResetModalVisible(true);
+            },
+            disabled: isSuperAdmin, // 🔒 Super Admin password cannot be reset
+          });
+        }
+        
+        // Divider before delete
+        if (menuItems.length > 0 && hasPermission('users.delete')) {
+          menuItems.push({
             type: 'divider',
-          },
-          {
+          });
+        }
+        
+        // Delete - requires users.delete permission
+        if (hasPermission('users.delete')) {
+          menuItems.push({
             key: 'delete',
             icon: <DeleteOutlined />,
             label: 'Delete User',
             danger: true,
             onClick: () => handleDeleteUser(record.id),
-          },
-        ];
+            disabled: isSuperAdmin, // 🔒 Super Admin cannot be deleted
+          });
+        }
+
+        // If no menu items, show "No actions"
+        if (menuItems.length === 0) {
+          return <Text type="secondary" style={{ fontSize: '12px' }}>No actions</Text>;
+        }
 
         return (
           <Dropdown
@@ -421,32 +497,38 @@ const Users: React.FC = () => {
               >
                 Refresh
               </Button>
-              <Button
-                icon={<DownloadOutlined />}
-                size="middle"
-                style={{ borderRadius: '6px' }}
-                onClick={() => handleExport('excel')}
-                loading={isExporting}
-              >
-                Export
-              </Button>
-              <Button
-                icon={<UserAddOutlined />}
-                size="middle"
-                style={{ borderRadius: '6px' }}
-                onClick={() => setIsInviteModalVisible(true)}
-              >
-                Send Invite
-              </Button>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                size="middle"
-                style={{ borderRadius: '6px', background: '#1890ff' }}
-                onClick={() => openUserModal()}
-              >
-                Add User
-              </Button>
+              {hasPermission('users.export') && (
+                <Button
+                  icon={<DownloadOutlined />}
+                  size="middle"
+                  style={{ borderRadius: '6px' }}
+                  onClick={() => handleExport('excel')}
+                  loading={isExporting}
+                >
+                  Export
+                </Button>
+              )}
+              {hasPermission('users.create') && (
+                <Button
+                  icon={<UserAddOutlined />}
+                  size="middle"
+                  style={{ borderRadius: '6px' }}
+                  onClick={() => setIsInviteModalVisible(true)}
+                >
+                  Send Invite
+                </Button>
+              )}
+              {hasPermission('users.create') && (
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  size="middle"
+                  style={{ borderRadius: '6px', background: '#1890ff' }}
+                  onClick={() => openUserModal()}
+                >
+                  Add User
+                </Button>
+              )}
             </Space>
           </Col>
         </Row>
@@ -601,10 +683,11 @@ const Users: React.FC = () => {
               value={roleFilter}
               onChange={setRoleFilter}
               allowClear
+              loading={rolesLoading}
             >
-              {Object.entries(roleConfig).map(([key, config]) => (
-                <Option key={key} value={key}>
-                  {config.icon} {config.name}
+              {roles?.map((role: Role) => (
+                <Option key={role._id} value={role._id}>
+                  {role.icon} {role.name}
                 </Option>
               ))}
             </Select>
@@ -721,9 +804,11 @@ const Users: React.FC = () => {
                 </div>
               }
             >
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => openUserModal()}>
-                Create User
-              </Button>
+              {hasPermission('users.create') && (
+                <Button type="primary" icon={<PlusOutlined />} onClick={() => openUserModal()}>
+                  Create User
+                </Button>
+              )}
             </Empty>
           </div>
         ) : null}
@@ -752,7 +837,7 @@ const Users: React.FC = () => {
         onCancel={() => {
           setIsUserModalVisible(false);
           setSelectedUser(null);
-          form.resetFields();
+          // Form will be reset by useEffect
         }}
         footer={null}
         width={600}
@@ -775,7 +860,7 @@ const Users: React.FC = () => {
               </Form.Item>
             </Col>
             
-            <Col span={12}>
+            <Col span={24}>
               <Form.Item
                 name="email"
                 label="Email Address"
@@ -784,16 +869,11 @@ const Users: React.FC = () => {
                   { type: 'email', message: 'Please enter a valid email' }
                 ]}
               >
-                <Input size="large" placeholder="user@example.com" />
-              </Form.Item>
-            </Col>
-            
-            <Col span={12}>
-              <Form.Item
-                name="phone"
-                label="Phone Number"
-              >
-                <Input size="large" placeholder="+1 234 567 8900" />
+                <Input 
+                  size="large" 
+                  placeholder="user@example.com"
+                  disabled={!!selectedUser}
+                />
               </Form.Item>
             </Col>
 
@@ -818,15 +898,15 @@ const Users: React.FC = () => {
                 label="Role"
                 rules={[{ required: true, message: 'Please select a role' }]}
               >
-                <Select size="large" placeholder="Select role">
-                  {Object.entries(roleConfig).map(([key, config]) => (
-                    <Option key={key} value={key}>
+                <Select size="large" placeholder="Select role" loading={rolesLoading}>
+                  {roles?.map((role: Role) => (
+                    <Option key={role._id} value={role._id}>
                       <div>
                         <div style={{ fontWeight: 500 }}>
-                          {config.icon} {config.name}
+                          {role.icon} {role.name}
                         </div>
                         <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
-                          {config.description}
+                          {role.description}
                         </div>
                       </div>
                     </Option>
@@ -851,23 +931,6 @@ const Users: React.FC = () => {
               </Form.Item>
             </Col>
             
-            <Col span={12}>
-              <Form.Item
-                name="department"
-                label="Department"
-              >
-                <Input size="large" placeholder="e.g., Engineering" />
-              </Form.Item>
-            </Col>
-            
-            <Col span={12}>
-              <Form.Item
-                name="position"
-                label="Position"
-              >
-                <Input size="large" placeholder="e.g., Senior Developer" />
-              </Form.Item>
-            </Col>
           </Row>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
@@ -901,6 +964,11 @@ const Users: React.FC = () => {
               icon={!selectedUser?.avatar && <UserOutlined />}
             />
             <span>User Details</span>
+            {selectedUser?.email === 'admin@visitor-system.com' && (
+              <Tag color="red" style={{ fontSize: '11px' }}>
+                👑 SUPER ADMIN (PROTECTED)
+              </Tag>
+            )}
           </div>
         }
         open={isViewModalVisible}
@@ -916,6 +984,16 @@ const Users: React.FC = () => {
         width={600}
         centered
       >
+        {selectedUser && selectedUser.email === 'admin@visitor-system.com' && (
+          <Alert
+            message="Protected Super Admin Account"
+            description="This is the Super Admin account with full system access. This user cannot be edited or deleted for security reasons. Only the password can be changed."
+            type="warning"
+            icon={<CrownOutlined />}
+            showIcon
+            style={{ marginBottom: '24px' }}
+          />
+        )}
         {selectedUser && (
           <div style={{ padding: '12px 0' }}>
             <Row gutter={[16, 16]}>
@@ -937,35 +1015,16 @@ const Users: React.FC = () => {
               </Col>
               <Col span={12}>
                 <div style={{ marginBottom: '16px' }}>
-                  <Text type="secondary" style={{ fontSize: '12px' }}>PHONE</Text>
-                  <div style={{ fontSize: '14px', marginTop: '4px' }}>
-                    {selectedUser.phone || 'Not provided'}
-                  </div>
-                </div>
-              </Col>
-              <Col span={12}>
-                <div style={{ marginBottom: '16px' }}>
                   <Text type="secondary" style={{ fontSize: '12px' }}>ROLE</Text>
                   <div style={{ marginTop: '4px' }}>
-                    <Tag color={roleConfig[getRoleName(selectedUser.role) as keyof typeof roleConfig]?.color}>
-                      {roleConfig[getRoleName(selectedUser.role) as keyof typeof roleConfig]?.name || getRoleName(selectedUser.role)}
-                    </Tag>
-                  </div>
-                </div>
-              </Col>
-              <Col span={12}>
-                <div style={{ marginBottom: '16px' }}>
-                  <Text type="secondary" style={{ fontSize: '12px' }}>DEPARTMENT</Text>
-                  <div style={{ fontSize: '14px', marginTop: '4px' }}>
-                    {selectedUser.department || 'Not specified'}
-                  </div>
-                </div>
-              </Col>
-              <Col span={12}>
-                <div style={{ marginBottom: '16px' }}>
-                  <Text type="secondary" style={{ fontSize: '12px' }}>POSITION</Text>
-                  <div style={{ fontSize: '14px', marginTop: '4px' }}>
-                    {selectedUser.position || 'Not specified'}
+                    {(() => {
+                      const roleInfo = getRoleDisplayInfo(selectedUser.role, roles);
+                      return (
+                        <Tag color={roleInfo.color}>
+                          {roleInfo.icon} {roleInfo.name}
+                        </Tag>
+                      );
+                    })()}
                   </div>
                 </div>
               </Col>
@@ -1019,15 +1078,15 @@ const Users: React.FC = () => {
             label="Role"
             rules={[{ required: true, message: 'Please select a role' }]}
           >
-            <Select size="large" placeholder="Select role">
-              {Object.entries(roleConfig).map(([key, config]) => (
-                <Option key={key} value={key}>
+            <Select size="large" placeholder="Select role" loading={rolesLoading}>
+              {roles?.map((role: Role) => (
+                <Option key={role._id} value={role._id}>
                   <div>
                     <div style={{ fontWeight: 500 }}>
-                      {config.icon} {config.name}
+                      {role.icon} {role.name}
                     </div>
                     <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
-                      {config.description}
+                      {role.description}
                     </div>
                   </div>
                 </Option>
@@ -1047,6 +1106,109 @@ const Users: React.FC = () => {
               Send Invitation
             </Button>
           </div>
+        </Form>
+      </Modal>
+
+      {/* Password Reset Modal */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ 
+              backgroundColor: '#faad14', 
+              borderRadius: '8px', 
+              padding: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <KeyOutlined style={{ fontSize: '20px', color: 'white' }} />
+            </div>
+            <span style={{ fontSize: '16px', fontWeight: 600 }}>
+              Reset User Password
+            </span>
+          </div>
+        }
+        open={isPasswordResetModalVisible}
+        onCancel={() => {
+          setIsPasswordResetModalVisible(false);
+          setResetPasswordUser(null);
+          passwordResetForm.resetFields();
+        }}
+        footer={null}
+        width={500}
+        centered
+      >
+        <Alert
+          message="Admin Password Reset"
+          description={`You are resetting the password for ${resetPasswordUser?.name || 'this user'}. The user will be able to login with the new password immediately.`}
+          type="warning"
+          showIcon
+          style={{ marginBottom: '20px' }}
+        />
+        
+        <Form
+          form={passwordResetForm}
+          layout="vertical"
+          onFinish={handleResetPassword}
+          style={{ marginTop: '24px' }}
+        >
+          <Form.Item
+            label="New Password"
+            name="newPassword"
+            rules={[
+              { required: true, message: 'Please enter new password' },
+              { min: 6, message: 'Password must be at least 6 characters' }
+            ]}
+          >
+            <Input.Password 
+              size="large"
+              placeholder="Enter new password (minimum 6 characters)"
+              prefix={<LockOutlined style={{ color: '#bfbfbf' }} />}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="Confirm Password"
+            name="confirmPassword"
+            dependencies={['newPassword']}
+            rules={[
+              { required: true, message: 'Please confirm password' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('newPassword') === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('Passwords do not match'));
+                },
+              }),
+            ]}
+          >
+            <Input.Password 
+              size="large"
+              placeholder="Confirm new password"
+              prefix={<LockOutlined style={{ color: '#bfbfbf' }} />}
+            />
+          </Form.Item>
+
+          <Form.Item style={{ marginBottom: 0, marginTop: '24px' }}>
+            <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+              <Button onClick={() => {
+                setIsPasswordResetModalVisible(false);
+                setResetPasswordUser(null);
+                passwordResetForm.resetFields();
+              }}>
+                Cancel
+              </Button>
+              <Button 
+                type="primary"
+                htmlType="submit"
+                icon={<KeyOutlined />}
+                style={{ background: '#faad14', borderColor: '#faad14' }}
+              >
+                Reset Password
+              </Button>
+            </Space>
+          </Form.Item>
         </Form>
       </Modal>
     </div>

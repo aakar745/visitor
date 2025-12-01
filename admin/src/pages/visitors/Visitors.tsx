@@ -32,6 +32,7 @@ import {
   EyeOutlined,
 } from '@ant-design/icons';
 import ImportVisitorsModal from '../../components/visitors/ImportVisitorsModal';
+import { usePermissions } from '../../hooks/usePermissions';
 import type { ColumnsType } from 'antd/es/table';
 import type { TableRowSelection } from 'antd/lib/table/interface';
 import { 
@@ -47,6 +48,8 @@ const { Option } = Select;
 const { confirm } = Modal;
 
 const Visitors: React.FC = () => {
+  const { hasPermission } = usePermissions();
+  
   // State management
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -478,40 +481,54 @@ const Visitors: React.FC = () => {
       width: 120,
       align: 'center',
       fixed: 'right',
-      render: (_, record: any) => (
-        <Space size="small">
-          <Tooltip title="View Details">
-            <Button
-              type="text"
-              icon={<EyeOutlined />}
-              size="small"
-              onClick={() => {
-                setSelectedVisitor(record);
-                setDetailsModalVisible(true);
-              }}
-              style={{ color: '#1890ff' }}
-            />
-          </Tooltip>
-          <Popconfirm
-            title="Delete Visitor"
-            description="Are you sure? This will delete the visitor and all their registrations."
-            onConfirm={() => handleDelete(record._id)}
-            okText="Yes"
-            cancelText="No"
-            okButtonProps={{ danger: true }}
-          >
-            <Tooltip title="Delete Visitor">
-              <Button
-                type="text"
-                danger
-                size="small"
-                icon={<DeleteOutlined />}
-                loading={deleteVisitor.isPending}
-              />
-            </Tooltip>
-          </Popconfirm>
-        </Space>
-      ),
+      render: (_, record: any) => {
+        const canView = hasPermission('visitors.view');
+        const canDelete = hasPermission('visitors.delete');
+        
+        // If user has no actions, show empty
+        if (!canView && !canDelete) {
+          return <Text type="secondary" style={{ fontSize: '12px' }}>No actions</Text>;
+        }
+
+        return (
+          <Space size="small">
+            {canView && (
+              <Tooltip title="View Details">
+                <Button
+                  type="text"
+                  icon={<EyeOutlined />}
+                  size="small"
+                  onClick={() => {
+                    setSelectedVisitor(record);
+                    setDetailsModalVisible(true);
+                  }}
+                  style={{ color: '#1890ff' }}
+                />
+              </Tooltip>
+            )}
+            {canDelete && (
+              <Popconfirm
+                title="Delete Visitor"
+                description="Are you sure? This will delete the visitor and all their registrations."
+                onConfirm={() => handleDelete(record._id)}
+                okText="Yes"
+                cancelText="No"
+                okButtonProps={{ danger: true }}
+              >
+                <Tooltip title="Delete Visitor">
+                  <Button
+                    type="text"
+                    danger
+                    size="small"
+                    icon={<DeleteOutlined />}
+                    loading={deleteVisitor.isPending}
+                  />
+                </Tooltip>
+              </Popconfirm>
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -573,15 +590,17 @@ const Visitors: React.FC = () => {
           </Col>
           <Col>
             <Space size="middle">
-              <Button
-                type="primary"
-                icon={<UploadOutlined />}
-                size="middle"
-                onClick={() => setImportModalVisible(true)}
-                style={{ borderRadius: '6px' }}
-              >
-                Import Visitors (CSV/Excel)
-              </Button>
+              {hasPermission('visitors.import') && (
+                <Button
+                  type="primary"
+                  icon={<UploadOutlined />}
+                  size="middle"
+                  onClick={() => setImportModalVisible(true)}
+                  style={{ borderRadius: '6px' }}
+                >
+                  Import Visitors (CSV/Excel)
+                </Button>
+              )}
               <Tooltip title="Refresh Data">
                 <Button
                   icon={<ReloadOutlined />}
@@ -593,27 +612,29 @@ const Visitors: React.FC = () => {
                   Refresh
                 </Button>
               </Tooltip>
-              <Space.Compact>
-                <Button
-                  icon={<ExportOutlined />}
-                  size="middle"
-                  onClick={() => handleExport('csv')}
-                  loading={isExporting && exportFormat === 'csv'}
-                  disabled={visitors.length === 0 || isExporting}
-                >
-                  Export CSV
-                </Button>
-                <Button
-                  icon={<ExportOutlined />}
-                  size="middle"
-                  onClick={() => handleExport('excel')}
-                  loading={isExporting && exportFormat === 'excel'}
-                  disabled={visitors.length === 0 || isExporting}
-                >
-                  Export Excel
-                </Button>
-              </Space.Compact>
-              {selectedRowKeys.length > 0 && (
+              {hasPermission('visitors.export') && (
+                <Space.Compact>
+                  <Button
+                    icon={<ExportOutlined />}
+                    size="middle"
+                    onClick={() => handleExport('csv')}
+                    loading={isExporting && exportFormat === 'csv'}
+                    disabled={visitors.length === 0 || isExporting}
+                  >
+                    Export CSV
+                  </Button>
+                  <Button
+                    icon={<ExportOutlined />}
+                    size="middle"
+                    onClick={() => handleExport('excel')}
+                    loading={isExporting && exportFormat === 'excel'}
+                    disabled={visitors.length === 0 || isExporting}
+                  >
+                    Export Excel
+                  </Button>
+                </Space.Compact>
+              )}
+              {hasPermission('visitors.bulk') && selectedRowKeys.length > 0 && (
                 <Button
                   danger
                   icon={<DeleteOutlined />}

@@ -293,29 +293,9 @@ export function CustomFieldsSection({
     // Check if this is a mobile field and user is authenticated
     const isMobileFieldReadonly = isMobileField(field) && Boolean(phoneNumber);
 
-    // Build validation rules from field.validation
-    const validationRules: any = {};
-    if (field.required) {
-      validationRules.required = `${field.label} is required`;
-    }
-    if (field.validation?.minLength) {
-      validationRules.minLength = {
-        value: field.validation.minLength,
-        message: `Minimum ${field.validation.minLength} characters required`,
-      };
-    }
-    if (field.validation?.maxLength) {
-      validationRules.maxLength = {
-        value: field.validation.maxLength,
-        message: `Maximum ${field.validation.maxLength} characters allowed`,
-      };
-    }
-    if (field.validation?.pattern) {
-      validationRules.pattern = {
-        value: new RegExp(field.validation.pattern),
-        message: `Invalid format for ${field.label}`,
-      };
-    }
+    // ✅ NOTE: Validation is now handled by Zod schema in RegistrationForm
+    // No need to build manual validation rules here
+    // The dynamic schema is created in RegistrationForm.tsx using createDynamicRegistrationSchema()
 
     switch (field.type) {
       case 'text':
@@ -364,7 +344,7 @@ export function CustomFieldsSection({
                     : 'text'
                 }
                 placeholder={field.placeholder}
-                {...register(fieldName, validationRules)}
+                {...register(fieldName)}
                 autoComplete={isPincodeFieldType ? 'new-password' : undefined}
                 className={cn(
                   fieldError ? 'border-red-500' : '',
@@ -375,7 +355,7 @@ export function CustomFieldsSection({
                 disabled={isMobileFieldReadonly}
                 onChange={(e) => {
                   // Call default register onChange
-                  register(fieldName, validationRules).onChange(e);
+                  register(fieldName).onChange(e);
                   
                   // If this is a PIN code field, trigger autocomplete
                   if (isPincodeFieldType) {
@@ -522,7 +502,7 @@ export function CustomFieldsSection({
               id={field.name}
               placeholder={field.placeholder}
               rows={3}
-              {...register(fieldName, validationRules)}
+              {...register(fieldName)}
               className={fieldError ? 'border-red-500' : ''}
             />
             {fieldError && (
@@ -542,7 +522,7 @@ export function CustomFieldsSection({
               id={field.name}
               type="number"
               placeholder={field.placeholder}
-              {...register(fieldName, { ...validationRules, valueAsNumber: true })}
+              {...register(fieldName, { valueAsNumber: true })}
               className={fieldError ? 'border-red-500' : ''}
             />
             {fieldError && (
@@ -711,7 +691,7 @@ export function CustomFieldsSection({
                   id={field.name}
                   type="text"
                   placeholder={field.placeholder}
-                  {...register(fieldName, validationRules)}
+                  {...register(fieldName)}
                   autoComplete={isPincodeFieldAPI ? 'new-password' : undefined}
                   className={cn(
                     fieldError ? 'border-red-500' : '',
@@ -719,7 +699,7 @@ export function CustomFieldsSection({
                   )}
                   onChange={(e) => {
                     // Call default register onChange
-                    register(fieldName, validationRules).onChange(e);
+                    register(fieldName).onChange(e);
                     
                     // If this is a PIN code field, trigger autocomplete
                     if (isPincodeFieldAPI) {
@@ -894,6 +874,9 @@ export function CustomFieldsSection({
   const selectedCategory = form.watch('registrationCategory');
   const selectedInterests = form.watch('selectedInterests') || [];
   const interestOptions = exhibitionsApi.getActiveInterestOptions(exhibition);
+  
+  // ✅ Check if any active interest option is marked as required
+  const hasRequiredInterest = interestOptions.some(option => option.required === true);
 
   return (
     <div className="space-y-6">
@@ -959,11 +942,17 @@ export function CustomFieldsSection({
         {interestOptions.length > 0 && (
           <div className="space-y-3">
             <div>
-              <Label className="text-sm font-medium">
+              <Label className={cn(
+                "text-sm font-medium",
+                hasRequiredInterest && "required"
+              )}>
                 What are you looking for?
               </Label>
               <p className="text-sm text-muted-foreground mt-1">
-                Select all areas you're interested in exploring at this exhibition
+                {hasRequiredInterest 
+                  ? 'Select all areas you\'re interested in exploring at this exhibition'
+                  : 'Select all areas you\'re interested in exploring at this exhibition (optional)'
+                }
               </p>
             </div>
             
@@ -988,7 +977,7 @@ export function CustomFieldsSection({
                       const newInterests = isSelected
                         ? selectedInterests.filter((name: string) => name !== option.name)
                         : [...selectedInterests, option.name];
-                      form.setValue('selectedInterests', newInterests);
+                      form.setValue('selectedInterests', newInterests, { shouldValidate: true });
                     }}
                   >
                     {isSelected && <Check className="h-3 w-3" />}
@@ -1001,6 +990,13 @@ export function CustomFieldsSection({
             {selectedInterests.length > 0 && (
               <p className="text-xs text-muted-foreground">
                 {selectedInterests.length} interest{selectedInterests.length !== 1 ? 's' : ''} selected
+              </p>
+            )}
+
+            {/* ✅ Show validation error if interests are required but not selected */}
+            {errors.selectedInterests && (
+              <p className="text-sm text-red-500">
+                {errors.selectedInterests.message}
               </p>
             )}
           </div>

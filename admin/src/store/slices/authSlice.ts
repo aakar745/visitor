@@ -45,7 +45,39 @@ export const loginUser = createAsyncThunk(
       const response = await authService.login(credentials);
       return response;
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Login failed');
+      console.error('[Login Error]', error);
+      
+      // Extract error message from various possible locations
+      const apiMessage = 
+        error?.response?.data?.message || 
+        error?.response?.data?.error || 
+        error?.message || 
+        'Unknown error';
+      
+      console.log('[Login Error Message]', apiMessage);
+      
+      // Map common backend errors to user-friendly messages
+      const lowerMessage = apiMessage.toLowerCase();
+      
+      if (lowerMessage.includes('invalid credentials') || 
+          lowerMessage.includes('incorrect') || 
+          lowerMessage.includes('wrong password')) {
+        return rejectWithValue('Incorrect email or password');
+      } else if (lowerMessage.includes('user not found') || 
+                 lowerMessage.includes('not found')) {
+        return rejectWithValue('No account found with this email');
+      } else if (lowerMessage.includes('locked') || 
+                 lowerMessage.includes('too many')) {
+        return rejectWithValue('Account temporarily locked. Please try again later');
+      } else if (lowerMessage.includes('deactivated')) {
+        return rejectWithValue('Your account has been deactivated. Please contact the administrator for assistance.');
+      } else if (lowerMessage.includes('inactive') || 
+                 lowerMessage.includes('suspended') || 
+                 lowerMessage.includes('disabled')) {
+        return rejectWithValue('Your account is inactive. Please contact the administrator.');
+      }
+      
+      return rejectWithValue(apiMessage === 'Unknown error' ? 'Login failed. Please try again' : apiMessage);
     }
   }
 );

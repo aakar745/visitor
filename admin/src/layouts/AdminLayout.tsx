@@ -27,6 +27,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { usePermissions } from '../hooks/usePermissions';
 import { useAppSelector, useAppDispatch } from '../store';
 import { toggleSidebar, setSidebarCollapsed } from '../store/slices/appSlice';
 import NetworkStatus from '../components/NetworkStatus';
@@ -34,84 +35,123 @@ import { APP_CONFIG } from '../constants';
 import { getRoleName } from '../utils/roleHelper';
 
 const { Header, Sider, Content } = Layout;
-const { Text } = Typography;
-
-  const menuItems = [
-  {
-    key: '/dashboard',
-    icon: <DashboardOutlined />,
-    label: 'Dashboard',
-  },
-  {
-    key: '/exhibitions',
-    icon: <CalendarOutlined />,
-    label: 'Exhibitions',
-    children: [
-      {
-        key: '/exhibitions/list',
-        label: 'All Exhibitions',
-      },
-      {
-        key: '/exhibitions/exhibitor-links',
-        label: 'Exhibitor Links',
-      },
-    ],
-  },
-  {
-    key: '/kiosk-settings',
-    icon: <SettingOutlined />,
-    label: 'Kiosk Settings',
-  },
-  {
-    key: '/visitors',
-    icon: <TeamOutlined />,
-    label: 'Visitors',
-    children: [
-      {
-        key: '/visitors/all',
-        label: 'All Visitors',
-      },
-      {
-        key: '/visitors/analytics',
-        label: 'Analytics',
-      },
-      {
-        key: '/visitors/reports',
-        label: 'Exhibition Reports',
-      },
-    ],
-  },
-  {
-    key: '/locations',
-    icon: <EnvironmentOutlined />,
-    label: 'Locations',
-  },
-  {
-    key: '/users',
-    icon: <UserOutlined />,
-    label: 'Users',
-  },
-  {
-    key: '/roles',
-    icon: <SafetyOutlined />,
-    label: 'Roles',
-  },
-  {
-    key: '/settings',
-    icon: <SettingOutlined />,
-    label: 'Settings',
-  },
-];
+const { Text} = Typography;
 
 const AdminLayout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useAppDispatch();
   const { logout, user } = useAuth();
+  const { hasAnyPermission, isSuperAdmin } = usePermissions();
   const { sidebarCollapsed, notifications } = useAppSelector((state) => state.app);
   
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [isSmallScreen, setIsSmallScreen] = useState(window.innerWidth < 768);
+
+  // Define all menu items with their required permissions
+  const allMenuItems = [
+    {
+      key: '/dashboard',
+      icon: <DashboardOutlined />,
+      label: 'Dashboard',
+      permissions: ['dashboard.view'],
+    },
+    {
+      key: '/exhibitions',
+      icon: <CalendarOutlined />,
+      label: 'Exhibitions',
+      permissions: ['exhibitions.view', 'exhibitions.create', 'exhibitions.update'],
+      children: [
+        {
+          key: '/exhibitions/list',
+          label: 'All Exhibitions',
+          permissions: ['exhibitions.view'],
+        },
+        {
+          key: '/exhibitions/exhibitor-links',
+          label: 'Exhibitor Links',
+          permissions: ['exhibitors.view'],
+        },
+      ],
+    },
+    {
+      key: '/kiosk-settings',
+      icon: <SettingOutlined />,
+      label: 'Kiosk Settings',
+      permissions: ['settings.kiosk'],
+    },
+    {
+      key: '/visitors',
+      icon: <TeamOutlined />,
+      label: 'Visitors',
+      permissions: ['visitors.view', 'visitors.create'],
+      children: [
+        {
+          key: '/visitors/all',
+          label: 'All Visitors',
+          permissions: ['visitors.view'],
+        },
+        {
+          key: '/visitors/analytics',
+          label: 'Analytics',
+          permissions: ['analytics.view'],
+        },
+        {
+          key: '/visitors/reports',
+          label: 'Exhibition Reports',
+          permissions: ['reports.view'],
+        },
+      ],
+    },
+    {
+      key: '/locations',
+      icon: <EnvironmentOutlined />,
+      label: 'Locations',
+      permissions: ['locations.view', 'locations.create'],
+    },
+    {
+      key: '/users',
+      icon: <UserOutlined />,
+      label: 'Users',
+      permissions: ['users.view', 'users.create'],
+    },
+    {
+      key: '/roles',
+      icon: <SafetyOutlined />,
+      label: 'Roles',
+      permissions: ['roles.view', 'roles.create'],
+    },
+    {
+      key: '/settings',
+      icon: <SettingOutlined />,
+      label: 'Settings',
+      permissions: ['settings.view', 'settings.update'],
+    },
+  ];
+
+  // Filter menu items based on user permissions
+  const menuItems = allMenuItems.filter((item) => {
+    // Super Admin sees everything
+    if (isSuperAdmin) return true;
+
+    // Check if user has any of the required permissions
+    if (item.permissions && !hasAnyPermission(item.permissions)) {
+      return false;
+    }
+
+    // Filter children if they exist
+    if (item.children) {
+      item.children = item.children.filter((child: any) => {
+        if (!child.permissions) return true;
+        return hasAnyPermission(child.permissions);
+      });
+
+      // Hide parent if no children are visible
+      if (item.children.length === 0) return false;
+    }
+
+    return true;
+  });
 
   React.useEffect(() => {
     const handleResize = () => {
