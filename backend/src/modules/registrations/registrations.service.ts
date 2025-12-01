@@ -635,7 +635,13 @@ export class RegistrationsService {
       }
     }
 
-    // 13. Update exhibitor registration count if applicable
+    // 13. Update exhibition registration count
+    await this.exhibitionModel.findByIdAndUpdate(dto.exhibitionId, {
+      $inc: { currentRegistrations: 1 },
+    });
+    this.logger.log(`Exhibition ${dto.exhibitionId} registration count incremented`);
+
+    // 14. Update exhibitor registration count if applicable
     if (exhibitor) {
       await this.exhibitorModel.findByIdAndUpdate(exhibitor._id, {
         $inc: { totalRegistrations: 1 },
@@ -1034,6 +1040,20 @@ export class RegistrationsService {
 
     // Delete the registration
     await this.registrationModel.findByIdAndDelete(id).exec();
+
+    // Decrement exhibition registration count
+    await this.exhibitionModel.findByIdAndUpdate(registration.exhibitionId, {
+      $inc: { currentRegistrations: -1 },
+    });
+    this.logger.log(`Exhibition ${registration.exhibitionId} registration count decremented`);
+
+    // Decrement exhibitor registration count if applicable
+    if (registration.exhibitorId) {
+      await this.exhibitorModel.findByIdAndUpdate(registration.exhibitorId, {
+        $inc: { totalRegistrations: -1 },
+      });
+      this.logger.log(`Exhibitor ${registration.exhibitorId} registration count decremented`);
+    }
 
     // Check remaining registrations for this visitor
     const visitorId = registration.visitorId;

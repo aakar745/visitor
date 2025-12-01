@@ -50,6 +50,7 @@ import {
   FireOutlined,
   StopOutlined,
   BarChartOutlined,
+  LockOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { Exhibitor } from '../../types/exhibitors';
@@ -310,6 +311,7 @@ const ExhibitorLinks: React.FC = () => {
 
   const getActionMenu = (exhibitor: Exhibitor): MenuProps => {
     const items: any[] = [];
+    const hasRegistrations = (exhibitor.totalRegistrations || 0) > 0;
 
     // Copy Link - Requires exhibitors.view
     if (hasPermission('exhibitors.view')) {
@@ -348,25 +350,42 @@ const ExhibitorLinks: React.FC = () => {
       });
     }
 
-    // Delete - Requires exhibitors.delete
+    // Delete - Requires exhibitors.delete and no registrations exist
     if (hasPermission('exhibitors.delete')) {
       const exhibitorId = exhibitor.id || (exhibitor as any)._id;
-      items.push({
-        key: 'delete',
-        icon: <DeleteOutlined />,
-        label: 'Delete',
-        danger: true,
-        onClick: () => {
-          Modal.confirm({
-            title: 'Delete Exhibitor',
-            content: `Are you sure you want to delete "${exhibitor.name}"? This action cannot be undone.`,
-            okText: 'Delete',
-            okType: 'danger',
-            cancelText: 'Cancel',
-            onOk: () => handleDeleteExhibitor(exhibitorId),
-          });
-        },
-      });
+      
+      if (hasRegistrations) {
+        items.push({
+          key: 'delete-locked',
+          icon: <DeleteOutlined />,
+          label: (
+            <Tooltip title={`Cannot delete: ${exhibitor.totalRegistrations} registration(s) exist. Deactivate the exhibitor instead.`}>
+              <span style={{ opacity: 0.5, cursor: 'not-allowed' }}>
+                Delete 🔒
+              </span>
+            </Tooltip>
+          ),
+          danger: true,
+          disabled: true,
+        });
+      } else {
+        items.push({
+          key: 'delete',
+          icon: <DeleteOutlined />,
+          label: 'Delete',
+          danger: true,
+          onClick: () => {
+            Modal.confirm({
+              title: 'Delete Exhibitor',
+              content: `Are you sure you want to delete "${exhibitor.name}"? This action cannot be undone.`,
+              okText: 'Delete',
+              okType: 'danger',
+              cancelText: 'Cancel',
+              onOk: () => handleDeleteExhibitor(exhibitorId),
+            });
+          },
+        });
+      }
     }
 
     return { items };
@@ -456,13 +475,21 @@ const ExhibitorLinks: React.FC = () => {
       key: 'registrations',
       align: 'center',
       width: 150,
-      render: (count) => {
+      render: (count, record) => {
         const isTopPerformer = count === stats.topPerformer?.totalRegistrations && count > 0;
+        const hasRegistrations = count > 0;
         return (
           <Space direction="vertical" align="center" size={4}>
-            <Text strong style={{ fontSize: '20px', color: isTopPerformer ? '#faad14' : '#1890ff' }}>
-              {count}
-            </Text>
+            <div>
+              <Text strong style={{ fontSize: '20px', color: isTopPerformer ? '#faad14' : '#1890ff' }}>
+                {count}
+              </Text>
+              {hasRegistrations && (
+                <Tooltip title="Exhibitor is locked - has registrations. Cannot be deleted.">
+                  <LockOutlined style={{ marginLeft: '6px', fontSize: '14px', color: '#faad14' }} />
+                </Tooltip>
+              )}
+            </div>
             {isTopPerformer && (
               <Tag className="top-performer-badge" icon={<TrophyOutlined />}>
                 Top Performer

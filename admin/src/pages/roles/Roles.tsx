@@ -290,8 +290,10 @@ const Roles: React.FC = () => {
     try {
       await deleteRole.mutateAsync(roleId);
       message.success('Role deleted successfully');
-    } catch (error) {
-      message.error('Failed to delete role');
+    } catch (error: any) {
+      // Show specific error message from backend
+      const errorMessage = error?.response?.data?.message || 'Failed to delete role';
+      message.error(errorMessage);
     }
   };
 
@@ -407,11 +409,14 @@ const Roles: React.FC = () => {
           <div>
             <Badge 
               count={record.userCount}
-              style={{ backgroundColor: '#52c41a' }}
+              style={{ backgroundColor: record.userCount > 0 ? '#52c41a' : '#d9d9d9' }}
               title="Users"
             />
             <Text style={{ marginLeft: '8px', fontSize: '12px' }}>
               Users assigned
+              {record.userCount > 0 && (
+                <LockOutlined style={{ marginLeft: '4px', color: '#faad14', fontSize: '10px' }} title="Role is locked (cannot delete)" />
+              )}
             </Text>
           </div>
         </div>
@@ -521,13 +526,19 @@ const Roles: React.FC = () => {
         
         // Delete - requires roles.delete permission
         if (hasPermission('roles.delete')) {
+          const isLocked = isSuperAdmin || record.isSystemRole || record.userCount > 0;
+          const lockReason = 
+            isSuperAdmin ? 'Super Admin role is protected' :
+            record.isSystemRole ? 'System role cannot be deleted' :
+            record.userCount > 0 ? `Role is assigned to ${record.userCount} user(s)` : '';
+          
           menuItems.push({
             key: 'delete',
-            icon: <DeleteOutlined />,
-            label: 'Delete Role',
-            danger: true,
-            onClick: () => handleDeleteRole(record.id),
-            disabled: isSuperAdmin || record.isSystemRole || record.userCount > 0, // 🔒 Super Admin & system roles cannot be deleted
+            icon: isLocked ? <LockOutlined /> : <DeleteOutlined />,
+            label: isLocked ? `Delete (Locked: ${lockReason})` : 'Delete Role',
+            danger: !isLocked,
+            onClick: () => !isLocked && handleDeleteRole(record.id),
+            disabled: isLocked,
           });
         }
 
@@ -1148,7 +1159,15 @@ const Roles: React.FC = () => {
                       <Text type="secondary" style={{ fontSize: '12px' }}>USERS ASSIGNED</Text>
                       <div style={{ fontSize: '16px', fontWeight: 500, marginTop: '4px' }}>
                         {selectedRole.userCount}
+                        {selectedRole.userCount > 0 && (
+                          <LockOutlined style={{ marginLeft: '8px', color: '#faad14', fontSize: '14px' }} title="Role is locked" />
+                        )}
                       </div>
+                      {selectedRole.userCount > 0 && (
+                        <Text type="warning" style={{ fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                          🔒 Role is locked and cannot be deleted
+                        </Text>
+                      )}
                     </div>
                   </Col>
                   <Col span={12}>

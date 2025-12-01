@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException, 
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Role, RoleDocument } from '../../database/schemas/role.schema';
+import { User, UserDocument } from '../../database/schemas/user.schema';
 import { CreateRoleDto, UpdateRoleDto, QueryRoleDto } from './dto';
 import { sanitizeSearch } from '../../common/utils/sanitize.util';
 import { sanitizePagination, calculatePaginationMeta } from '../../common/constants/pagination.constants';
@@ -12,6 +13,7 @@ export class RolesService {
 
   constructor(
     @InjectModel(Role.name) private roleModel: Model<RoleDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
   ) {}
 
   async getStats() {
@@ -306,13 +308,26 @@ export class RolesService {
       throw new BadRequestException('System roles cannot be deleted');
     }
     
-    // Check if role is assigned to users
-    if (role.userCount > 0) {
-      throw new BadRequestException('Cannot delete role that is assigned to users');
+    // 🔒 ROLE LOCK: Check if role is assigned to any users
+    // Query the User collection directly for accurate count
+    const usersWithRole = await this.userModel.countDocuments({ role: role._id }).exec();
+    
+    if (usersWithRole > 0) {
+      this.logger.warn(`Attempted to delete role "${role.name}" which is assigned to ${usersWithRole} user(s)`);
+      throw new BadRequestException(
+        `Cannot delete role "${role.name}". This role is currently assigned to ${usersWithRole} user(s). ` +
+        `Please reassign these users to a different role before deleting.`
+      );
     }
     
+    this.logger.log(`Deleting role "${role.name}" (ID: ${id})`);
     await this.roleModel.findByIdAndDelete(id).exec();
-    return { message: 'Role deleted successfully', id };
+    
+    return { 
+      message: 'Role deleted successfully', 
+      id,
+      name: role.name 
+    };
   }
 }
 

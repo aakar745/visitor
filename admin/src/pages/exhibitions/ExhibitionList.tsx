@@ -40,6 +40,7 @@ import {
   LinkOutlined,
   QrcodeOutlined,
   DownloadOutlined,
+  LockOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { format } from 'date-fns';
@@ -76,6 +77,27 @@ const ExhibitionList: React.FC = () => {
   React.useEffect(() => {
     loadExhibitions();
   }, [filters.isPaid, searchTerm]); // Only reload from backend when isPaid or search changes
+
+  // Reload exhibitions when page becomes visible (user navigates back)
+  React.useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadExhibitions();
+      }
+    };
+
+    const handleFocus = () => {
+      loadExhibitions();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
 
   const loadExhibitions = async () => {
     try {
@@ -143,7 +165,10 @@ const ExhibitionList: React.FC = () => {
     }
   };
 
-  const handleDelete = (exhibition: Exhibition) => {
+  const handleDelete = (exhibitionId: string) => {
+    const exhibition = allExhibitions.find(e => (e.id || (e as any)._id) === exhibitionId);
+    if (!exhibition) return;
+
     Modal.confirm({
       title: 'Delete Exhibition',
       content: `Are you sure you want to delete "${exhibition.name}"? This action cannot be undone.`,
@@ -151,12 +176,13 @@ const ExhibitionList: React.FC = () => {
       okType: 'danger',
       onOk: async () => {
         try {
-          const exhibitionId = exhibition.id || (exhibition as any)._id;
           await exhibitionService.deleteExhibition(exhibitionId);
           message.success('Exhibition deleted successfully');
           loadExhibitions();
-        } catch (error) {
-          message.error('Failed to delete exhibition');
+        } catch (error: any) {
+          // Extract error message from backend
+          const errorMessage = error?.response?.data?.message || error?.message || 'Failed to delete exhibition';
+          message.error(errorMessage);
         }
       }
     });
@@ -252,6 +278,7 @@ const ExhibitionList: React.FC = () => {
     const isDraft = exhibition.status === 'draft';
     // Handle both id and _id (backend returns _id, frontend type uses id)
     const exhibitionId = exhibition.id || (exhibition as any)._id;
+    const hasRegistrations = (exhibition.currentRegistrations || 0) > 0;
     
     const items = [];
 
@@ -347,15 +374,31 @@ const ExhibitionList: React.FC = () => {
       });
     }
 
-    // Delete - Only if user has delete permission
+    // Delete - Only if user has delete permission and no registrations exist
     if (hasPermission('exhibitions.delete')) {
-      items.push({
-        key: 'delete',
-        icon: <DeleteOutlined />,
-        label: 'Delete Exhibition',
-        danger: true,
-        onClick: () => handleDelete(exhibitionId),
-      });
+      if (hasRegistrations) {
+        items.push({
+          key: 'delete-locked',
+          icon: <DeleteOutlined />,
+          label: (
+            <Tooltip title={`Cannot delete: ${exhibition.currentRegistrations} registration(s) exist. Deactivate the exhibition instead.`}>
+              <span style={{ opacity: 0.5, cursor: 'not-allowed' }}>
+                Delete Exhibition 🔒
+              </span>
+            </Tooltip>
+          ),
+          danger: true,
+          disabled: true,
+        });
+      } else {
+        items.push({
+          key: 'delete',
+          icon: <DeleteOutlined />,
+          label: 'Delete Exhibition',
+          danger: true,
+          onClick: () => handleDelete(exhibitionId),
+        });
+      }
     }
 
     return items;
@@ -451,9 +494,10 @@ const ExhibitionList: React.FC = () => {
     {
       title: 'Registrations',
       key: 'registrations',
-      width: 120,
+      width: 140,
       align: 'center',
       render: (_, record: Exhibition) => {
+        const hasRegistrations = (record.currentRegistrations || 0) > 0;
         return (
           <div style={{ textAlign: 'center' }}>
             <div style={{ 
@@ -463,6 +507,11 @@ const ExhibitionList: React.FC = () => {
               marginBottom: '4px'
             }}>
               {(record.currentRegistrations || 0).toLocaleString()}
+              {hasRegistrations && (
+                <Tooltip title="Exhibition is locked - has registrations. Cannot be deleted.">
+                  <LockOutlined style={{ marginLeft: '6px', fontSize: '14px', color: '#faad14' }} />
+                </Tooltip>
+              )}
             </div>
             <Text type="secondary" style={{ fontSize: '11px' }}>
               Unlimited

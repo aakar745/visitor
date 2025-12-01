@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { User, UserDocument } from '../../database/schemas/user.schema';
+import { Role, RoleDocument } from '../../database/schemas/role.schema';
 import { CreateUserDto, UpdateUserDto, QueryUserDto, ChangePasswordDto } from './dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { sanitizeSearch } from '../../common/utils/sanitize.util';
@@ -14,6 +15,7 @@ export class UsersService {
 
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Role.name) private roleModel: Model<RoleDocument>,
   ) {}
 
   async getStats() {
@@ -105,6 +107,13 @@ export class UsersService {
     });
     
     const savedUser = await user.save();
+    
+    // 🔒 ROLE LOCK: Increment userCount for the assigned role
+    await this.roleModel.findByIdAndUpdate(
+      createUserDto.role,
+      { $inc: { userCount: 1 } }
+    ).exec();
+    
     return this.userModel.findById(savedUser._id).populate('role').select('-password').exec();
   }
 
@@ -124,6 +133,23 @@ export class UsersService {
 
     // Validate update data
     const sanitizedUpdate = await this.validateAndSanitizeUpdate(id, updateUserDto);
+    
+    // 🔒 ROLE LOCK: If role is being changed, update userCount for both old and new roles
+    if (updateUserDto.role && updateUserDto.role.toString() !== existingUser.role.toString()) {
+      // Decrement old role's userCount
+      await this.roleModel.findByIdAndUpdate(
+        existingUser.role,
+        { $inc: { userCount: -1 } }
+      ).exec();
+      
+      // Increment new role's userCount
+      await this.roleModel.findByIdAndUpdate(
+        updateUserDto.role,
+        { $inc: { userCount: 1 } }
+      ).exec();
+      
+      this.logger.log(`User ${id} role changed from ${existingUser.role} to ${updateUserDto.role}`);
+    }
     
     // Perform update
     const updatedUser = await this.userModel
@@ -286,8 +312,17 @@ export class UsersService {
       );
     }
     
+    // Store role ID before deletion
+    const roleId = user.role;
+    
     // Proceed with deletion
     await this.userModel.findByIdAndDelete(id).exec();
+    
+    // 🔒 ROLE LOCK: Decrement userCount for the role
+    await this.roleModel.findByIdAndUpdate(
+      roleId,
+      { $inc: { userCount: -1 } }
+    ).exec();
     
     this.logger.log(`User ${id} deleted successfully`);
     return { message: 'User deleted successfully', id };
