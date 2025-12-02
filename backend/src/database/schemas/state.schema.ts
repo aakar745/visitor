@@ -29,6 +29,10 @@ export class State {
   @Prop({ default: 0 })
   cityCount: number; // Cached count of cities
 
+  @ApiProperty({ example: 0 })
+  @Prop({ default: 0 })
+  usageCount: number; // Track how many visitors use this state
+
   @ApiProperty()
   createdAt: Date;
 
@@ -38,8 +42,14 @@ export class State {
 
 export const StateSchema = SchemaFactory.createForClass(State);
 
-// Compound unique index: One country can't have duplicate state names
-StateSchema.index({ countryId: 1, name: 1 }, { unique: true });
+// Compound unique index with case-insensitive collation: One country can't have duplicate state names
+StateSchema.index(
+  { countryId: 1, name: 1 }, 
+  { 
+    unique: true,
+    collation: { locale: 'en', strength: 2 } // Case-insensitive unique index
+  }
+);
 StateSchema.index({ code: 1 }, { unique: true }); // State codes are globally unique
 StateSchema.index({ countryId: 1, isActive: 1 });
 

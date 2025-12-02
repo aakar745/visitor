@@ -114,6 +114,14 @@ const FORM_TEMPLATES = [
         order: 4 
       },
       { 
+        name: 'area', 
+        label: 'Area / Locality', 
+        type: 'text' as const, 
+        required: false, 
+        placeholder: 'Area will be auto-filled from PIN code', 
+        order: 5 
+      },
+      { 
         name: 'city', 
         label: 'City', 
         type: 'api_select' as const, 
@@ -128,7 +136,7 @@ const FORM_TEMPLATES = [
           searchable: true,
           cacheKey: 'cities_list'
         },
-        order: 5 
+        order: 6 
       },
       { 
         name: 'state', 
@@ -145,7 +153,7 @@ const FORM_TEMPLATES = [
           searchable: true,
           cacheKey: 'states_list'
         },
-        order: 6 
+        order: 7 
       },
       { 
         name: 'country', 
@@ -162,7 +170,7 @@ const FORM_TEMPLATES = [
           searchable: true,
           cacheKey: 'countries_list'
         },
-        order: 7 
+        order: 8 
       },
       { 
         name: 'how_did_you_find_us', 
@@ -171,7 +179,7 @@ const FORM_TEMPLATES = [
         required: false, 
         placeholder: 'Select source',
         options: ['Google Search', 'Social Media', 'Friend Referral', 'Email', 'Advertisement', 'Other'],
-        order: 8 
+        order: 9 
       },
     ]
   },
@@ -275,6 +283,13 @@ const FIELD_TEMPLATES = [
       minLength: 6,
       maxLength: 6
     },
+  },
+  {
+    name: 'area',
+    label: 'Area / Locality',
+    type: 'text' as const,
+    required: false,
+    placeholder: 'Area will be auto-filled from PIN code',
   },
   {
     name: 'how_did_you_find_us',

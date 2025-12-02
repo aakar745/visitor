@@ -7,6 +7,10 @@ import { GlobalVisitor, GlobalVisitorSchema } from '../../database/schemas/globa
 import { Exhibition, ExhibitionSchema } from '../../database/schemas/exhibition.schema';
 import { Exhibitor, ExhibitorSchema } from '../../database/schemas/exhibitor.schema';
 import { RegistrationCounter, RegistrationCounterSchema } from '../../database/schemas/registration-counter.schema';
+import { Pincode, PincodeSchema } from '../../database/schemas/pincode.schema';
+import { Country, CountrySchema } from '../../database/schemas/country.schema';
+import { State, StateSchema } from '../../database/schemas/state.schema';
+import { City, CitySchema } from '../../database/schemas/city.schema';
 import { BadgesModule } from '../badges/badges.module';
 import { PrintQueueModule } from '../print-queue/print-queue.module';
 import { MeilisearchModule } from '../meilisearch/meilisearch.module';
@@ -19,6 +23,10 @@ import { MeilisearchModule } from '../meilisearch/meilisearch.module';
       { name: Exhibition.name, schema: ExhibitionSchema },
       { name: Exhibitor.name, schema: ExhibitorSchema },
       { name: RegistrationCounter.name, schema: RegistrationCounterSchema },
+      { name: Pincode.name, schema: PincodeSchema },
+      { name: Country.name, schema: CountrySchema },
+      { name: State.name, schema: StateSchema },
+      { name: City.name, schema: CitySchema },
     ]),
     BadgesModule, // Import for badge generation
     PrintQueueModule, // Import for print job queue

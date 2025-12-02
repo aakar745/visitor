@@ -25,6 +25,10 @@ export class City {
   @Prop({ default: 0 })
   pincodeCount: number; // Cached count of PIN codes
 
+  @ApiProperty({ example: 0 })
+  @Prop({ default: 0 })
+  usageCount: number; // Track how many visitors use this city
+
   @ApiProperty()
   createdAt: Date;
 
@@ -34,8 +38,14 @@ export class City {
 
 export const CitySchema = SchemaFactory.createForClass(City);
 
-// Compound unique index: One state can't have duplicate city names
-CitySchema.index({ stateId: 1, name: 1 }, { unique: true });
+// Compound unique index with case-insensitive collation: One state can't have duplicate city names
+CitySchema.index(
+  { stateId: 1, name: 1 }, 
+  { 
+    unique: true,
+    collation: { locale: 'en', strength: 2 } // Case-insensitive unique index
+  }
+);
 CitySchema.index({ stateId: 1, isActive: 1 });
 CitySchema.index({ name: 'text' }); // Text search on city names
 

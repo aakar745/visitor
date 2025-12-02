@@ -39,7 +39,9 @@ export class Pincode {
 export const PincodeSchema = SchemaFactory.createForClass(Pincode);
 
 // Indexes for fast lookups
-PincodeSchema.index({ pincode: 1 }, { unique: true });
+// Compound unique index: Same pincode can exist multiple times with different areas
+PincodeSchema.index({ pincode: 1, cityId: 1, area: 1 }, { unique: true, sparse: true });
+PincodeSchema.index({ pincode: 1 }); // Non-unique index for lookups
 PincodeSchema.index({ cityId: 1 });
 PincodeSchema.index({ pincode: 1, isActive: 1 });
 PincodeSchema.index({ usageCount: -1 }); // For popular PINs sorting

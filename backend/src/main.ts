@@ -15,9 +15,14 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
     // CORS is configured manually below with app.enableCors() - don't enable here
+    bodyParser: true,
   });
 
   const configService = app.get(ConfigService);
+
+  // Increase body size limit for bulk imports (200MB to support lakhs of records)
+  app.use(require('express').json({ limit: '200mb' }));
+  app.use(require('express').urlencoded({ limit: '200mb', extended: true }));
 
   // Security - Configure Helmet to allow images from uploads
   if (configService.get('ENABLE_HELMET', true)) {

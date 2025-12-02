@@ -32,54 +32,6 @@
   --radius-xl: 1rem;
 }
 
-/* Dark mode - supports both system preference and manual toggle */
-@media (prefers-color-scheme: dark) {
-  :root:not(.light) {
-    --color-background: oklch(12% 0.02 237);
-    --color-foreground: oklch(98% 0.01 237);
-    --color-card: oklch(15% 0.02 237);
-    --color-card-foreground: oklch(98% 0.01 237);
-    --color-popover: oklch(12% 0.02 237);
-    --color-popover-foreground: oklch(98% 0.01 237);
-    --color-primary: oklch(55% 0.08 237);
-    --color-primary-foreground: oklch(98% 0.01 237);
-    --color-secondary: oklch(23% 0.03 237);
-    --color-secondary-foreground: oklch(98% 0.01 237);
-    --color-muted: oklch(23% 0.03 237);
-    --color-muted-foreground: oklch(68% 0.02 237);
-    --color-accent: oklch(23% 0.03 237);
-    --color-accent-foreground: oklch(98% 0.01 237);
-    --color-destructive: oklch(35% 0.15 25);
-    --color-destructive-foreground: oklch(98% 0.01 237);
-    --color-border: oklch(23% 0.03 237);
-    --color-input: oklch(23% 0.03 237);
-    --color-ring: oklch(55% 0.08 237);
-  }
-}
-
-/* Manual dark mode */
-.dark {
-  --color-background: oklch(12% 0.02 237);
-  --color-foreground: oklch(98% 0.01 237);
-  --color-card: oklch(15% 0.02 237);
-  --color-card-foreground: oklch(98% 0.01 237);
-  --color-popover: oklch(12% 0.02 237);
-  --color-popover-foreground: oklch(98% 0.01 237);
-  --color-primary: oklch(55% 0.08 237);
-  --color-primary-foreground: oklch(98% 0.01 237);
-  --color-secondary: oklch(23% 0.03 237);
-  --color-secondary-foreground: oklch(98% 0.01 237);
-  --color-muted: oklch(23% 0.03 237);
-  --color-muted-foreground: oklch(68% 0.02 237);
-  --color-accent: oklch(23% 0.03 237);
-  --color-accent-foreground: oklch(98% 0.01 237);
-  --color-destructive: oklch(35% 0.15 25);
-  --color-destructive-foreground: oklch(98% 0.01 237);
-  --color-border: oklch(23% 0.03 237);
-  --color-input: oklch(23% 0.03 237);
-  --color-ring: oklch(55% 0.08 237);
-}
-
 /* Base styles */
 * {
   border-color: var(--color-border);
@@ -123,12 +75,6 @@ body {
 /* Grid background */
 .bg-grid-slate-200 {
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32' fill='none' stroke='rgb(226 232 240 / 0.5)'%3e%3cpath d='M0 .5H31.5V32'/%3e%3c/svg%3e");
-}
-
-@media (prefers-color-scheme: dark) {
-  .bg-grid-slate-700\/25 {
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32' fill='none' stroke='rgb(51 65 85 / 0.25)'%3e%3cpath d='M0 .5H31.5V32'/%3e%3c/svg%3e");
-  }
 }
 
 /* Custom Animations */

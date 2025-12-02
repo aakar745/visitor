@@ -6,6 +6,7 @@ import { Country, CountrySchema } from '../../database/schemas/country.schema';
 import { State, StateSchema } from '../../database/schemas/state.schema';
 import { City, CitySchema } from '../../database/schemas/city.schema';
 import { Pincode, PincodeSchema } from '../../database/schemas/pincode.schema';
+import { GlobalVisitor, GlobalVisitorSchema } from '../../database/schemas/global-visitor.schema';
 import { LocationsSeedService } from '../../database/seeds/locations.seed';
 
 @Module({
@@ -15,6 +16,7 @@ import { LocationsSeedService } from '../../database/seeds/locations.seed';
       { name: State.name, schema: StateSchema },
       { name: City.name, schema: CitySchema },
       { name: Pincode.name, schema: PincodeSchema },
+      { name: GlobalVisitor.name, schema: GlobalVisitorSchema },
     ]),
   ],
   controllers: [LocationsController],

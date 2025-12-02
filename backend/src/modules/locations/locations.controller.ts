@@ -27,6 +27,10 @@ import { UpdateCityDto } from './dto/update-city.dto';
 import { CreatePincodeDto } from './dto/create-pincode.dto';
 import { UpdatePincodeDto } from './dto/update-pincode.dto';
 import { BulkImportDto } from './dto/bulk-import.dto';
+import { QueryCountryDto } from './dto/query-country.dto';
+import { QueryStateDto } from './dto/query-state.dto';
+import { QueryCityDto } from './dto/query-city.dto';
+import { QueryPincodeDto } from './dto/query-pincode.dto';
 import { MeilisearchService } from '../meilisearch/meilisearch.service';
 
 @ApiTags('Locations')
@@ -59,26 +63,18 @@ export class LocationsController {
 
   @Public() // Frontend needs to fetch countries without authentication
   @Get('countries')
-  @ApiOperation({ summary: 'Get all countries (Public)' })
-  @ApiQuery({ name: 'isActive', required: false, type: Boolean })
-  @ApiQuery({ name: 'search', required: false, type: String })
-  async findAllCountries(
-    @Query('isActive') isActive?: string,
-    @Query('search') search?: string,
-  ) {
-    const filters: any = {};
-    if (isActive !== undefined) {
-      filters.isActive = isActive === 'true';
-    }
-    if (search) {
-      filters.search = search;
-    }
-
-    const countries = await this.locationsService.findAllCountries(filters);
+  @ApiOperation({ summary: 'Get all countries with pagination (Public)' })
+  async findAllCountries(@Query() query: QueryCountryDto) {
+    const result = await this.locationsService.findAllCountries(query);
     return {
       success: true,
-      data: countries,
-      total: countries.length,
+      data: result.data,
+      pagination: {
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
+      },
     };
   }
 
@@ -111,9 +107,16 @@ export class LocationsController {
   @RequirePermissions('locations.delete')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete country' })
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiResponse({ status: 200, description: 'Country deleted or deactivated' })
   async deleteCountry(@Param('id') id: string) {
-    await this.locationsService.deleteCountry(id);
+    const result = await this.locationsService.deleteCountry(id);
+    return {
+      success: true,
+      message: result.softDeleted 
+        ? `Country deactivated (used in ${result.usageCount} registration${result.usageCount > 1 ? 's' : ''})` 
+        : 'Country deleted successfully',
+      data: result,
+    };
   }
 
   // ============================================================================
@@ -135,25 +138,18 @@ export class LocationsController {
   }
 
   @Get('states')
-  @ApiOperation({ summary: 'Get all states' })
-  @ApiQuery({ name: 'countryId', required: false, type: String })
-  @ApiQuery({ name: 'isActive', required: false, type: Boolean })
-  @ApiQuery({ name: 'search', required: false, type: String })
-  async findAllStates(
-    @Query('countryId') countryId?: string,
-    @Query('isActive') isActive?: string,
-    @Query('search') search?: string,
-  ) {
-    const filters: any = {};
-    if (countryId) filters.countryId = countryId;
-    if (isActive !== undefined) filters.isActive = isActive === 'true';
-    if (search) filters.search = search;
-
-    const states = await this.locationsService.findAllStates(filters);
+  @ApiOperation({ summary: 'Get all states with pagination' })
+  async findAllStates(@Query() query: QueryStateDto) {
+    const result = await this.locationsService.findAllStates(query);
     return {
       success: true,
-      data: states,
-      total: states.length,
+      data: result.data,
+      pagination: {
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
+      },
     };
   }
 
@@ -186,9 +182,16 @@ export class LocationsController {
   @RequirePermissions('locations.delete')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete state' })
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiResponse({ status: 200, description: 'State deleted or deactivated' })
   async deleteState(@Param('id') id: string) {
-    await this.locationsService.deleteState(id);
+    const result = await this.locationsService.deleteState(id);
+    return {
+      success: true,
+      message: result.softDeleted 
+        ? `State deactivated (used in ${result.usageCount} registration${result.usageCount > 1 ? 's' : ''})` 
+        : 'State deleted successfully',
+      data: result,
+    };
   }
 
   // ============================================================================
@@ -210,25 +213,18 @@ export class LocationsController {
   }
 
   @Get('cities')
-  @ApiOperation({ summary: 'Get all cities' })
-  @ApiQuery({ name: 'stateId', required: false, type: String })
-  @ApiQuery({ name: 'isActive', required: false, type: Boolean })
-  @ApiQuery({ name: 'search', required: false, type: String })
-  async findAllCities(
-    @Query('stateId') stateId?: string,
-    @Query('isActive') isActive?: string,
-    @Query('search') search?: string,
-  ) {
-    const filters: any = {};
-    if (stateId) filters.stateId = stateId;
-    if (isActive !== undefined) filters.isActive = isActive === 'true';
-    if (search) filters.search = search;
-
-    const cities = await this.locationsService.findAllCities(filters);
+  @ApiOperation({ summary: 'Get all cities with pagination' })
+  async findAllCities(@Query() query: QueryCityDto) {
+    const result = await this.locationsService.findAllCities(query);
     return {
       success: true,
-      data: cities,
-      total: cities.length,
+      data: result.data,
+      pagination: {
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
+      },
     };
   }
 
@@ -261,9 +257,16 @@ export class LocationsController {
   @RequirePermissions('locations.delete')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete city' })
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiResponse({ status: 200, description: 'City deleted or deactivated' })
   async deleteCity(@Param('id') id: string) {
-    await this.locationsService.deleteCity(id);
+    const result = await this.locationsService.deleteCity(id);
+    return {
+      success: true,
+      message: result.softDeleted 
+        ? `City deactivated (used in ${result.usageCount} registration${result.usageCount > 1 ? 's' : ''})` 
+        : 'City deleted successfully',
+      data: result,
+    };
   }
 
   // ============================================================================
@@ -285,25 +288,18 @@ export class LocationsController {
   }
 
   @Get('pincodes')
-  @ApiOperation({ summary: 'Get all PIN codes' })
-  @ApiQuery({ name: 'cityId', required: false, type: String })
-  @ApiQuery({ name: 'isActive', required: false, type: Boolean })
-  @ApiQuery({ name: 'search', required: false, type: String })
-  async findAllPincodes(
-    @Query('cityId') cityId?: string,
-    @Query('isActive') isActive?: string,
-    @Query('search') search?: string,
-  ) {
-    const filters: any = {};
-    if (cityId) filters.cityId = cityId;
-    if (isActive !== undefined) filters.isActive = isActive === 'true';
-    if (search) filters.search = search;
-
-    const pincodes = await this.locationsService.findAllPincodes(filters);
+  @ApiOperation({ summary: 'Get all PIN codes with pagination' })
+  async findAllPincodes(@Query() query: QueryPincodeDto) {
+    const result = await this.locationsService.findAllPincodes(query);
     return {
       success: true,
-      data: pincodes,
-      total: pincodes.length,
+      data: result.data,
+      pagination: {
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
+      },
     };
   }
 
@@ -336,9 +332,16 @@ export class LocationsController {
   @RequirePermissions('locations.delete')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete PIN code' })
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiResponse({ status: 200, description: 'PIN code deleted or deactivated' })
   async deletePincode(@Param('id') id: string) {
-    await this.locationsService.deletePincode(id);
+    const result = await this.locationsService.deletePincode(id);
+    return {
+      success: true,
+      message: result.softDeleted 
+        ? `PIN code deactivated (used in ${result.usageCount} registration${result.usageCount > 1 ? 's' : ''})` 
+        : 'PIN code deleted successfully',
+      data: result,
+    };
   }
 
   // ============================================================================
@@ -499,5 +502,119 @@ export class LocationsController {
       `attachment; filename="locations_export_${Date.now()}.csv"`,
     );
     res.send(csv);
+  }
+
+  // ============================================================================
+  // MAINTENANCE ENDPOINTS
+  // ============================================================================
+
+  @Post('pincodes/recalculate-usage')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermissions('locations.manage')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Recalculate pincode usage counts (Admin)' })
+  @ApiResponse({ status: 200, description: 'Usage counts recalculated successfully' })
+  async recalculatePincodeUsage() {
+    const result = await this.locationsService.recalculatePincodeUsageCounts();
+    return {
+      success: true,
+      message: `Recalculated ${result.updated} pincode(s) out of ${result.totalPincodes} total`,
+      data: result,
+    };
+  }
+
+  @Post('countries/recalculate-usage')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermissions('locations.manage')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Recalculate country usage counts (Admin)' })
+  @ApiResponse({ status: 200, description: 'Usage counts recalculated successfully' })
+  async recalculateCountryUsage() {
+    const result = await this.locationsService.recalculateCountryUsageCounts();
+    return {
+      success: true,
+      message: `Recalculated ${result.updated} country/countries out of ${result.totalCountries} total`,
+      data: result,
+    };
+  }
+
+  @Post('states/recalculate-usage')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermissions('locations.manage')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Recalculate state usage counts (Admin)' })
+  @ApiResponse({ status: 200, description: 'Usage counts recalculated successfully' })
+  async recalculateStateUsage() {
+    const result = await this.locationsService.recalculateStateUsageCounts();
+    return {
+      success: true,
+      message: `Recalculated ${result.updated} state(s) out of ${result.totalStates} total`,
+      data: result,
+    };
+  }
+
+  @Post('cities/recalculate-usage')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermissions('locations.manage')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Recalculate city usage counts (Admin)' })
+  @ApiResponse({ status: 200, description: 'Usage counts recalculated successfully' })
+  async recalculateCityUsage() {
+    const result = await this.locationsService.recalculateCityUsageCounts();
+    return {
+      success: true,
+      message: `Recalculated ${result.updated} city/cities out of ${result.totalCities} total`,
+      data: result,
+    };
+  }
+
+  @Post('recalculate-all-usage')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermissions('locations.manage')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Recalculate ALL location usage counts (Admin)' })
+  @ApiResponse({ status: 200, description: 'All usage counts recalculated successfully' })
+  async recalculateAllUsage() {
+    const result = await this.locationsService.recalculateAllUsageCounts();
+    const totalUpdated = result.countries.updated + result.states.updated + result.cities.updated + result.pincodes.updated;
+    return {
+      success: true,
+      message: `✅ Recalculated ${totalUpdated} location(s) across all types`,
+      data: result,
+    };
+  }
+
+  // ============================================================================
+  // BULK DELETE ENDPOINTS
+  // ============================================================================
+
+  @Post('cities/bulk-delete')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermissions('locations.delete')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Bulk delete cities (Admin)' })
+  @ApiResponse({ status: 200, description: 'Cities deleted or deactivated' })
+  async bulkDeleteCities(@Body('ids') ids: string[]) {
+    const result = await this.locationsService.bulkDeleteCities(ids);
+    return {
+      success: true,
+      message: `${result.deleted} deleted, ${result.softDeleted} deactivated, ${result.failed} failed`,
+      data: result,
+    };
+  }
+
+  @Post('pincodes/bulk-delete')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermissions('locations.delete')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Bulk delete pincodes (Admin)' })
+  @ApiResponse({ status: 200, description: 'Pincodes deleted or deactivated' })
+  async bulkDeletePincodes(@Body('ids') ids: string[]) {
+    const result = await this.locationsService.bulkDeletePincodes(ids);
+    return {
+      success: true,
+      message: `${result.deleted} deleted, ${result.softDeleted} deactivated, ${result.failed} failed`,
+      data: result,
+    };
   }
 }

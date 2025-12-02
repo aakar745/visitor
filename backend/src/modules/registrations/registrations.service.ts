@@ -18,6 +18,10 @@ import {
 import { GlobalVisitor, GlobalVisitorDocument } from '../../database/schemas/global-visitor.schema';
 import { Exhibition, ExhibitionDocument } from '../../database/schemas/exhibition.schema';
 import { Exhibitor, ExhibitorDocument } from '../../database/schemas/exhibitor.schema';
+import { Pincode, PincodeDocument } from '../../database/schemas/pincode.schema';
+import { Country, CountryDocument } from '../../database/schemas/country.schema';
+import { State, StateDocument } from '../../database/schemas/state.schema';
+import { City, CityDocument } from '../../database/schemas/city.schema';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { BadgesService } from '../badges/badges.service';
 import { PrintQueueService } from '../print-queue/print-queue.service';
@@ -43,6 +47,14 @@ export class RegistrationsService {
     private exhibitorModel: Model<ExhibitorDocument>,
     @InjectModel('RegistrationCounter')
     private counterModel: Model<any>,
+    @InjectModel(Pincode.name)
+    private pincodeModel: Model<PincodeDocument>,
+    @InjectModel(Country.name)
+    private countryModel: Model<CountryDocument>,
+    @InjectModel(State.name)
+    private stateModel: Model<StateDocument>,
+    @InjectModel(City.name)
+    private cityModel: Model<CityDocument>,
     private badgesService: BadgesService,
     private printQueueService: PrintQueueService,
     private configService: ConfigService,
@@ -1063,6 +1075,32 @@ export class RegistrationsService {
 
     const visitor = await this.visitorModel.findById(visitorId).exec();
     
+    // Decrement location usage counts if visitor has them
+    if (visitor?.pincodeId) {
+      await this.pincodeModel.findByIdAndUpdate(visitor.pincodeId, {
+        $inc: { usageCount: -1 },
+      }).exec();
+      this.logger.log(`Pincode ${visitor.pincodeId} usage count decremented`);
+    }
+    if (visitor?.cityId) {
+      await this.cityModel.findByIdAndUpdate(visitor.cityId, {
+        $inc: { usageCount: -1 },
+      }).exec();
+      this.logger.log(`City ${visitor.cityId} usage count decremented`);
+    }
+    if (visitor?.stateId) {
+      await this.stateModel.findByIdAndUpdate(visitor.stateId, {
+        $inc: { usageCount: -1 },
+      }).exec();
+      this.logger.log(`State ${visitor.stateId} usage count decremented`);
+    }
+    if (visitor?.countryId) {
+      await this.countryModel.findByIdAndUpdate(visitor.countryId, {
+        $inc: { usageCount: -1 },
+      }).exec();
+      this.logger.log(`Country ${visitor.countryId} usage count decremented`);
+    }
+    
     if (visitor) {
       // Always keep the visitor in the global database for future registrations
       // Update visitor's registration count and metadata
@@ -1091,6 +1129,15 @@ export class RegistrationsService {
         
         await visitor.save();
         this.logger.log(`Visitor ${visitorId} updated (${remainingRegistrations} registrations remaining)`);
+      }
+      
+      // ✅ AUTO-SYNC: Update visitor in MeiliSearch after registration deletion
+      try {
+        await this.meilisearchService.updateVisitor(visitor);
+        this.logger.debug(`✅ Visitor ${visitorId} auto-synced to MeiliSearch after registration deletion`);
+      } catch (error) {
+        this.logger.error(`Failed to auto-sync visitor ${visitorId} to MeiliSearch: ${error.message}`);
+        // Don't throw - deletion is complete, search indexing is optional
       }
     }
 

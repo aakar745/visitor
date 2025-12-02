@@ -10,6 +10,7 @@ export interface Country {
   code: string;
   isActive: boolean;
   stateCount: number;
+  usageCount: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -21,6 +22,7 @@ export interface State {
   code: string;
   isActive: boolean;
   cityCount: number;
+  usageCount: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -31,6 +33,7 @@ export interface City {
   name: string;
   isActive: boolean;
   pincodeCount: number;
+  usageCount: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -68,8 +71,16 @@ export interface PincodeLookupResult {
 
 export interface BulkImportResult {
   success: number;
+  skipped: number;
   failed: number;
   errors: string[];
+  details: {
+    countriesCreated: number;
+    statesCreated: number;
+    citiesCreated: number;
+    pincodesCreated: number;
+    pincodesSkipped: number;
+  };
 }
 
 export interface BulkImportData {
@@ -93,11 +104,47 @@ class LocationService {
   // COUNTRY OPERATIONS
   // ==========================================================================
 
-  async getCountries(filters?: { isActive?: boolean; search?: string }): Promise<Country[]> {
+  async getCountries(filters?: {
+    page?: number;
+    limit?: number;
+    isActive?: boolean;
+    search?: string;
+  }): Promise<{ data: Country[]; pagination: any }> {
     try {
       const response = await api.get(`${this.baseUrl}/countries`, { params: filters });
-      // Backend response is double-wrapped: response.data.data.data contains the actual array
-      return response.data.data.data;
+      
+      // Handle different response formats for backward compatibility
+      if (response.data.pagination) {
+        // Direct pagination format: response.data.pagination
+        return {
+          data: response.data.data || [],
+          pagination: response.data.pagination,
+        };
+      } else if (response.data.data && typeof response.data.data === 'object' && response.data.data.data) {
+        // Triple-nested format: response.data.data.data and response.data.data.pagination
+        const innerData = response.data.data;
+        return {
+          data: innerData.data || [],
+          pagination: innerData.pagination || {
+            total: innerData.data?.length || 0,
+            page: 1,
+            limit: innerData.data?.length || 0,
+            totalPages: 1,
+          },
+        };
+      } else {
+        // Old format (array only) - create pagination wrapper
+        const data = Array.isArray(response.data.data) ? response.data.data : [];
+        return {
+          data,
+          pagination: {
+            total: data.length,
+            page: 1,
+            limit: data.length,
+            totalPages: 1,
+          },
+        };
+      }
     } catch (error) {
       console.error('Error fetching countries:', error);
       throw error;
@@ -119,18 +166,60 @@ class LocationService {
     return response.data.data.data;
   }
 
-  async deleteCountry(id: string): Promise<void> {
-    await api.delete(`${this.baseUrl}/countries/${id}`);
+  async deleteCountry(id: string): Promise<{ deleted: boolean; softDeleted: boolean; usageCount: number; message: string }> {
+    const response = await api.delete(`${this.baseUrl}/countries/${id}`);
+    return {
+      ...response.data.data,
+      message: response.data.message,
+    };
   }
 
   // ==========================================================================
   // STATE OPERATIONS
   // ==========================================================================
 
-  async getStates(filters?: { countryId?: string; isActive?: boolean; search?: string }): Promise<State[]> {
+  async getStates(filters?: {
+    page?: number;
+    limit?: number;
+    countryId?: string;
+    isActive?: boolean;
+    search?: string;
+  }): Promise<{ data: State[]; pagination: any }> {
     try {
       const response = await api.get(`${this.baseUrl}/states`, { params: filters });
-      return response.data.data.data;
+      
+      // Handle different response formats
+      if (response.data.pagination) {
+        // New paginated format
+        return {
+          data: response.data.data || [],
+          pagination: response.data.pagination,
+        };
+      } else if (response.data.data && typeof response.data.data === 'object' && response.data.data.data) {
+        // Triple-nested response
+        const innerData = response.data.data;
+        return {
+          data: innerData.data || [],
+          pagination: innerData.pagination || {
+            total: innerData.data?.length || 0,
+            page: 1,
+            limit: innerData.data?.length || 0,
+            totalPages: 1,
+          },
+        };
+      } else {
+        // Old format (array)
+        const data = Array.isArray(response.data.data) ? response.data.data : [];
+        return {
+          data,
+          pagination: {
+            total: data.length,
+            page: 1,
+            limit: data.length,
+            totalPages: 1,
+          },
+        };
+      }
     } catch (error) {
       console.error('Error fetching states:', error);
       throw error;
@@ -152,18 +241,60 @@ class LocationService {
     return response.data.data.data;
   }
 
-  async deleteState(id: string): Promise<void> {
-    await api.delete(`${this.baseUrl}/states/${id}`);
+  async deleteState(id: string): Promise<{ deleted: boolean; softDeleted: boolean; usageCount: number; message: string }> {
+    const response = await api.delete(`${this.baseUrl}/states/${id}`);
+    return {
+      ...response.data.data,
+      message: response.data.message,
+    };
   }
 
   // ==========================================================================
   // CITY OPERATIONS
   // ==========================================================================
 
-  async getCities(filters?: { stateId?: string; isActive?: boolean; search?: string }): Promise<City[]> {
+  async getCities(filters?: {
+    page?: number;
+    limit?: number;
+    stateId?: string;
+    isActive?: boolean;
+    search?: string;
+  }): Promise<{ data: City[]; pagination: any }> {
     try {
       const response = await api.get(`${this.baseUrl}/cities`, { params: filters });
-      return response.data.data.data;
+      
+      // Handle different response formats
+      if (response.data.pagination) {
+        // New paginated format
+        return {
+          data: response.data.data || [],
+          pagination: response.data.pagination,
+        };
+      } else if (response.data.data && typeof response.data.data === 'object' && response.data.data.data) {
+        // Triple-nested response
+        const innerData = response.data.data;
+        return {
+          data: innerData.data || [],
+          pagination: innerData.pagination || {
+            total: innerData.data?.length || 0,
+            page: 1,
+            limit: innerData.data?.length || 0,
+            totalPages: 1,
+          },
+        };
+      } else {
+        // Old format (array)
+        const data = Array.isArray(response.data.data) ? response.data.data : [];
+        return {
+          data,
+          pagination: {
+            total: data.length,
+            page: 1,
+            limit: data.length,
+            totalPages: 1,
+          },
+        };
+      }
     } catch (error) {
       console.error('Error fetching cities:', error);
       throw error;
@@ -185,18 +316,60 @@ class LocationService {
     return response.data.data.data;
   }
 
-  async deleteCity(id: string): Promise<void> {
-    await api.delete(`${this.baseUrl}/cities/${id}`);
+  async deleteCity(id: string): Promise<{ deleted: boolean; softDeleted: boolean; usageCount: number; message: string }> {
+    const response = await api.delete(`${this.baseUrl}/cities/${id}`);
+    return {
+      ...response.data.data,
+      message: response.data.message,
+    };
   }
 
   // ==========================================================================
   // PINCODE OPERATIONS
   // ==========================================================================
 
-  async getPincodes(filters?: { cityId?: string; isActive?: boolean; search?: string }): Promise<Pincode[]> {
+  async getPincodes(filters?: {
+    page?: number;
+    limit?: number;
+    cityId?: string;
+    isActive?: boolean;
+    search?: string;
+  }): Promise<{ data: Pincode[]; pagination: any }> {
     try {
       const response = await api.get(`${this.baseUrl}/pincodes`, { params: filters });
-      return response.data.data.data;
+      
+      // Handle different response formats
+      if (response.data.pagination) {
+        // New paginated format
+        return {
+          data: response.data.data || [],
+          pagination: response.data.pagination,
+        };
+      } else if (response.data.data && typeof response.data.data === 'object' && response.data.data.data) {
+        // Triple-nested response
+        const innerData = response.data.data;
+        return {
+          data: innerData.data || [],
+          pagination: innerData.pagination || {
+            total: innerData.data?.length || 0,
+            page: 1,
+            limit: innerData.data?.length || 0,
+            totalPages: 1,
+          },
+        };
+      } else {
+        // Old format (array)
+        const data = Array.isArray(response.data.data) ? response.data.data : [];
+        return {
+          data,
+          pagination: {
+            total: data.length,
+            page: 1,
+            limit: data.length,
+            totalPages: 1,
+          },
+        };
+      }
     } catch (error) {
       console.error('Error fetching pincodes:', error);
       throw error;
@@ -218,8 +391,12 @@ class LocationService {
     return response.data.data.data;
   }
 
-  async deletePincode(id: string): Promise<void> {
-    await api.delete(`${this.baseUrl}/pincodes/${id}`);
+  async deletePincode(id: string): Promise<{ deleted: boolean; softDeleted: boolean; usageCount: number; message: string }> {
+    const response = await api.delete(`${this.baseUrl}/pincodes/${id}`);
+    return {
+      ...response.data.data,
+      message: response.data.message,
+    };
   }
 
   // ==========================================================================
@@ -268,10 +445,31 @@ class LocationService {
    */
   async bulkImport(data: BulkImportData[]): Promise<BulkImportResult> {
     const response = await api.post(`${this.baseUrl}/bulk-import`, {
-      data,
-      format: 'json',
+      locations: data,
     });
-    return response.data.data.data;
+    
+    // The response is triple-nested!
+    // response.data = { success: true, data: {...}, message: '...', timestamp: '...' }
+    // response.data.data = { success: true, message: 'Bulk import completed', data: {...} }
+    // response.data.data.data = The ACTUAL result { success: 123, skipped: 456, ... }
+    const result = response.data.data.data;
+    
+    console.log('[bulkImport] Extracted result:', result);
+    
+    // Ensure we return the correct structure with proper number types
+    return {
+      success: Number(result.success) || 0,
+      skipped: Number(result.skipped) || 0,
+      failed: Number(result.failed) || 0,
+      errors: Array.isArray(result.errors) ? result.errors : [],
+      details: result.details || {
+        countriesCreated: 0,
+        statesCreated: 0,
+        citiesCreated: 0,
+        pincodesCreated: 0,
+        pincodesSkipped: 0,
+      },
+    };
   }
 
   /**
@@ -299,15 +497,30 @@ class LocationService {
 
   /**
    * Parse CSV file to bulk import format
+   * Properly handles quoted fields with commas and newlines
    */
   parseCSV(csvContent: string): BulkImportData[] {
-    const lines = csvContent.trim().split('\n');
-    const headers = lines[0].split(',').map((h) => h.trim().replace(/"/g, ''));
     const data: BulkImportData[] = [];
+    
+    // Split by newlines but handle quoted fields that may contain newlines
+    const lines = csvContent.split(/\r?\n/);
+    if (lines.length === 0) return data;
 
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map((v) => v.trim().replace(/"/g, ''));
-      if (values.length === headers.length) {
+    // Skip header row
+    let currentLine = 1;
+    
+    while (currentLine < lines.length) {
+      const line = lines[currentLine].trim();
+      if (!line) {
+        currentLine++;
+        continue;
+      }
+
+      // Parse CSV line with proper handling of quoted fields
+      const values = this.parseCSVLine(line);
+      
+      // Expected format: Country,CountryCode,State,StateCode,City,Pincode,Area
+      if (values.length >= 6) {
         data.push({
           country: values[0] || '',
           countryCode: values[1] || '',
@@ -315,12 +528,50 @@ class LocationService {
           stateCode: values[3] || '',
           city: values[4] || '',
           pincode: values[5] || '',
-          area: values[6] || '',
+          area: values[6] || '', // Area is optional
         });
       }
+      
+      currentLine++;
     }
 
     return data;
+  }
+
+  /**
+   * Parse a single CSV line, handling quoted fields properly
+   */
+  private parseCSVLine(line: string): string[] {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      const nextChar = line[i + 1];
+      
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          // Escaped quote
+          current += '"';
+          i++; // Skip next quote
+        } else {
+          // Toggle quote state
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        // Field separator (only when not inside quotes)
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    
+    // Add last field
+    result.push(current.trim());
+    
+    return result;
   }
 
   /**
@@ -365,6 +616,101 @@ India,IN,Maharashtra,MH,Mumbai,400001,Fort`;
       valid: errors.length === 0,
       errors,
     };
+  }
+
+  // ==========================================================================
+  // MAINTENANCE
+  // ==========================================================================
+
+  /**
+   * Recalculate pincode usage counts based on actual registrations
+   */
+  async recalculatePincodeUsage(): Promise<{
+    totalPincodes: number;
+    updated: number;
+    errors: number;
+  }> {
+    const response = await api.post(`${this.baseUrl}/pincodes/recalculate-usage`);
+    return response.data.data;
+  }
+
+  /**
+   * Recalculate country usage counts based on actual registrations
+   */
+  async recalculateCountryUsage(): Promise<{
+    totalCountries: number;
+    updated: number;
+    errors: number;
+  }> {
+    const response = await api.post(`${this.baseUrl}/countries/recalculate-usage`);
+    return response.data.data;
+  }
+
+  /**
+   * Recalculate state usage counts based on actual registrations
+   */
+  async recalculateStateUsage(): Promise<{
+    totalStates: number;
+    updated: number;
+    errors: number;
+  }> {
+    const response = await api.post(`${this.baseUrl}/states/recalculate-usage`);
+    return response.data.data;
+  }
+
+  /**
+   * Recalculate city usage counts based on actual registrations
+   */
+  async recalculateCityUsage(): Promise<{
+    totalCities: number;
+    updated: number;
+    errors: number;
+  }> {
+    const response = await api.post(`${this.baseUrl}/cities/recalculate-usage`);
+    return response.data.data;
+  }
+
+  /**
+   * Recalculate ALL location usage counts at once
+   */
+  async recalculateAllUsage(): Promise<{
+    countries: { totalCountries: number; updated: number; errors: number };
+    states: { totalStates: number; updated: number; errors: number };
+    cities: { totalCities: number; updated: number; errors: number };
+    pincodes: { totalPincodes: number; updated: number; errors: number };
+  }> {
+    const response = await api.post(`${this.baseUrl}/recalculate-all-usage`);
+    return response.data.data;
+  }
+
+  // ==========================================================================
+  // BULK DELETE
+  // ==========================================================================
+
+  /**
+   * Bulk delete cities
+   */
+  async bulkDeleteCities(ids: string[]): Promise<{
+    deleted: number;
+    softDeleted: number;
+    failed: number;
+    errors: string[];
+  }> {
+    const response = await api.post(`${this.baseUrl}/cities/bulk-delete`, { ids });
+    return response.data.data;
+  }
+
+  /**
+   * Bulk delete pincodes
+   */
+  async bulkDeletePincodes(ids: string[]): Promise<{
+    deleted: number;
+    softDeleted: number;
+    failed: number;
+    errors: string[];
+  }> {
+    const response = await api.post(`${this.baseUrl}/pincodes/bulk-delete`, { ids });
+    return response.data.data;
   }
 }
 

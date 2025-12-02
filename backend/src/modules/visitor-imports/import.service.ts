@@ -10,6 +10,7 @@ import {
   ImportStatus,
   DuplicateStrategy,
 } from '../../database/schemas/import-history.schema';
+import { MeilisearchService } from '../meilisearch/meilisearch.service';
 
 interface ParsedVisitor {
   name: string;
@@ -47,6 +48,7 @@ export class ImportService {
     private readonly visitorModel: Model<GlobalVisitor>,
     @InjectModel(ImportHistory.name)
     private readonly importHistoryModel: Model<ImportHistory>,
+    private readonly meilisearchService: MeilisearchService,
   ) {}
 
   /**
@@ -203,6 +205,9 @@ export class ImportService {
       let updatedRows = 0;
       const errorMessages: string[] = [];
       const importedVisitors: any[] = [];
+      
+      // Track created/updated visitors for Meilisearch batch sync
+      const visitorsToSync: any[] = [];
 
       // Process in batches
       for (let i = 0; i < totalRows; i += this.BATCH_SIZE) {
@@ -246,6 +251,7 @@ export class ImportService {
                 await existingVisitor.save();
                 updatedRows++;
                 importedVisitors.push(existingVisitor._id as Types.ObjectId);
+                visitorsToSync.push(existingVisitor); // Track for Meilisearch
                 this.logger.debug(`Updated visitor: ${parsedVisitor.phone}`);
               } else if (duplicateStrategy === DuplicateStrategy.CREATE_NEW) {
                 // Create new visitor (allow duplicate phone)
@@ -256,6 +262,7 @@ export class ImportService {
                 });
                 successRows++;
                 importedVisitors.push(newVisitor._id as Types.ObjectId);
+                visitorsToSync.push(newVisitor); // Track for Meilisearch
                 this.logger.debug(`Created new visitor: ${parsedVisitor.phone}`);
               }
             } else {
@@ -267,6 +274,7 @@ export class ImportService {
               });
               successRows++;
               importedVisitors.push(newVisitor._id as Types.ObjectId);
+              visitorsToSync.push(newVisitor); // Track for Meilisearch
               this.logger.debug(`Created visitor: ${parsedVisitor.phone}`);
             }
           } catch (error) {
@@ -292,6 +300,18 @@ export class ImportService {
         this.logger.log(
           `Batch progress: ${processedRows}/${totalRows} (${((processedRows / totalRows) * 100).toFixed(2)}%)`,
         );
+        
+        // ✅ AUTO-SYNC: Sync batch to Meilisearch for instant search
+        if (visitorsToSync.length > 0) {
+          try {
+            await this.meilisearchService.indexAllVisitors(visitorsToSync);
+            this.logger.debug(`✅ Synced ${visitorsToSync.length} visitors to Meilisearch (batch complete)`);
+            visitorsToSync.length = 0; // Clear for next batch
+          } catch (error) {
+            this.logger.warn(`⚠️ Failed to sync batch to Meilisearch: ${error.message}`);
+            // Don't throw - import continues, search indexing is optional
+          }
+        }
       }
 
       // Mark as completed
@@ -304,6 +324,10 @@ export class ImportService {
 
       this.logger.log(
         `Import ${importId} completed: ${successRows} success, ${updatedRows} updated, ${skippedRows} skipped, ${failedRows} failed`,
+      );
+      
+      this.logger.log(
+        `✅ All ${successRows + updatedRows} visitors are now instantly searchable in Exhibition Reports!`
       );
     } catch (error: any) {
       importHistory.status = ImportStatus.FAILED;
@@ -483,6 +507,19 @@ export class ImportService {
     const result = await this.visitorModel.deleteMany({
       _id: { $in: importHistory.importedVisitors },
     });
+
+    // ✅ AUTO-SYNC: Remove rolled-back visitors from Meilisearch
+    if (result.deletedCount > 0) {
+      try {
+        for (const visitorId of importHistory.importedVisitors) {
+          await this.meilisearchService.deleteVisitor(visitorId.toString());
+        }
+        this.logger.log(`✅ Removed ${result.deletedCount} rolled-back visitors from Meilisearch`);
+      } catch (error) {
+        this.logger.warn(`⚠️ Failed to remove visitors from Meilisearch during rollback: ${error.message}`);
+        // Don't throw - rollback is complete, search cleanup is optional
+      }
+    }
 
     // Mark as rolled back
     importHistory.isRolledBack = true;

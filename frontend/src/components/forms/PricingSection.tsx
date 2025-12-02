@@ -346,7 +346,7 @@ export function PricingSection({ form, exhibition }: PricingSectionProps) {
       )}
 
       {selectedTier && totalAmount > 0 && (
-        <Card className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+        <Card className="bg-blue-50 border-blue-200">
           <div className="flex items-center justify-between p-3">
             <div>
               <p className="text-sm font-semibold">Total Amount</p>

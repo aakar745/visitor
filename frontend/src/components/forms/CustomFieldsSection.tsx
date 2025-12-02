@@ -132,6 +132,17 @@ export function CustomFieldsSection({
     return fieldName === 'country' || fieldName.includes('country');
   };
 
+  // Helper to check if field is an area field
+  const isAreaField = (field: CustomField): boolean => {
+    const fieldName = field.name.toLowerCase();
+    return (
+      fieldName === 'area' ||
+      fieldName.includes('area') ||
+      fieldName.includes('locality') ||
+      fieldName.includes('neighborhood')
+    );
+  };
+
   // Handle PIN code lookup and auto-fill
   /**
    * Debounced autocomplete search for PIN codes using Meilisearch
@@ -173,6 +184,7 @@ export function CustomFieldsSection({
     const cityField = customFields.find(isCityField);
     const stateField = customFields.find(isStateField);
     const countryField = customFields.find(isCountryField);
+    const areaField = customFields.find(isAreaField);
 
     if (cityField) {
       setValue(`customFieldData.${cityField.name}`, suggestion.cityName, {
@@ -195,11 +207,25 @@ export function CustomFieldsSection({
       });
     }
 
+    // ✅ Auto-fill area if field exists and area data is available
+    if (areaField && suggestion.area) {
+      setValue(`customFieldData.${areaField.name}`, suggestion.area, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    }
+
     // Close suggestions and show success
     setShowSuggestions(false);
     setPincodeFound(true);
+    // Build location description with area if available
+    const locationParts = [suggestion.cityName, suggestion.stateName, suggestion.countryName];
+    if (suggestion.area) {
+      locationParts.unshift(suggestion.area); // Add area at the beginning
+    }
+    
     toast.success('Location selected!', {
-      description: `${suggestion.cityName}, ${suggestion.stateName}, ${suggestion.countryName}`,
+      description: locationParts.filter(Boolean).join(', '),
       icon: <MapPin className="h-4 w-4" />,
     });
 
@@ -235,10 +261,11 @@ export function CustomFieldsSection({
       const result = await locationsApi.lookupByPincode(pincode);
 
       if (result.found && result.city && result.state) {
-        // Find city, state, and country fields in the form
+        // Find city, state, country, and area fields in the form
         const cityField = customFields.find(isCityField);
         const stateField = customFields.find(isStateField);
         const countryField = customFields.find(isCountryField);
+        const areaField = customFields.find(isAreaField);
 
         // Auto-fill city
         if (cityField) {
@@ -264,9 +291,23 @@ export function CustomFieldsSection({
           });
         }
 
+        // ✅ Auto-fill area if field exists and area data is available
+        if (areaField && result.area) {
+          setValue(`customFieldData.${areaField.name}`, result.area, {
+            shouldValidate: true,
+            shouldDirty: true,
+          });
+        }
+
         setPincodeFound(true);
+        // Build location description with area if available
+        const locationParts = [result.city.name, result.state.name, result.country?.name || ''];
+        if (result.area) {
+          locationParts.unshift(result.area); // Add area at the beginning
+        }
+        
         toast.success('Location found!', {
-          description: `${result.city.name}, ${result.state.name}, ${result.country?.name || ''}`,
+          description: locationParts.filter(Boolean).join(', '),
           icon: <MapPin className="h-4 w-4" />,
         });
       } else {
@@ -321,7 +362,7 @@ export function CustomFieldsSection({
               {isPincodeFieldType && (
                 <span className="ml-2 inline-flex items-center gap-1 text-xs text-blue-600 font-normal">
                   <MapPin className="h-3 w-3" />
-                  Auto-fills country, state & city
+                  Auto-fills area, city, state & country
                 </span>
               )}
               {isLocationField && pincodeFound && (
@@ -676,7 +717,7 @@ export function CustomFieldsSection({
                 {isPincodeFieldAPI && (
                   <span className="ml-2 inline-flex items-center gap-1 text-xs text-blue-600 font-normal">
                     <MapPin className="h-3 w-3" />
-                    Auto-fills country, state & city
+                    Auto-fills area, city, state & country
                   </span>
                 )}
                 {isLocationFieldAPI && pincodeFound && (

@@ -61,9 +61,9 @@ export default async function HomePage() {
       <Header />
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-primary/5 via-purple-50/50 to-background dark:from-primary/10 dark:via-purple-950/20 dark:to-background">
+      <section className="relative overflow-hidden bg-gradient-to-b from-primary/5 via-purple-50/50 to-background">
         {/* Background Pattern */}
-        <div className="absolute inset-0 bg-grid-slate-200 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] dark:bg-grid-slate-700/25" />
+        <div className="absolute inset-0 bg-grid-slate-200 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))]" />
         
         <div className="container relative mx-auto max-w-7xl px-4 py-24 md:py-32">
           <div className="mx-auto max-w-3xl text-center space-y-8">

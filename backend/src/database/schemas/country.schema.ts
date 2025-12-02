@@ -25,6 +25,10 @@ export class Country {
   @Prop({ default: 0 })
   stateCount: number; // Cached count of states
 
+  @ApiProperty({ example: 0 })
+  @Prop({ default: 0 })
+  usageCount: number; // Track how many visitors use this country
+
   @ApiProperty()
   createdAt: Date;
 
