@@ -110,12 +110,14 @@ export function RegistrationForm({ exhibition, exhibitor }: RegistrationFormProp
   const { hasDraft, draft, restoreDraft, discardDraft } = useLoadDraft(exhibitionId);
 
   // Ensure exhibition and exhibitor IDs are set on mount
+  // Note: Don't reset registrationCategory here - let CustomFieldsSection handle it
+  // based on exhibition.allowedCategories
   useEffect(() => {
     form.reset({
       ...form.getValues(),
       exhibitionId: exhibitionId,
       exhibitorId: exhibitorId,
-      registrationCategory: 'general',
+      // registrationCategory is set by CustomFieldsSection from exhibition.allowedCategories
     });
   }, [exhibitionId, exhibitorId]);
 

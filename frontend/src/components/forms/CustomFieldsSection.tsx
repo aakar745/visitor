@@ -79,11 +79,17 @@ export function CustomFieldsSection({
     loadCountries();
   }, []);
 
-  // Auto-select first registration category (since UI is hidden)
+  // Auto-select registration category from exhibition's allowed categories
+  // This ensures the form uses the exhibition's configured category, not a hardcoded default
   useEffect(() => {
-    const currentCategory = form.getValues('registrationCategory');
-    if (!currentCategory && exhibition.allowedCategories?.length) {
-      form.setValue('registrationCategory', exhibition.allowedCategories[0], { shouldValidate: true });
+    if (exhibition.allowedCategories?.length) {
+      const exhibitionCategory = exhibition.allowedCategories[0];
+      const currentCategory = form.getValues('registrationCategory');
+      
+      // Only update if the category is different (avoids unnecessary re-renders)
+      if (currentCategory !== exhibitionCategory) {
+        form.setValue('registrationCategory', exhibitionCategory, { shouldValidate: true });
+      }
     }
   }, [exhibition.allowedCategories, form]);
 

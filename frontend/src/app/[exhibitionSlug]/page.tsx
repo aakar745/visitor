@@ -331,15 +331,14 @@ export default function ExhibitionPage({ params: paramsPromise }: PageProps) {
         {/* Exhibition Banner - Full Width Centered */}
         {bannerUrl && (
           <div className="flex justify-center w-full mt-8">
-            <div className="rounded-xl overflow-hidden shadow-lg max-w-4xl w-full">
-              <div className="relative w-full h-[400px]">
-                <Image
-                  src={bannerUrl}
-                  alt={`${exhibition.name} banner`}
-                  fill
-                  className="object-cover"
-                />
-              </div>
+            <div className="rounded-xl overflow-hidden shadow-lg w-full" style={{ maxWidth: '2000px' }}>
+              <Image
+                src={bannerUrl}
+                alt={`${exhibition.name} banner`}
+                width={2000}
+                height={400}
+                className="w-full h-auto"
+              />
             </div>
           </div>
         )}

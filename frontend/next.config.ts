@@ -26,9 +26,10 @@ const securityHeaders = [
     value: 'strict-origin-when-cross-origin',
   },
   // 5. Permissions Policy - Restrict browser features
+  // Note: camera=(self) is needed for kiosk QR code scanner
   {
     key: 'Permissions-Policy',
-    value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+    value: 'camera=(self), microphone=(), geolocation=(), interest-cohort=()',
   },
   // 6. XSS Protection (legacy browsers)
   {
