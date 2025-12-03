@@ -9,20 +9,23 @@ import {
   MapPin, 
   ArrowRight, 
   Sparkles, 
-  Users, 
   Zap, 
   Shield,
-  TrendingUp,
   Clock,
   Smartphone,
   QrCode,
   Scan,
-  CheckCircle
+  CheckCircle,
+  Printer,
+  MessageCircle,
+  Users,
+  BadgeCheck
 } from 'lucide-react';
 import { exhibitionsApi } from '@/lib/api/exhibitions';
 import { Exhibition } from '@/types';
 import { format } from 'date-fns';
 import Image from 'next/image';
+import { API_BASE_URL } from '@/lib/constants';
 
 // Enable ISR - Revalidate every 60 seconds
 // This caches the page and revalidates in background
@@ -60,287 +63,192 @@ export default async function HomePage() {
     <div className="min-h-screen flex flex-col">
       <Header />
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-primary/5 via-purple-50/50 to-background">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 bg-grid-slate-200 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))]" />
+      {/* Hero Section - Exhibition Registration System */}
+      <section className="relative overflow-hidden min-h-[90vh] flex items-center">
+        {/* Animated Gradient Mesh Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/50" />
+        <div className="absolute inset-0">
+          <div className="absolute top-0 -left-4 w-96 h-96 bg-primary/20 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob" />
+          <div className="absolute top-0 -right-4 w-96 h-96 bg-purple-300/30 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-2000" />
+          <div className="absolute -bottom-8 left-20 w-96 h-96 bg-pink-300/20 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-4000" />
+        </div>
         
-        <div className="container relative mx-auto max-w-7xl px-4 py-24 md:py-32">
-          <div className="mx-auto max-w-3xl text-center space-y-8">
-            {/* Badge */}
-            <div className="flex justify-center">
-              <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary ring-1 ring-inset ring-primary/20">
-                <Sparkles className="h-4 w-4" />
-                <span>Your Gateway to Amazing Events</span>
+        {/* Grid Pattern Overlay */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:64px_64px]" />
+        
+        <div className="container relative mx-auto max-w-7xl px-4 py-16 md:py-24">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+            
+            {/* Left Side - Content */}
+            <div className="space-y-8 text-center lg:text-left">
+              {/* Live Badge */}
+              <div className="flex justify-center lg:justify-start">
+                <div className="inline-flex items-center gap-2 rounded-full bg-green-500/10 px-4 py-2 text-sm font-medium text-green-700 ring-1 ring-inset ring-green-500/30">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                  </span>
+                  <span>{exhibitions.length > 0 ? `${exhibitions.length} Exhibition${exhibitions.length !== 1 ? 's' : ''} Open for Registration` : 'Registration System Active'}</span>
+                </div>
+              </div>
+
+              {/* Headline */}
+              <div className="space-y-4">
+                <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl">
+                  <span className="text-foreground">Your Digital</span>
+                  <br />
+                  <span className="bg-gradient-to-r from-primary via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                    Visitor Badge
+                  </span>
+                  <br />
+                  <span className="text-foreground">In Seconds</span>
+                </h1>
+                <p className="text-lg sm:text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0">
+                  Register for exhibitions, receive your <strong>QR-coded visitor pass</strong> instantly 
+                  via WhatsApp, and walk into events hassle-free.
+                </p>
+              </div>
+
+              {/* Process Steps - Mini */}
+              <div className="flex flex-wrap justify-center lg:justify-start gap-3">
+                <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-full px-4 py-2 shadow-sm border">
+                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">1</div>
+                  <span className="text-sm font-medium">Register</span>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground hidden sm:block self-center" />
+                <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-full px-4 py-2 shadow-sm border">
+                  <div className="w-6 h-6 rounded-full bg-purple-500/10 flex items-center justify-center text-xs font-bold text-purple-600">2</div>
+                  <span className="text-sm font-medium">Get Badge</span>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground hidden sm:block self-center" />
+                <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-full px-4 py-2 shadow-sm border">
+                  <div className="w-6 h-6 rounded-full bg-green-500/10 flex items-center justify-center text-xs font-bold text-green-600">3</div>
+                  <span className="text-sm font-medium">Walk In</span>
+                </div>
+              </div>
+
+              {/* CTA Buttons */}
+              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                <Button
+                  asChild
+                  size="lg"
+                  className="bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white shadow-xl hover:shadow-2xl transition-all duration-300 text-base h-14 px-8 rounded-xl"
+                >
+                  <Link href="#exhibitions" className="flex items-center gap-2">
+                    <QrCode className="h-5 w-5" />
+                    Register Now
+                    <ArrowRight className="h-5 w-5" />
+                  </Link>
+                </Button>
+                <Button 
+                  asChild 
+                  size="lg" 
+                  variant="outline" 
+                  className="h-14 px-8 rounded-xl border-2 hover:bg-muted/50"
+                >
+                  <Link href="#how-it-works" className="flex items-center gap-2">
+                    Learn How It Works
+                  </Link>
+                </Button>
+              </div>
+
+              {/* Trust Indicators */}
+              <div className="pt-4 border-t border-border/50">
+                <div className="flex flex-wrap items-center justify-center lg:justify-start gap-6 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-green-600" />
+                    <span>Secure & Private</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-yellow-600" />
+                    <span>Instant Badge</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-primary" />
+                    <span>Free Registration</span>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Headline */}
-            <h1 className="text-4xl font-bold tracking-tight sm:text-6xl bg-gradient-to-r from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">
-              Discover & Register for
-              <span className="block mt-2 bg-gradient-to-r from-primary via-purple-600 to-pink-600 bg-clip-text text-transparent">
-                World-Class Exhibitions
-              </span>
-            </h1>
-
-            {/* Description */}
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Join thousands of attendees in experiencing cutting-edge exhibitions, 
-              networking opportunities, and industry insights. Simple, fast, and secure registration.
-            </p>
-
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                asChild
-                size="lg"
-                className="bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white shadow-lg hover:shadow-xl transition-all duration-300 text-base h-12 px-8"
-              >
-                <Link href="#exhibitions" className="flex items-center gap-2">
-                  Browse Exhibitions
-                  <ArrowRight className="h-5 w-5" />
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline" className="text-base h-12 px-8">
-                <Link href="#features">
-                  Learn More
-                </Link>
-              </Button>
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-8 pt-8 max-w-2xl mx-auto">
-              <div className="space-y-1">
-                <div className="text-3xl font-bold text-primary">50+</div>
-                <div className="text-sm text-muted-foreground">Active Events</div>
-              </div>
-              <div className="space-y-1">
-                <div className="text-3xl font-bold text-purple-600">10K+</div>
-                <div className="text-sm text-muted-foreground">Attendees</div>
-              </div>
-              <div className="space-y-1">
-                <div className="text-3xl font-bold text-pink-600">500+</div>
-                <div className="text-sm text-muted-foreground">Exhibitors</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works Section */}
-      <section className="py-20 bg-gradient-to-b from-background to-muted/30">
-        <div className="container mx-auto max-w-7xl px-4">
-          <div className="text-center space-y-4 mb-16">
-            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary ring-1 ring-inset ring-primary/20 mb-4">
-              <Sparkles className="h-4 w-4" />
-              <span>Simple 4-Step Process</span>
-            </div>
-            <h2 className="text-3xl font-bold sm:text-4xl">How It Works</h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              From registration to entry - experience seamless access in just 4 simple steps
-            </p>
-          </div>
-
-          {/* Process Flow */}
-          <div className="relative">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-              {/* Step 1 */}
+            {/* Right Side - Floating Badge Mockup */}
+            <div className="relative flex justify-center lg:justify-end">
+              {/* Decorative Elements */}
+              <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br from-primary/20 to-purple-500/20 rounded-full blur-2xl" />
+              <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-gradient-to-br from-pink-500/20 to-orange-500/20 rounded-full blur-2xl" />
+              
+              {/* Badge Container with 3D Effect */}
               <div className="relative">
-              <Card className="p-6 text-center hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/30 hover:-translate-y-2 bg-gradient-to-br from-white to-primary/5">
-                <div className="relative mx-auto w-20 h-20 mb-6">
-                  {/* Number Badge */}
-                  <div className="absolute -top-2 -left-2 w-8 h-8 bg-gradient-to-r from-primary to-[#4A7090] text-white rounded-full flex items-center justify-center font-bold text-sm shadow-lg z-10">
-                    1
+                {/* Scanning Animation Ring */}
+                <div className="absolute inset-0 -m-4">
+                  <div className="absolute inset-0 rounded-3xl border-2 border-primary/30 animate-ping opacity-20" style={{ animationDuration: '3s' }} />
+                </div>
+                
+                {/* Main Badge Card */}
+                <div className="relative bg-white rounded-2xl shadow-2xl p-6 w-72 sm:w-80 transform hover:scale-105 transition-transform duration-500 border border-gray-100">
+                  {/* Badge Header */}
+                  <div className="text-center space-y-3 pb-4 border-b border-dashed border-gray-200">
+                    <div className="inline-flex items-center gap-2 bg-primary/10 rounded-full px-3 py-1">
+                      <Sparkles className="h-3 w-3 text-primary" />
+                      <span className="text-xs font-semibold text-primary uppercase tracking-wider">Visitor Pass</span>
+                    </div>
+                    <div className="w-16 h-16 mx-auto bg-gradient-to-br from-primary to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+                      <span className="text-2xl font-bold text-white">V</span>
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg text-gray-900">Your Name</h3>
+                      <p className="text-sm text-gray-500">Company / Organization</p>
+                    </div>
                   </div>
-                  {/* Icon Circle */}
-                  <div className="w-full h-full rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center relative">
-                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary to-[#4A7090] opacity-10 animate-pulse"></div>
-                    <Smartphone className="h-10 w-10 text-primary z-10" />
+                  
+                  {/* QR Code Section */}
+                  <div className="py-4 text-center">
+                    <div className="relative inline-block">
+                      {/* QR Code Placeholder with animated border */}
+                      <div className="w-32 h-32 mx-auto bg-gray-50 rounded-xl flex items-center justify-center relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent animate-shimmer" style={{ backgroundSize: '200% 100%' }} />
+                        <QrCode className="h-20 w-20 text-gray-800" />
+                      </div>
+                      {/* Scan Line Animation */}
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-green-500 to-transparent animate-scan" />
+                    </div>
+                    <p className="text-xs text-gray-400 mt-2">Scan at entry for instant check-in</p>
+                  </div>
+                  
+                  {/* Badge Footer */}
+                  <div className="pt-3 border-t border-dashed border-gray-200 text-center">
+                    <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+                      <Calendar className="h-3 w-3" />
+                      <span>Exhibition 2025</span>
+                    </div>
+                    <div className="mt-2 inline-flex items-center gap-1.5 bg-green-50 text-green-700 rounded-full px-3 py-1 text-xs font-medium">
+                      <CheckCircle className="h-3 w-3" />
+                      Verified Visitor
+                    </div>
                   </div>
                 </div>
-                <h3 className="text-xl font-bold mb-2 bg-gradient-to-r from-primary to-[#4A7090] bg-clip-text text-transparent">
-                  Register Online
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Fill out the quick registration form online or at our kiosk
-                </p>
-              </Card>
-              {/* Arrow - Hidden on mobile */}
-              <div className="hidden md:flex absolute -right-4 top-1/2 -translate-y-1/2 z-20">
-                <ArrowRight className="h-6 w-6 text-primary/40" />
-              </div>
-            </div>
-
-            {/* Step 2 */}
-            <div className="relative">
-              <Card className="p-6 text-center hover:shadow-xl transition-all duration-300 border-2 hover:border-purple-500/30 hover:-translate-y-2 bg-gradient-to-br from-white to-purple-50/50">
-                <div className="relative mx-auto w-20 h-20 mb-6">
-                  <div className="absolute -top-2 -left-2 w-8 h-8 bg-gradient-to-r from-purple-600 to-purple-400 text-white rounded-full flex items-center justify-center font-bold text-sm shadow-lg z-10">
-                    2
-                  </div>
-                  <div className="w-full h-full rounded-full bg-gradient-to-br from-purple-500/20 to-purple-500/10 flex items-center justify-center relative">
-                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-purple-600 to-purple-400 opacity-10 animate-pulse"></div>
-                    <QrCode className="h-10 w-10 text-purple-600 z-10" />
-                  </div>
+                
+                {/* Floating Elements Around Badge */}
+                <div className="absolute -top-4 -right-4 bg-white rounded-xl shadow-lg p-3 animate-bounce" style={{ animationDuration: '3s' }}>
+                  <Smartphone className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="text-xl font-bold mb-2 bg-gradient-to-r from-purple-600 to-purple-400 bg-clip-text text-transparent">
-                  Receive QR Code
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Get your unique QR code badge instantly via email/WhatsApp
-                </p>
-              </Card>
-              {/* Arrow - Hidden on mobile */}
-              <div className="hidden md:flex absolute -right-4 top-1/2 -translate-y-1/2 z-20">
-                <ArrowRight className="h-6 w-6 text-purple-400/40" />
-              </div>
-            </div>
-
-            {/* Step 3 */}
-            <div className="relative">
-              <Card className="p-6 text-center hover:shadow-xl transition-all duration-300 border-2 hover:border-pink-500/30 hover:-translate-y-2 bg-gradient-to-br from-white to-pink-50/50">
-                <div className="relative mx-auto w-20 h-20 mb-6">
-                  <div className="absolute -top-2 -left-2 w-8 h-8 bg-gradient-to-r from-pink-600 to-pink-400 text-white rounded-full flex items-center justify-center font-bold text-sm shadow-lg z-10">
-                    3
-                  </div>
-                  <div className="w-full h-full rounded-full bg-gradient-to-br from-pink-500/20 to-pink-500/10 flex items-center justify-center relative">
-                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-600 to-pink-400 opacity-10 animate-pulse"></div>
-                    <Scan className="h-10 w-10 text-pink-600 z-10" />
-                  </div>
-                </div>
-                <h3 className="text-xl font-bold mb-2 bg-gradient-to-r from-pink-600 to-pink-400 bg-clip-text text-transparent">
-                  Scan at Entry
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Simply scan your QR code at the venue entrance kiosk
-                </p>
-              </Card>
-              {/* Arrow - Hidden on mobile */}
-              <div className="hidden md:flex absolute -right-4 top-1/2 -translate-y-1/2 z-20">
-                <ArrowRight className="h-6 w-6 text-pink-400/40" />
-              </div>
-            </div>
-
-            {/* Step 4 */}
-            <div className="relative">
-              <Card className="p-6 text-center hover:shadow-xl transition-all duration-300 border-2 hover:border-green-500/30 hover:-translate-y-2 bg-gradient-to-br from-white to-green-50/50">
-                <div className="relative mx-auto w-20 h-20 mb-6">
-                  <div className="absolute -top-2 -left-2 w-8 h-8 bg-gradient-to-r from-green-600 to-green-400 text-white rounded-full flex items-center justify-center font-bold text-sm shadow-lg z-10">
-                    4
-                  </div>
-                  <div className="w-full h-full rounded-full bg-gradient-to-br from-green-500/20 to-green-500/10 flex items-center justify-center relative">
-                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-green-600 to-green-400 opacity-10 animate-pulse"></div>
-                    <CheckCircle className="h-10 w-10 text-green-600 z-10" />
-                  </div>
-                </div>
-                <h3 className="text-xl font-bold mb-2 bg-gradient-to-r from-green-600 to-green-400 bg-clip-text text-transparent">
-                  Instant Access
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Walk in and enjoy the exhibition - it's that simple!
-                </p>
-              </Card>
-            </div>
-            </div>
-          </div>
-
-          {/* Additional Benefits */}
-          <div className="mt-16 text-center">
-            <Card className="max-w-4xl mx-auto p-8 bg-gradient-to-r from-primary/5 via-purple-50/50 to-pink-50/30 border-2 border-primary/20">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="flex flex-col items-center space-y-2">
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Clock className="h-6 w-6 text-primary" />
-                  </div>
-                  <div className="font-semibold">Under 2 Minutes</div>
-                  <div className="text-sm text-muted-foreground">Complete registration</div>
-                </div>
-                <div className="flex flex-col items-center space-y-2">
-                  <div className="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center">
-                    <Shield className="h-6 w-6 text-purple-600" />
-                  </div>
-                  <div className="font-semibold">100% Secure</div>
-                  <div className="text-sm text-muted-foreground">Your data is protected</div>
-                </div>
-                <div className="flex flex-col items-center space-y-2">
-                  <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center">
-                    <Zap className="h-6 w-6 text-green-600" />
-                  </div>
-                  <div className="font-semibold">Instant Badge</div>
-                  <div className="text-sm text-muted-foreground">Get your badge immediately</div>
+                <div className="absolute -bottom-4 -left-4 bg-white rounded-xl shadow-lg p-3 animate-bounce" style={{ animationDuration: '2.5s', animationDelay: '0.5s' }}>
+                  <Scan className="h-6 w-6 text-green-600" />
                 </div>
               </div>
-            </Card>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="py-20 bg-muted/30">
-        <div className="container mx-auto max-w-7xl px-4">
-          <div className="text-center space-y-4 mb-16">
-            <h2 className="text-3xl font-bold sm:text-4xl">Why Choose ExhibitHub?</h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Experience seamless event registration with our cutting-edge platform
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="p-6 hover:shadow-lg transition-shadow border-2 hover:border-primary/20">
-              <div className="space-y-4">
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Zap className="h-6 w-6 text-primary" />
-                </div>
-                <h3 className="text-xl font-semibold">Lightning Fast</h3>
-                <p className="text-muted-foreground">
-                  Register in under 2 minutes with our streamlined process
-                </p>
-              </div>
-            </Card>
-
-            <Card className="p-6 hover:shadow-lg transition-shadow border-2 hover:border-purple-500/20">
-              <div className="space-y-4">
-                <div className="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                  <Shield className="h-6 w-6 text-purple-600" />
-                </div>
-                <h3 className="text-xl font-semibold">Secure & Safe</h3>
-                <p className="text-muted-foreground">
-                  Bank-grade security to protect your personal information
-                </p>
-              </div>
-            </Card>
-
-            <Card className="p-6 hover:shadow-lg transition-shadow border-2 hover:border-pink-500/20">
-              <div className="space-y-4">
-                <div className="w-12 h-12 rounded-lg bg-pink-500/10 flex items-center justify-center">
-                  <Users className="h-6 w-6 text-pink-600" />
-                </div>
-                <h3 className="text-xl font-semibold">10K+ Attendees</h3>
-                <p className="text-muted-foreground">
-                  Join a thriving community of exhibition enthusiasts
-                </p>
-              </div>
-            </Card>
-
-            <Card className="p-6 hover:shadow-lg transition-shadow border-2 hover:border-blue-500/20">
-              <div className="space-y-4">
-                <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                  <TrendingUp className="h-6 w-6 text-blue-600" />
-                </div>
-                <h3 className="text-xl font-semibold">Real-time Updates</h3>
-                <p className="text-muted-foreground">
-                  Get instant notifications about exhibition updates
-                </p>
-              </div>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* Exhibitions Section */}
-      <section id="exhibitions" className="py-20">
+      {/* Active Exhibitions Section - Moved right after Hero */}
+      <section id="exhibitions" className="py-20 bg-gradient-to-b from-background to-muted/30">
         <div className="container mx-auto max-w-7xl px-4">
           <div className="text-center space-y-4 mb-12">
+            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary ring-1 ring-inset ring-primary/20 mb-4">
+              <Calendar className="h-4 w-4" />
+              <span>Now Open for Registration</span>
+            </div>
             <h2 className="text-3xl font-bold sm:text-4xl">Active Exhibitions</h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               {exhibitions.length > 0
@@ -365,7 +273,7 @@ export default async function HomePage() {
                   </p>
                 </div>
                 <Button variant="outline" asChild className="mt-4">
-                  <Link href="#contact">Get Notified</Link>
+                  <Link href="/contact">Contact Us</Link>
                 </Button>
               </div>
             </Card>
@@ -376,6 +284,236 @@ export default async function HomePage() {
               ))}
             </div>
           )}
+        </div>
+      </section>
+
+      {/* How It Works Section - Enhanced */}
+      <section id="how-it-works" className="py-24 relative overflow-hidden">
+        {/* Background */}
+        <div className="absolute inset-0 bg-gradient-to-b from-muted/30 via-background to-muted/20" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:48px_48px]" />
+        
+        <div className="container relative mx-auto max-w-7xl px-4">
+          {/* Section Header */}
+          <div className="text-center space-y-4 mb-20">
+            <div className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-primary/10 to-purple-500/10 px-5 py-2 text-sm font-semibold text-primary ring-1 ring-inset ring-primary/20">
+              <Sparkles className="h-4 w-4" />
+              <span>Your Journey to the Exhibition</span>
+            </div>
+            <h2 className="text-4xl font-extrabold sm:text-5xl">
+              How It <span className="bg-gradient-to-r from-primary via-purple-600 to-pink-600 bg-clip-text text-transparent">Works</span>
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              From online registration to walking into the exhibition with your printed badge — 
+              a seamless 4-step experience
+            </p>
+          </div>
+
+          {/* Timeline Process Flow */}
+          <div className="relative max-w-5xl mx-auto">
+            {/* Connection Line - Desktop */}
+            <div className="hidden lg:block absolute top-32 left-[10%] right-[10%] h-1 bg-gradient-to-r from-primary via-purple-500 via-pink-500 to-green-500 rounded-full opacity-20" />
+            <div className="hidden lg:block absolute top-32 left-[10%] right-[10%] h-1">
+              <div className="h-full bg-gradient-to-r from-primary via-purple-500 via-pink-500 to-green-500 rounded-full animate-pulse opacity-40" style={{ width: '100%' }} />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-6 items-stretch">
+              
+              {/* Step 1: Register Online */}
+              <div className="relative group flex">
+                <div className="bg-white rounded-2xl p-6 shadow-lg border-2 border-transparent hover:border-primary/30 hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 flex flex-col w-full">
+                  {/* Step Number - Floating */}
+                  <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-10">
+                    <div className="w-10 h-10 bg-gradient-to-br from-primary to-blue-600 text-white rounded-xl flex items-center justify-center font-bold shadow-lg shadow-primary/30 group-hover:scale-110 transition-transform">
+                      1
+                    </div>
+                  </div>
+                  
+                  {/* Icon */}
+                  <div className="mt-4 mb-6 flex justify-center">
+                    <div className="relative">
+                      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/10 to-blue-500/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                        <Smartphone className="h-10 w-10 text-primary" />
+                      </div>
+                      {/* Decorative ring */}
+                      <div className="absolute inset-0 rounded-2xl border-2 border-primary/20 scale-110 group-hover:scale-125 transition-transform duration-500" />
+                    </div>
+                  </div>
+                  
+                  {/* Content */}
+                  <div className="text-center space-y-2 flex-grow">
+                    <h3 className="text-xl font-bold text-foreground">Register Online</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      Fill the quick registration form with your details. Takes less than 2 minutes!
+                    </p>
+                  </div>
+                  
+                  {/* Feature Tags */}
+                  <div className="mt-4 flex flex-wrap justify-center gap-2 pt-2">
+                    <span className="text-xs bg-primary/5 text-primary px-2 py-1 rounded-full">Mobile Friendly</span>
+                    <span className="text-xs bg-primary/5 text-primary px-2 py-1 rounded-full">OTP Login</span>
+                  </div>
+                </div>
+                
+                {/* Arrow - Mobile */}
+                <div className="lg:hidden flex justify-center py-4">
+                  <ArrowRight className="h-6 w-6 text-primary/40 rotate-90" />
+                </div>
+              </div>
+
+              {/* Step 2: Receive Digital Badge */}
+              <div className="relative group flex">
+                <div className="bg-white rounded-2xl p-6 shadow-lg border-2 border-transparent hover:border-purple-500/30 hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 flex flex-col w-full">
+                  <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-10">
+                    <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-700 text-white rounded-xl flex items-center justify-center font-bold shadow-lg shadow-purple-500/30 group-hover:scale-110 transition-transform">
+                      2
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 mb-6 flex justify-center">
+                    <div className="relative">
+                      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                        <div className="relative">
+                          <QrCode className="h-10 w-10 text-purple-600" />
+                          <MessageCircle className="h-5 w-5 text-green-500 absolute -bottom-1 -right-1 fill-green-500" />
+                        </div>
+                      </div>
+                      <div className="absolute inset-0 rounded-2xl border-2 border-purple-500/20 scale-110 group-hover:scale-125 transition-transform duration-500" />
+                    </div>
+                  </div>
+                  
+                  <div className="text-center space-y-2 flex-grow">
+                    <h3 className="text-xl font-bold text-foreground">Receive Digital Badge</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      Get your unique QR-coded visitor badge instantly via WhatsApp & Email
+                    </p>
+                  </div>
+                  
+                  <div className="mt-4 flex flex-wrap justify-center gap-2 pt-2">
+                    <span className="text-xs bg-green-500/10 text-green-700 px-2 py-1 rounded-full flex items-center gap-1">
+                      <MessageCircle className="h-3 w-3" /> WhatsApp
+                    </span>
+                    <span className="text-xs bg-purple-500/10 text-purple-700 px-2 py-1 rounded-full">Email</span>
+                  </div>
+                </div>
+                
+                <div className="lg:hidden flex justify-center py-4">
+                  <ArrowRight className="h-6 w-6 text-purple-400/40 rotate-90" />
+                </div>
+              </div>
+
+              {/* Step 3: Visit Kiosk/Volunteer */}
+              <div className="relative group flex">
+                <div className="bg-white rounded-2xl p-6 shadow-lg border-2 border-transparent hover:border-pink-500/30 hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 flex flex-col w-full">
+                  <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-10">
+                    <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-rose-600 text-white rounded-xl flex items-center justify-center font-bold shadow-lg shadow-pink-500/30 group-hover:scale-110 transition-transform">
+                      3
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 mb-6 flex justify-center">
+                    <div className="relative">
+                      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-pink-500/10 to-rose-500/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                        <div className="relative">
+                          <Scan className="h-10 w-10 text-pink-600" />
+                          <Users className="h-5 w-5 text-orange-500 absolute -bottom-1 -right-1" />
+                        </div>
+                      </div>
+                      <div className="absolute inset-0 rounded-2xl border-2 border-pink-500/20 scale-110 group-hover:scale-125 transition-transform duration-500" />
+                    </div>
+                  </div>
+                  
+                  <div className="text-center space-y-2 flex-grow">
+                    <h3 className="text-xl font-bold text-foreground">Visit Kiosk / Volunteer</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      Show your QR badge at the kiosk or to a volunteer at the venue entrance
+                    </p>
+                  </div>
+                  
+                  <div className="mt-4 flex flex-wrap justify-center gap-2 pt-2">
+                    <span className="text-xs bg-pink-500/10 text-pink-700 px-2 py-1 rounded-full">Self-Service Kiosk</span>
+                    <span className="text-xs bg-orange-500/10 text-orange-700 px-2 py-1 rounded-full">Volunteer Desk</span>
+                  </div>
+                </div>
+                
+                <div className="lg:hidden flex justify-center py-4">
+                  <ArrowRight className="h-6 w-6 text-pink-400/40 rotate-90" />
+                </div>
+              </div>
+
+              {/* Step 4: Get Badge Printed */}
+              <div className="relative group flex">
+                <div className="bg-white rounded-2xl p-6 shadow-lg border-2 border-transparent hover:border-green-500/30 hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 flex flex-col w-full">
+                  <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-10">
+                    <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-xl flex items-center justify-center font-bold shadow-lg shadow-green-500/30 group-hover:scale-110 transition-transform">
+                      4
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 mb-6 flex justify-center">
+                    <div className="relative">
+                      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-green-500/10 to-emerald-500/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                        <div className="relative">
+                          <Printer className="h-10 w-10 text-green-600" />
+                          <BadgeCheck className="h-5 w-5 text-emerald-500 absolute -bottom-1 -right-1 fill-emerald-100" />
+                        </div>
+                      </div>
+                      <div className="absolute inset-0 rounded-2xl border-2 border-green-500/20 scale-110 group-hover:scale-125 transition-transform duration-500" />
+                    </div>
+                  </div>
+                  
+                  <div className="text-center space-y-2 flex-grow">
+                    <h3 className="text-xl font-bold text-foreground">Get Badge Printed</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      Your physical badge is printed instantly — wear it and enjoy the exhibition!
+                    </p>
+                  </div>
+                  
+                  <div className="mt-4 flex flex-wrap justify-center gap-2 pt-2">
+                    <span className="text-xs bg-green-500/10 text-green-700 px-2 py-1 rounded-full flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3" /> Instant Print
+                    </span>
+                    <span className="text-xs bg-emerald-500/10 text-emerald-700 px-2 py-1 rounded-full">Walk In</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Benefits Bar */}
+          <div className="mt-20">
+            <Card className="max-w-4xl mx-auto p-8 bg-gradient-to-r from-primary/5 via-purple-50/50 to-green-50/30 border-2 border-primary/10 shadow-xl">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+                <div className="flex flex-col items-center space-y-3 text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                    <Clock className="h-7 w-7 text-primary" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-lg">Under 2 Minutes</div>
+                    <div className="text-sm text-muted-foreground">Complete registration</div>
+                  </div>
+                </div>
+                <div className="flex flex-col items-center space-y-3 text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500/20 to-purple-500/10 flex items-center justify-center">
+                    <Shield className="h-7 w-7 text-purple-600" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-lg">100% Secure</div>
+                    <div className="text-sm text-muted-foreground">Your data is protected</div>
+                  </div>
+                </div>
+                <div className="flex flex-col items-center space-y-3 text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-green-500/20 to-green-500/10 flex items-center justify-center">
+                    <Zap className="h-7 w-7 text-green-600" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-lg">Instant Badge</div>
+                    <div className="text-sm text-muted-foreground">Print on arrival</div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
         </div>
       </section>
 
@@ -411,21 +549,53 @@ export default async function HomePage() {
 }
 
 /**
+ * Helper function to get full image URL
+ */
+function getImageUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  // If already a full URL, return as is
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  // Use API_BASE_URL constant (remove /api/v1 suffix)
+  const baseUrl = API_BASE_URL.replace('/api/v1', '');
+  return `${baseUrl}${url.startsWith('/') ? url : `/${url}`}`;
+}
+
+/**
  * Exhibition Card Component - Modern Design
  */
 function ExhibitionCard({ exhibition }: { exhibition: Exhibition }) {
   const isRegistrationOpen = exhibitionsApi.isRegistrationOpen(exhibition);
+  
+  // Process image URLs - check multiple possible field names
+  // Backend uses exhibitionLogo/bannerImage, but toJSON transforms to logoUrl/bannerImageUrl
+  const bannerUrl = getImageUrl(exhibition.bannerImageUrl || (exhibition as any).bannerImage);
+  const logoUrl = getImageUrl(exhibition.logoUrl || (exhibition as any).exhibitionLogo);
+  const displayImage = bannerUrl || logoUrl;
+  
+  // Debug logging
+  console.log('[ExhibitionCard] Exhibition:', exhibition.name, {
+    bannerImageUrl: exhibition.bannerImageUrl,
+    bannerImage: (exhibition as any).bannerImage,
+    logoUrl: exhibition.logoUrl,
+    exhibitionLogo: (exhibition as any).exhibitionLogo,
+    processedBanner: bannerUrl,
+    processedLogo: logoUrl,
+    displayImage,
+  });
 
   return (
     <Card className="group overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 border-2 hover:border-primary/20">
       {/* Exhibition Image */}
       <div className="relative h-56 w-full overflow-hidden bg-gradient-to-br from-primary/10 via-purple-50/50 to-pink-50/30">
-        {exhibition.bannerImageUrl || exhibition.logoUrl ? (
+        {displayImage ? (
           <Image
-            src={exhibition.bannerImageUrl || exhibition.logoUrl!}
+            src={displayImage}
             alt={exhibition.name}
             fill
-            className="object-cover transition-transform duration-500 group-hover:scale-110"
+            className="object-contain transition-transform duration-500 group-hover:scale-105"
+            unoptimized // Bypass Next.js image optimization for dynamic external URLs
           />
         ) : (
           <div className="flex h-full items-center justify-center bg-gradient-to-br from-primary/20 via-purple-100/50 to-pink-100/30">

@@ -53,7 +53,8 @@ export function Header() {
                   alt={appName}
                   width={120}
                   height={40}
-                  className="h-10 w-auto object-contain"
+                  className="h-10 object-contain"
+                  style={{ width: 'auto', height: 'auto', maxHeight: '40px' }}
                   priority
                 />
               </div>
@@ -79,17 +80,12 @@ export function Header() {
                 Exhibitions
               </Button>
             </Link>
-            <Link href="/#about">
+            <Link href="/about">
               <Button variant="ghost" className="text-sm font-medium">
                 About
               </Button>
             </Link>
-            <Link href="/#features">
-              <Button variant="ghost" className="text-sm font-medium">
-                Features
-              </Button>
-            </Link>
-            <Link href="/#contact">
+            <Link href="/contact">
               <Button variant="ghost" className="text-sm font-medium">
                 Contact
               </Button>
@@ -133,17 +129,12 @@ export function Header() {
                   Exhibitions
                 </Button>
               </Link>
-              <Link href="/#about" onClick={() => setIsMobileMenuOpen(false)}>
+              <Link href="/about" onClick={() => setIsMobileMenuOpen(false)}>
                 <Button variant="ghost" className="w-full justify-start text-sm font-medium">
                   About
                 </Button>
               </Link>
-              <Link href="/#features" onClick={() => setIsMobileMenuOpen(false)}>
-                <Button variant="ghost" className="w-full justify-start text-sm font-medium">
-                  Features
-                </Button>
-              </Link>
-              <Link href="/#contact" onClick={() => setIsMobileMenuOpen(false)}>
+              <Link href="/contact" onClick={() => setIsMobileMenuOpen(false)}>
                 <Button variant="ghost" className="w-full justify-start text-sm font-medium">
                   Contact
                 </Button>

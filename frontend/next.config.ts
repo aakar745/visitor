@@ -1,12 +1,15 @@
 import type { NextConfig } from "next";
 
+// Environment-aware CSP configuration
+const isDev = process.env.NODE_ENV === 'development';
+
 // Security Headers Configuration
 const securityHeaders = [
-  // 1. HSTS - Force HTTPS for 1 year, include subdomains
-  {
+  // 1. HSTS - Force HTTPS for 1 year, include subdomains (production only)
+  ...(isDev ? [] : [{
     key: 'Strict-Transport-Security',
     value: 'max-age=31536000; includeSubDomains; preload',
-  },
+  }]),
   // 2. Prevent clickjacking - Only allow framing from same origin
   {
     key: 'X-Frame-Options',
@@ -32,7 +35,7 @@ const securityHeaders = [
     key: 'X-XSS-Protection',
     value: '1; mode=block',
   },
-  // 7. Content Security Policy
+  // 7. Content Security Policy (relaxed in development to allow localhost)
   {
     key: 'Content-Security-Policy',
     value: [
@@ -41,12 +44,16 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", // For inline styles & Google Fonts
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data: blob: https: http:",
-      "connect-src 'self' https: wss: ws:", // API calls & WebSockets
+      // Allow localhost in dev, only HTTPS in production
+      isDev 
+        ? "connect-src 'self' http://localhost:* http://127.0.0.1:* https: wss: ws:"
+        : "connect-src 'self' https: wss: ws:",
       "frame-ancestors 'self'",
       "form-action 'self'",
       "base-uri 'self'",
       "object-src 'none'",
-      "upgrade-insecure-requests",
+      // Don't upgrade insecure requests in dev (allows localhost HTTP)
+      ...(isDev ? [] : ["upgrade-insecure-requests"]),
     ].join('; '),
   },
 ];

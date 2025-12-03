@@ -37,7 +37,8 @@ export function Footer() {
                     alt={appName}
                     width={120}
                     height={40}
-                    className="h-10 w-auto object-contain"
+                    className="h-10 object-contain"
+                    style={{ width: 'auto', height: 'auto', maxHeight: '40px' }}
                   />
                 </div>
               ) : (
@@ -73,7 +74,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/#about"
+                  href="/about"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   About Us
@@ -81,18 +82,10 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/#features"
+                  href="/contact"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Features
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/#contact"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Contact
+                  Contact Us
                 </Link>
               </li>
             </ul>
@@ -100,19 +93,11 @@ export function Footer() {
 
           {/* Resources */}
           <div>
-            <h3 className="font-semibold mb-4">Resources</h3>
+            <h3 className="font-semibold mb-4">Legal</h3>
             <ul className="space-y-2 text-sm">
               <li>
                 <Link
-                  href="/help"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Help Center
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/privacy"
+                  href="/privacy-policy"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Privacy Policy
@@ -128,10 +113,18 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/faq"
+                  href="/refund-policy"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  FAQ
+                  Refund Policy
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/#contact"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Contact Us
                 </Link>
               </li>
             </ul>
@@ -144,24 +137,24 @@ export function Footer() {
               <li className="flex items-start gap-2 text-muted-foreground">
                 <Mail className="h-4 w-4 mt-0.5 flex-shrink-0" />
                 <a
-                  href="mailto:info@exhibithub.com"
+                  href="mailto:visitor@aakarexhibition.com"
                   className="hover:text-foreground transition-colors"
                 >
-                  info@exhibithub.com
+                  visitor@aakarexhibition.com
                 </a>
               </li>
               <li className="flex items-start gap-2 text-muted-foreground">
                 <Phone className="h-4 w-4 mt-0.5 flex-shrink-0" />
                 <a
-                  href="tel:+1234567890"
+                  href="tel:+917016727956"
                   className="hover:text-foreground transition-colors"
                 >
-                  +1 (234) 567-890
+                  +91 7016727956
                 </a>
               </li>
               <li className="flex items-start gap-2 text-muted-foreground">
                 <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <span>123 Exhibition St, Event City, EC 12345</span>
+                <span>Office No B-2, Wall Street 2, Opp. Orient Club, Ellisbridge, Ahmedabad 380006</span>
               </li>
             </ul>
           </div>
@@ -171,16 +164,16 @@ export function Footer() {
 
         {/* Bottom Bar */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
-          <p>&copy; {currentYear} ExhibitHub. All rights reserved.</p>
+          <p>&copy; {currentYear} Aakar Visitor. All rights reserved.</p>
           <div className="flex items-center gap-6">
-            <Link href="/privacy" className="hover:text-foreground transition-colors">
+            <Link href="/privacy-policy" className="hover:text-foreground transition-colors">
               Privacy
             </Link>
             <Link href="/terms" className="hover:text-foreground transition-colors">
               Terms
             </Link>
-            <Link href="/cookies" className="hover:text-foreground transition-colors">
-              Cookies
+            <Link href="/refund-policy" className="hover:text-foreground transition-colors">
+              Refund Policy
             </Link>
           </div>
         </div>
