@@ -566,8 +566,13 @@ const Roles: React.FC = () => {
   ];
 
   // Render permission groups in modal
+  // FIX: Using forceRender to ensure all checkboxes are mounted even when panels are collapsed
+  // This prevents the form state from being reset when expanding panels
   const renderPermissionGroups = () => {
     if (!permissionGroups) return null;
+
+    // Get current form permissions to show count in collapsed panels
+    const currentPermissions = form.getFieldValue('permissions') || [];
 
     return (
       <Form.Item
@@ -577,34 +582,49 @@ const Roles: React.FC = () => {
       >
         <Checkbox.Group style={{ width: '100%' }}>
           <Collapse
-            items={permissionGroups.map((group: any) => ({
-              key: group.category,
-              label: (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {permissionCategoryConfig[group.category as PermissionCategory]?.icon}
-                  <span>{permissionCategoryConfig[group.category as PermissionCategory]?.name || group.name}</span>
-                  <Badge count={group.permissions.length} style={{ backgroundColor: '#f0f0f0', color: '#666' }} />
-                </div>
-              ),
-              children: (
-                <Row gutter={[8, 8]}>
-                  {group.permissions.map((permission: any) => (
-                    <Col span={12} key={permission.id}>
-                      <Checkbox value={permission.id}>
-                        <div>
-                          <Text style={{ fontSize: '13px', fontWeight: 500 }}>
-                            {permission.name}
-                          </Text>
-                          <Text type="secondary" style={{ fontSize: '11px', display: 'block' }}>
-                            {permission.description}
-                          </Text>
-                        </div>
-                      </Checkbox>
-                    </Col>
-                  ))}
-                </Row>
-              ),
-            }))}
+            // FIX: Force render all panels so checkboxes remain mounted and synced with form
+            items={permissionGroups.map((group: any) => {
+              // Count selected permissions in this group
+              const selectedInGroup = group.permissions.filter(
+                (p: any) => currentPermissions.includes(p.id)
+              ).length;
+              
+              return {
+                key: group.category,
+                forceRender: true, // KEY FIX: Keep checkboxes mounted even when collapsed
+                label: (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {permissionCategoryConfig[group.category as PermissionCategory]?.icon}
+                    <span>{permissionCategoryConfig[group.category as PermissionCategory]?.name || group.name}</span>
+                    <Badge 
+                      count={selectedInGroup > 0 ? `${selectedInGroup}/${group.permissions.length}` : group.permissions.length} 
+                      style={{ 
+                        backgroundColor: selectedInGroup > 0 ? '#52c41a' : '#f0f0f0', 
+                        color: selectedInGroup > 0 ? '#fff' : '#666' 
+                      }} 
+                    />
+                  </div>
+                ),
+                children: (
+                  <Row gutter={[8, 8]}>
+                    {group.permissions.map((permission: any) => (
+                      <Col span={12} key={permission.id}>
+                        <Checkbox value={permission.id}>
+                          <div>
+                            <Text style={{ fontSize: '13px', fontWeight: 500 }}>
+                              {permission.name}
+                            </Text>
+                            <Text type="secondary" style={{ fontSize: '11px', display: 'block' }}>
+                              {permission.description}
+                            </Text>
+                          </div>
+                        </Checkbox>
+                      </Col>
+                    ))}
+                  </Row>
+                ),
+              };
+            })}
           />
         </Checkbox.Group>
       </Form.Item>
