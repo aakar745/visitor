@@ -17,7 +17,7 @@ import { UseFormReturn } from 'react-hook-form';
 import { RegistrationFormData, Exhibition, CustomField } from '@/types';
 import { exhibitionsApi } from '@/lib/api/exhibitions';
 import { locationsApi } from '@/lib/api/locations';
-import { Loader2, CheckCircle, Check, Lock, MapPin } from 'lucide-react';
+import { Loader2, CheckCircle, Lock, MapPin } from 'lucide-react';
 import { badgeVariants } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useVisitorAuthStore } from '@/lib/store/visitorAuthStore';
@@ -30,16 +30,6 @@ interface CustomFieldsSectionProps {
   existingVisitor?: any;
 }
 
-// Category labels mapping
-const CATEGORY_LABELS: Record<string, string> = {
-  general: 'General Visitor',
-  vip: 'VIP',
-  media: 'Media',
-  exhibitor: 'Exhibitor',
-  speaker: 'Speaker',
-  guest: 'Guest',
-  visitor: 'Visitor',
-};
 
 export function CustomFieldsSection({ 
   form, 
@@ -88,6 +78,14 @@ export function CustomFieldsSection({
     };
     loadCountries();
   }, []);
+
+  // Auto-select first registration category (since UI is hidden)
+  useEffect(() => {
+    const currentCategory = form.getValues('registrationCategory');
+    if (!currentCategory && exhibition.allowedCategories?.length) {
+      form.setValue('registrationCategory', exhibition.allowedCategories[0], { shouldValidate: true });
+    }
+  }, [exhibition.allowedCategories, form]);
 
   if (customFields.length === 0) {
     return null;
@@ -912,7 +910,6 @@ export function CustomFieldsSection({
     }
   };
 
-  const selectedCategory = form.watch('registrationCategory');
   const selectedInterests = form.watch('selectedInterests') || [];
   const interestOptions = exhibitionsApi.getActiveInterestOptions(exhibition);
   
@@ -935,28 +932,6 @@ export function CustomFieldsSection({
             Returning Visitor
           </div>
         )}
-      </div>
-
-      {/* Registration Category - Badge Style */}
-      <div className="space-y-3">
-        <Label className="text-sm font-medium">
-          I am registering as <span className="text-red-500">*</span>
-        </Label>
-        <div className="flex flex-wrap gap-2">
-          {exhibition.allowedCategories?.map((category) => (
-            <div
-              key={category}
-              className={cn(
-                badgeVariants({ variant: selectedCategory === category ? 'default' : 'outline' }),
-                "cursor-pointer px-4 py-2 text-sm transition-all hover:scale-105 flex items-center"
-              )}
-              onClick={() => form.setValue('registrationCategory', category, { shouldValidate: true })}
-            >
-              {selectedCategory === category && <Check className="mr-1 h-3 w-3" />}
-              <span>{CATEGORY_LABELS[category] || category}</span>
-            </div>
-          ))}
-        </div>
       </div>
 
       {/* Custom Fields */}

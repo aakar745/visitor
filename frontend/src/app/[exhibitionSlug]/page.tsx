@@ -276,20 +276,21 @@ export default function ExhibitionPage({ params: paramsPromise }: PageProps) {
                   /* Show Registration Form */
                   <>
                     {/* Form Header with Logout Option */}
-                    <Card className="p-6 bg-gradient-to-r from-primary/5 via-purple-50/50 to-pink-50/30 border-2 border-primary/10">
-                      <div className="flex items-start gap-4">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-white flex-shrink-0">
-                          <Users className="h-6 w-6" />
+                    <Card className="px-4 py-3 bg-gradient-to-r from-primary/5 via-purple-50/30 to-background border border-primary/10">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white flex-shrink-0">
+                          <Users className="h-5 w-5" />
                         </div>
-                        <div className="flex-1">
-                          <h2 className="text-2xl font-bold mb-1">Complete Registration</h2>
-                          <p className="text-muted-foreground">
-                            Fill in your details below to complete your registration
+                        <div className="flex-1 min-w-0">
+                          <h2 className="text-lg font-semibold">Complete Registration</h2>
+                          <p className="text-sm text-muted-foreground">
+                            Fill in your details to complete registration
                           </p>
                         </div>
                         <Button
                           variant="ghost"
                           size="sm"
+                          className="text-primary hover:text-primary/80 text-sm"
                           onClick={() => {
                             clearAuthentication();
                             setShowForm(false);
