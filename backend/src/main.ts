@@ -6,6 +6,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -24,21 +25,60 @@ async function bootstrap() {
   app.use(require('express').json({ limit: '200mb' }));
   app.use(require('express').urlencoded({ limit: '200mb', extended: true }));
 
-  // Security - Configure Helmet to allow images from uploads
+  // Security - Configure Helmet with comprehensive security headers
   if (configService.get('ENABLE_HELMET', true)) {
     app.use(
       helmet({
+        // Allow cross-origin resource access for uploads
         crossOriginResourcePolicy: { policy: 'cross-origin' },
+        
+        // Content Security Policy
         contentSecurityPolicy: {
           directives: {
             defaultSrc: ["'self'"],
             imgSrc: ["'self'", 'data:', 'blob:', '*'],
             styleSrc: ["'self'", "'unsafe-inline'"],
-            scriptSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'"], // For Swagger UI
+            connectSrc: ["'self'"],
+            fontSrc: ["'self'", 'data:'],
+            objectSrc: ["'none'"],
+            frameSrc: ["'none'"],
+            upgradeInsecureRequests: [],
           },
         },
+        
+        // HSTS - Force HTTPS for 1 year
+        strictTransportSecurity: {
+          maxAge: 31536000,
+          includeSubDomains: true,
+          preload: true,
+        },
+        
+        // Prevent clickjacking
+        frameguard: { action: 'deny' },
+        
+        // Prevent MIME type sniffing
+        noSniff: true,
+        
+        // Referrer Policy
+        referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+        
+        // Hide X-Powered-By header
+        hidePoweredBy: true,
+        
+        // XSS filter (legacy browsers)
+        xssFilter: true,
       }),
     );
+    
+    // Permissions Policy (not included in helmet by default)
+    app.use((req: Request, res: Response, next: NextFunction) => {
+      res.setHeader(
+        'Permissions-Policy',
+        'camera=(), microphone=(), geolocation=(), interest-cohort=()'
+      );
+      next();
+    });
   }
 
   // Compression

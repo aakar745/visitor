@@ -17,6 +17,13 @@ import { AlertCircle, Save, CheckCircle2, Lock } from 'lucide-react';
 import type { Exhibition, Exhibitor, RegistrationFormData } from '@/types';
 import { toast } from 'sonner';
 import { useVisitorAuthStore } from '@/lib/store/visitorAuthStore';
+import {
+  createVisitorFieldMapping,
+  findMatchingValue,
+  isPhoneField,
+  isCountryField,
+  findFieldByKeywords,
+} from '@/lib/utils/visitorFieldMapper';
 
 interface RegistrationFormProps {
   exhibition: Exhibition;
@@ -124,141 +131,12 @@ export function RegistrationForm({ exhibition, exhibitor }: RegistrationFormProp
       console.log('[FORM] Authenticated phone number:', phoneNumber);
       console.log('[FORM] Full visitor data object (all fields):', visitorData);
       
-      // Create a mapping of all possible field name variations to visitor data
-      const fieldMapping: Record<string, any> = {};
-      
-      // Name variations
-      if (visitorData.name) {
-        fieldMapping['name'] = visitorData.name;
-        fieldMapping['full_name'] = visitorData.name;
-        fieldMapping['fullname'] = visitorData.name;
-        fieldMapping['visitor_name'] = visitorData.name;
-        fieldMapping['full name'] = visitorData.name;
-      }
-      
-      // Email variations
-      if (visitorData.email) {
-        fieldMapping['email'] = visitorData.email;
-        fieldMapping['email_address'] = visitorData.email;
-        fieldMapping['emailaddress'] = visitorData.email;
-        fieldMapping['email address'] = visitorData.email;
-      }
-      
-      // Phone variations (always use the authenticated phone number)
-      if (phoneNumber) {
-        fieldMapping['phone'] = phoneNumber;
-        fieldMapping['mobile'] = phoneNumber;
-        fieldMapping['phone_number'] = phoneNumber;
-        fieldMapping['mobile_number'] = phoneNumber;
-        fieldMapping['phonenumber'] = phoneNumber;
-        fieldMapping['mobilenumber'] = phoneNumber;
-        fieldMapping['contact'] = phoneNumber;
-        fieldMapping['contact_number'] = phoneNumber;
-        fieldMapping['contactnumber'] = phoneNumber;
-        fieldMapping['phone number'] = phoneNumber;
-        fieldMapping['mobile number'] = phoneNumber;
-        fieldMapping['contact number'] = phoneNumber;
-      }
-      
-      // Company variations
-      if (visitorData.company) {
-        fieldMapping['company'] = visitorData.company;
-        fieldMapping['company_name'] = visitorData.company;
-        fieldMapping['companyname'] = visitorData.company;
-        fieldMapping['organization'] = visitorData.company;
-        fieldMapping['organisation'] = visitorData.company;
-        fieldMapping['company name'] = visitorData.company;
-      }
-      
-      // Designation variations
-      if (visitorData.designation) {
-        fieldMapping['designation'] = visitorData.designation;
-        fieldMapping['job_title'] = visitorData.designation;
-        fieldMapping['jobtitle'] = visitorData.designation;
-        fieldMapping['position'] = visitorData.designation;
-        fieldMapping['role'] = visitorData.designation;
-        fieldMapping['job title'] = visitorData.designation;
-      }
-      
-      // City variations
-      if (visitorData.city) {
-        fieldMapping['city'] = visitorData.city;
-        fieldMapping['city_name'] = visitorData.city;
-        fieldMapping['cityname'] = visitorData.city;
-        fieldMapping['city name'] = visitorData.city;
-      }
-      
-      // State variations
-      if (visitorData.state) {
-        fieldMapping['state'] = visitorData.state;
-        fieldMapping['state_name'] = visitorData.state;
-        fieldMapping['statename'] = visitorData.state;
-        fieldMapping['state name'] = visitorData.state;
-      }
-      
-      // Pincode variations
-      if (visitorData.pincode) {
-        fieldMapping['pincode'] = visitorData.pincode;
-        fieldMapping['pin_code'] = visitorData.pincode;
-        fieldMapping['pin'] = visitorData.pincode;
-        fieldMapping['zipcode'] = visitorData.pincode;
-        fieldMapping['zip_code'] = visitorData.pincode;
-        fieldMapping['postal_code'] = visitorData.pincode;
-        fieldMapping['postalcode'] = visitorData.pincode;
-        fieldMapping['pin code'] = visitorData.pincode;
-        fieldMapping['zip code'] = visitorData.pincode;
-        fieldMapping['postal code'] = visitorData.pincode;
-      }
-      
-      // Address variations
-      if (visitorData.address) {
-        fieldMapping['address'] = visitorData.address;
-        fieldMapping['full_address'] = visitorData.address;
-        fieldMapping['fulladdress'] = visitorData.address;
-        fieldMapping['street_address'] = visitorData.address;
-        fieldMapping['streetaddress'] = visitorData.address;
-        fieldMapping['full address'] = visitorData.address;
-        fieldMapping['street address'] = visitorData.address;
-      }
-      
-      // Country variations
-      // Note: Country can be stored as a dynamic field on the visitor object (schema has strict: false)
-      if ((visitorData as any).country || (visitorData as any).Country) {
-        const countryValue = (visitorData as any).country || (visitorData as any).Country;
-        fieldMapping['country'] = countryValue;
-        fieldMapping['country_name'] = countryValue;
-        fieldMapping['countryname'] = countryValue;
-        fieldMapping['nation'] = countryValue;
-        fieldMapping['country name'] = countryValue;
-      }
-      
-      // Generic fallback: Add any other dynamic fields from visitor data
-      // (e.g., custom fields like "hobby", "blood_group", "Country", etc.)
-      Object.keys(visitorData).forEach((key) => {
-        const value = (visitorData as any)[key];
-        // Skip standard fields (already handled above) and system fields
-        const skipFields = ['_id', 'id', 'createdAt', 'updatedAt', 'totalRegistrations', 'lastRegistrationDate', 'registeredExhibitions'];
-        if (value && !skipFields.includes(key)) {
-          fieldMapping[key.toLowerCase()] = value;
-        }
-      });
+      // Create a comprehensive field mapping using the utility
+      const fieldMapping = createVisitorFieldMapping(visitorData, phoneNumber || undefined);
       
       // Auto-fill matching custom fields
       exhibition.customFields.forEach((field) => {
-        // Normalize field name for matching (lowercase, remove spaces/underscores)
-        const normalizedFieldName = field.name.toLowerCase().replace(/[_\s-]/g, '');
-        
-        // Try to find a matching value in our mapping
-        let matchedValue = null;
-        
-        // First try exact match with normalized name
-        for (const [key, value] of Object.entries(fieldMapping)) {
-          const normalizedKey = key.toLowerCase().replace(/[_\s-]/g, '');
-          if (normalizedKey === normalizedFieldName) {
-            matchedValue = value;
-            break;
-          }
-        }
+        const matchedValue = findMatchingValue(field.name, fieldMapping);
         
         // If value found, set it in the form
         if (matchedValue) {
@@ -279,15 +157,9 @@ export function RegistrationForm({ exhibition, exhibitor }: RegistrationFormProp
     if (phoneNumber && !visitorData && exhibition.customFields) {
       console.log('Auto-filling phone for new visitor:', phoneNumber);
       
-      // Find phone field in custom fields
+      // Find phone field in custom fields using the utility
       exhibition.customFields.forEach((field) => {
-        const normalizedFieldName = field.name.toLowerCase().replace(/[_\s-]/g, '');
-        const phoneKeywords = ['phone', 'mobile', 'contact', 'phonenumber', 'mobilenumber', 'contactnumber'];
-        
-        // Check if this field is a phone field
-        const isPhoneField = phoneKeywords.some(keyword => normalizedFieldName.includes(keyword));
-        
-        if (isPhoneField) {
+        if (isPhoneField(field.name)) {
           form.setValue(`customFieldData.${field.name}`, phoneNumber);
           console.log(`Auto-filled phone field "${field.name}" with:`, phoneNumber);
         }
@@ -304,15 +176,9 @@ export function RegistrationForm({ exhibition, exhibitor }: RegistrationFormProp
       if (isIndianNumber) {
         console.log('Indian phone number detected, auto-filling country as India');
         
-        // Find country field in custom fields
+        // Find country field in custom fields using the utility
         exhibition.customFields.forEach((field) => {
-          const normalizedFieldName = field.name.toLowerCase().replace(/[_\s-]/g, '');
-          const countryKeywords = ['country', 'nation', 'countryname'];
-          
-          // Check if this field is a country field
-          const isCountryField = countryKeywords.some(keyword => normalizedFieldName.includes(keyword));
-          
-          if (isCountryField && field.type === 'select') {
+          if (isCountryField(field.name) && field.type === 'select') {
             // Auto-fill with "India" for Indian phone numbers
             form.setValue(`customFieldData.${field.name}`, 'India', { shouldValidate: true });
             console.log(`Auto-filled country field "${field.name}" with: India`);
@@ -366,29 +232,14 @@ export function RegistrationForm({ exhibition, exhibitor }: RegistrationFormProp
     if (existingVisitor?.visitor && exhibition.customFields) {
       const { visitor } = existingVisitor;
       
-      // Map visitor data to custom field names
-      const fieldMapping: Record<string, any> = {
-        'email': visitor.email,
-        'name': visitor.name,
-        'full_name': visitor.name,
-        'phone': visitor.phone,
-        'phone_number': visitor.phone,
-        'company': visitor.company,
-        'company_name': visitor.company,
-        'designation': visitor.designation,
-        'state': visitor.state,
-        'city': visitor.city,
-        'pincode': visitor.pincode,
-        'pin_code': visitor.pincode,
-        'address': visitor.address,
-        'full_address': visitor.address,
-      };
+      // Use the visitor field mapping utility for consistency
+      const fieldMapping = createVisitorFieldMapping(visitor);
       
       // Pre-fill custom fields if they match visitor data
       exhibition.customFields.forEach((field) => {
-        const value = fieldMapping[field.name.toLowerCase().replace(/ /g, '_')];
-        if (value) {
-          form.setValue(`customFieldData.${field.name}`, value);
+        const matchedValue = findMatchingValue(field.name, fieldMapping);
+        if (matchedValue) {
+          form.setValue(`customFieldData.${field.name}`, matchedValue);
         }
       });
     }
@@ -439,18 +290,10 @@ export function RegistrationForm({ exhibition, exhibitor }: RegistrationFormProp
     // Extract all fields from customFieldData
     const customData = data.customFieldData || {};
     
-    // Field mapping helper (case-insensitive)
-    const findField = (keywords: string[]) => {
-      const key = Object.keys(customData).find(k => 
-        keywords.some(keyword => k.toLowerCase().includes(keyword))
-      );
-      return key ? customData[key] : undefined;
-    };
-    
-    // Extract email, name, and phone (for dynamic forms)
-    const email = findField(['email', 'e_mail', 'e-mail']);
-    const name = findField(['name', 'full_name', 'fullname', 'full-name']);
-    const phone = findField(['phone', 'mobile', 'contact', 'phone_number']);
+    // Extract email, name, and phone using the utility (for dynamic forms)
+    const email = findFieldByKeywords(customData, ['email', 'e_mail', 'e-mail']);
+    const name = findFieldByKeywords(customData, ['name', 'full_name', 'fullname', 'full-name']);
+    const phone = findFieldByKeywords(customData, ['phone', 'mobile', 'contact', 'phone_number']);
     
     // Validate: At least one of email or phone must be present
     if (!email && !phone) {
@@ -471,12 +314,12 @@ export function RegistrationForm({ exhibition, exhibitor }: RegistrationFormProp
       email: email || undefined,
       name: name || undefined,
       phone: phone || undefined,
-      company: findField(['company', 'organization']) || undefined,
-      designation: findField(['designation', 'position', 'title']) || undefined,
-      state: findField(['state']) || undefined,
-      city: findField(['city']) || undefined,
-      pincode: findField(['pincode', 'pin_code', 'postal', 'zip']) || undefined,
-      address: findField(['address', 'full_address', 'street']) || undefined,
+      company: findFieldByKeywords(customData, ['company', 'organization']) || undefined,
+      designation: findFieldByKeywords(customData, ['designation', 'position', 'title']) || undefined,
+      state: findFieldByKeywords(customData, ['state']) || undefined,
+      city: findFieldByKeywords(customData, ['city']) || undefined,
+      pincode: findFieldByKeywords(customData, ['pincode', 'pin_code', 'postal', 'zip']) || undefined,
+      address: findFieldByKeywords(customData, ['address', 'full_address', 'street']) || undefined,
       customFieldData: customData, // Keep all custom fields
       selectedInterests: cleanedInterests, // Clean interests array
       // CRITICAL: Include pricing tier ID and selected days for paid exhibitions

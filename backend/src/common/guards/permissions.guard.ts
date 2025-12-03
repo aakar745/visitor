@@ -4,7 +4,9 @@ import {
   ExecutionContext,
   ForbiddenException,
   Logger,
+  Inject,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from '../decorators/require-permissions.decorator';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
@@ -12,8 +14,14 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 @Injectable()
 export class PermissionsGuard implements CanActivate {
   private readonly logger = new Logger(PermissionsGuard.name);
+  private readonly superAdminRoleName: string;
 
-  constructor(private reflector: Reflector) {}
+  constructor(
+    private reflector: Reflector,
+    @Inject(ConfigService) private configService: ConfigService,
+  ) {
+    this.superAdminRoleName = this.configService.get<string>('app.superAdminRoleName', 'super_admin');
+  }
 
   canActivate(context: ExecutionContext): boolean {
     // Check if route is public
@@ -41,20 +49,18 @@ export class PermissionsGuard implements CanActivate {
     const user = request.user;
 
     if (!user) {
-      this.logger.warn(`[PERMISSIONS GUARD] No user found in request`);
+      this.logger.warn(`No user found in request`);
       throw new ForbiddenException('User not authenticated');
     }
 
-    // Super Admin bypass: Check if user's role name is 'super_admin'
+    // Super Admin bypass: Check if user's role name matches configured super admin role
     const userRoleName =
       typeof user.role === 'string'
         ? user.role
         : user.role?.name || user.role?._id;
 
-    if (userRoleName === 'super_admin' || userRoleName === '690c90671d9e51e875279cd9') {
-      this.logger.debug(
-        `[PERMISSIONS GUARD] Super Admin detected, bypassing permission check`,
-      );
+    if (userRoleName === this.superAdminRoleName) {
+      this.logger.debug(`Super Admin detected, bypassing permission check`);
       return true;
     }
 
@@ -72,11 +78,9 @@ export class PermissionsGuard implements CanActivate {
       });
     }
 
-    this.logger.debug(
-      `[PERMISSIONS GUARD] Route: ${request.method} ${request.url}`,
-    );
-    this.logger.debug(`[PERMISSIONS GUARD] Required: ${requiredPermissions.join(', ')}`);
-    this.logger.debug(`[PERMISSIONS GUARD] User has: ${userPermissions.join(', ')}`);
+    this.logger.debug(`Route: ${request.method} ${request.url}`);
+    this.logger.debug(`Required: ${requiredPermissions.join(', ')}`);
+    this.logger.debug(`User has: ${userPermissions.join(', ')}`);
 
     // Check if user has ANY of the required permissions
     const hasPermission = requiredPermissions.some((permission) =>
@@ -85,16 +89,14 @@ export class PermissionsGuard implements CanActivate {
 
     if (!hasPermission) {
       this.logger.warn(
-        `[PERMISSIONS GUARD] Access denied for user ${user.email}. Required: [${requiredPermissions.join(', ')}], Has: [${userPermissions.join(', ')}]`,
+        `Access denied for user ${user.email}. Required: [${requiredPermissions.join(', ')}], Has: [${userPermissions.join(', ')}]`,
       );
       throw new ForbiddenException(
         'You do not have permission to perform this action',
       );
     }
 
-    this.logger.debug(
-      `[PERMISSIONS GUARD] Access granted for user ${user.email}`,
-    );
+    this.logger.debug(`Access granted for user ${user.email}`);
     return true;
   }
 }

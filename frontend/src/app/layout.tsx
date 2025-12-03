@@ -20,6 +20,13 @@ export const metadata: Metadata = {
   title: `${APP_CONFIG.name} - Register for Exhibitions`,
   description: 'Register for upcoming exhibitions and events. Simple, fast, and secure registration process.',
   keywords: ['exhibition', 'registration', 'events', 'visitor registration'],
+  icons: {
+    icon: [
+      { url: '/icon.ico', sizes: 'any' },
+      { url: '/icon.png', type: 'image/png' },
+    ],
+    apple: '/icon.png',
+  },
 };
 
 export default function RootLayout({

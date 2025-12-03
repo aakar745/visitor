@@ -2,6 +2,7 @@ import {
   ExecutionContext,
   Injectable,
   UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
@@ -9,6 +10,8 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
+  private readonly logger = new Logger(JwtAuthGuard.name);
+
   constructor(private reflector: Reflector) {
     super();
   }
@@ -20,14 +23,14 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       context.getClass(),
     ]);
 
-    console.log(`[JWT GUARD] Route: ${request.method} ${request.url}, IsPublic: ${isPublic}`);
+    this.logger.debug(`Route: ${request.method} ${request.url}, IsPublic: ${isPublic}`);
 
     if (isPublic) {
-      console.log(`[JWT GUARD] Public route, skipping authentication`);
+      this.logger.debug(`Public route, skipping authentication`);
       return true;
     }
 
-    console.log(`[JWT GUARD] Protected route, checking authentication`);
+    this.logger.debug(`Protected route, checking authentication`);
     return super.canActivate(context);
   }
 
@@ -35,17 +38,17 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     const request = context?.switchToHttp?.()?.getRequest?.();
     const route = request ? `${request.method} ${request.url}` : 'Unknown route';
     
-    console.log(`[JWT GUARD HANDLE] Route: ${route}`);
-    console.log(`[JWT GUARD HANDLE] Error: ${err ? err.message : 'None'}`);
-    console.log(`[JWT GUARD HANDLE] User: ${user ? JSON.stringify({ email: user.email, id: user._id || user.id }) : 'None'}`);
-    console.log(`[JWT GUARD HANDLE] Info: ${info ? JSON.stringify(info) : 'None'}`);
+    this.logger.debug(`Route: ${route}`);
+    this.logger.debug(`Error: ${err ? err.message : 'None'}`);
+    this.logger.debug(`User: ${user ? JSON.stringify({ email: user.email, id: user._id || user.id }) : 'None'}`);
+    this.logger.debug(`Info: ${info ? JSON.stringify(info) : 'None'}`);
     
     if (err || !user) {
-      console.error(`[JWT GUARD FAILED] ${err ? err.message : 'User not found'}`);
+      this.logger.warn(`Authentication failed: ${err ? err.message : 'User not found'}`);
       throw err || new UnauthorizedException('Invalid or expired token');
     }
     
-    console.log(`[JWT GUARD SUCCESS] User authenticated: ${user.email}`);
+    this.logger.debug(`User authenticated: ${user.email}`);
     return user;
   }
 }

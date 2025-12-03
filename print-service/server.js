@@ -19,13 +19,58 @@ const PORT = process.env.PORT || 9100;
 const PRINTER_NAME = process.env.PRINTER_NAME || 'Brother QL-800';
 const AUTO_PRINT_ENABLED = process.env.AUTO_PRINT === 'true';
 
+// 🔐 SECURITY CONFIGURATION
+// API key for authenticating print service requests (optional but recommended for production)
+const API_KEY = process.env.PRINT_SERVICE_API_KEY || '';
+const REQUIRE_AUTH = process.env.PRINT_SERVICE_REQUIRE_AUTH === 'true';
+
 console.log('🖨️  Print Configuration:');
 console.log(`   Auto-Print: ${AUTO_PRINT_ENABLED ? 'ENABLED ✅' : 'DISABLED ❌'}`);
 console.log(`   Printer: ${PRINTER_NAME}`);
+console.log(`   Auth Required: ${REQUIRE_AUTH ? 'YES 🔐' : 'NO ⚠️'}`);
 
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+/**
+ * 🔐 Authentication middleware for protected endpoints
+ * Validates API key from Authorization header (Bearer token) or x-api-key header
+ * 
+ * Usage:
+ * - Set PRINT_SERVICE_API_KEY in .env to enable authentication
+ * - Set PRINT_SERVICE_REQUIRE_AUTH=true to enforce authentication
+ * - Pass API key via: Authorization: Bearer <key> OR x-api-key: <key>
+ */
+const authenticateRequest = (req, res, next) => {
+  // Skip auth if not required or no API key configured
+  if (!REQUIRE_AUTH || !API_KEY) {
+    return next();
+  }
+
+  // Extract API key from headers
+  const authHeader = req.headers['authorization'];
+  const xApiKey = req.headers['x-api-key'];
+  
+  let providedKey = null;
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    providedKey = authHeader.substring(7);
+  } else if (xApiKey) {
+    providedKey = xApiKey;
+  }
+
+  // Validate API key
+  if (!providedKey || providedKey !== API_KEY) {
+    console.log('[AUTH] ❌ Unauthorized request to:', req.path);
+    return res.status(401).json({
+      success: false,
+      message: 'Unauthorized: Invalid or missing API key',
+    });
+  }
+
+  next();
+};
 
 // ✅ Create output directory for labels in WRITABLE location
 // Use user data directory (same as .env location) to avoid permission issues
@@ -188,14 +233,24 @@ function scheduleCleanup() {
 // Start cleanup scheduler
 scheduleCleanup();
 
-// Health check
+// Health check (public - basic status only)
 app.get('/health', (req, res) => {
+  res.json({
+    status: 'running',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Detailed health check (authenticated - includes sensitive config)
+app.get('/health/detailed', authenticateRequest, (req, res) => {
   res.json({
     status: 'running',
     printer: PRINTER_NAME,
     port: PORT,
     autoPrint: AUTO_PRINT_ENABLED,
     mode: 'PDF-Silent-Print',
+    authEnabled: REQUIRE_AUTH,
+    outputDir: OUTPUT_DIR,
     timestamp: new Date().toISOString(),
   });
 });
@@ -224,7 +279,7 @@ app.get('/test-connection', async (req, res) => {
 });
 
 // Print label endpoint (Simplified - saves to file for now)
-app.post('/print', async (req, res) => {
+app.post('/print', authenticateRequest, async (req, res) => {
   try {
     const { name, location, registrationNumber, qrCode } = req.body;
 
@@ -312,7 +367,7 @@ app.post('/print', async (req, res) => {
 });
 
 // Test print
-app.post('/test-print', async (req, res) => {
+app.post('/test-print', authenticateRequest, async (req, res) => {
   try {
     const { name, location, registrationNumber } = req.body;
 
@@ -732,7 +787,7 @@ async function printImageDirectly(imagePath, printerName) {
  *   message: "Cleanup completed successfully"
  * }
  */
-app.get('/api/cleanup', async (req, res) => {
+app.get('/api/cleanup', authenticateRequest, async (req, res) => {
   console.log('\n🧹 [API] Manual cleanup triggered via HTTP endpoint');
   
   try {

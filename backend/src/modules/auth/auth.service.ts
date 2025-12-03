@@ -1,4 +1,5 @@
 import { Injectable, UnauthorizedException, Logger, BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -9,11 +10,21 @@ import { WhatsAppOtpService } from '../../services/whatsapp-otp.service';
 import { RedisLockService } from '../../common/services/redis-lock.service';
 import { normalizePhoneNumberE164 } from '../../common/utils/sanitize.util';
 import { LoginDto } from './dto/login.dto';
+import { ERR_AUTH, ERR_OTP } from '../../common/constants/error-messages';
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
-  private readonly MAX_REFRESH_TOKENS = 5; // Limit stored tokens per user
+  
+  // Authentication configuration (from environment/config)
+  private readonly MAX_REFRESH_TOKENS: number;
+  private readonly MAX_LOGIN_ATTEMPTS: number;
+  private readonly LOCKOUT_DURATION_MS: number;
+  
+  // OTP configuration
+  private readonly OTP_EXPIRY_MS: number;
+  private readonly OTP_MAX_ATTEMPTS: number;
+  private readonly OTP_RESEND_COOLDOWN_MS: number;
 
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
@@ -21,7 +32,18 @@ export class AuthService {
     private jwtService: JwtService,
     private whatsAppOtpService: WhatsAppOtpService,
     private redisLockService: RedisLockService,
-  ) {}
+    private configService: ConfigService,
+  ) {
+    // Load auth configuration
+    this.MAX_REFRESH_TOKENS = this.configService.get<number>('app.auth.maxRefreshTokens', 5);
+    this.MAX_LOGIN_ATTEMPTS = this.configService.get<number>('app.auth.maxLoginAttempts', 5);
+    this.LOCKOUT_DURATION_MS = this.configService.get<number>('app.auth.lockoutDurationMinutes', 15) * 60 * 1000;
+    
+    // Load OTP configuration
+    this.OTP_EXPIRY_MS = this.configService.get<number>('app.otp.expiryMinutes', 10) * 60 * 1000;
+    this.OTP_MAX_ATTEMPTS = this.configService.get<number>('app.otp.maxAttempts', 5);
+    this.OTP_RESEND_COOLDOWN_MS = this.configService.get<number>('app.otp.resendCooldownSeconds', 60) * 1000;
+  }
 
   async login(loginDto: LoginDto) {
     this.logger.log(`[LOGIN START] Email: ${loginDto.email}`);
@@ -30,7 +52,7 @@ export class AuthService {
     
     if (!user) {
       this.logger.warn(`[LOGIN FAILED] Invalid credentials for: ${loginDto.email}`);
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException(ERR_AUTH.INVALID_CREDENTIALS);
     }
 
     this.logger.log(`[LOGIN SUCCESS] User validated: ${user.email}, ID: ${user._id}, Role: ${JSON.stringify(user.role)}`);
@@ -86,9 +108,6 @@ export class AuthService {
   }
 
   async validateUser(email: string, password: string): Promise<any> {
-    const MAX_LOGIN_ATTEMPTS = 5;
-    const LOCK_TIME = 15 * 60 * 1000; // 15 minutes in milliseconds
-
     this.logger.debug(`[VALIDATE USER] Looking up: ${email}`);
     const user = await this.userModel.findOne({ email }).select('+password').populate('role');
     
@@ -107,14 +126,14 @@ export class AuthService {
     // Check if account is inactive or deactivated
     if (!user.isActive || user.status === 'inactive') {
       this.logger.warn(`Login attempt for inactive account: ${email}. Status: ${user.status}, IsActive: ${user.isActive}`);
-      throw new UnauthorizedException('Your account has been deactivated. Please contact the administrator for assistance.');
+      throw new UnauthorizedException(ERR_AUTH.ACCOUNT_DEACTIVATED);
     }
 
     // Check if account is locked
     if (user.lockedUntil && user.lockedUntil > new Date()) {
       const remainingTime = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000);
       this.logger.warn(`Login attempt for locked account: ${email}. Locked for ${remainingTime} more minutes.`);
-      throw new UnauthorizedException(`Account is locked. Please try again in ${remainingTime} minute(s).`);
+      throw new UnauthorizedException(ERR_AUTH.ACCOUNT_LOCKED(remainingTime));
     }
 
     // If lock time has expired, reset login attempts
@@ -140,15 +159,15 @@ export class AuthService {
     const updates: any = { loginAttempts: newLoginAttempts };
 
     // Lock account if max attempts reached
-    if (newLoginAttempts >= MAX_LOGIN_ATTEMPTS) {
-      updates.lockedUntil = new Date(Date.now() + LOCK_TIME);
-      this.logger.warn(`Account locked due to ${MAX_LOGIN_ATTEMPTS} failed login attempts: ${email}`);
+    if (newLoginAttempts >= this.MAX_LOGIN_ATTEMPTS) {
+      updates.lockedUntil = new Date(Date.now() + this.LOCKOUT_DURATION_MS);
+      this.logger.warn(`Account locked due to ${this.MAX_LOGIN_ATTEMPTS} failed login attempts: ${email}`);
     }
 
     await this.userModel.findByIdAndUpdate(user._id, updates);
 
     // Provide feedback about remaining attempts
-    const remainingAttempts = MAX_LOGIN_ATTEMPTS - newLoginAttempts;
+    const remainingAttempts = this.MAX_LOGIN_ATTEMPTS - newLoginAttempts;
     if (remainingAttempts > 0) {
       this.logger.warn(`Failed login attempt for ${email}. ${remainingAttempts} attempt(s) remaining.`);
     }
@@ -179,12 +198,12 @@ export class AuthService {
       const user = await this.userModel.findById(payload.sub).exec();
       
       if (!user) {
-        throw new UnauthorizedException('User not found');
+        throw new UnauthorizedException(ERR_AUTH.USER_NOT_FOUND);
       }
 
       // Check if user account is active
       if (!user.isActive) {
-        throw new UnauthorizedException('Account is deactivated');
+        throw new UnauthorizedException(ERR_AUTH.ACCOUNT_DEACTIVATED);
       }
 
       // Clean up expired tokens before validation
@@ -205,7 +224,7 @@ export class AuthService {
 
       if (!rotationSuccess) {
         this.logger.warn(`Invalid or already-used refresh token for user ${user.email}`);
-        throw new UnauthorizedException('Invalid refresh token or token already used');
+        throw new UnauthorizedException(ERR_AUTH.REFRESH_TOKEN_USED);
       }
       
       return {
@@ -217,7 +236,7 @@ export class AuthService {
         throw error;
       }
       this.logger.error(`Refresh token error: ${error.message}`);
-      throw new UnauthorizedException('Invalid or expired refresh token');
+      throw new UnauthorizedException(ERR_AUTH.REFRESH_TOKEN_INVALID);
     }
   }
 
@@ -229,7 +248,7 @@ export class AuthService {
     const user = await this.userModel.findById(userId).exec();
     
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      throw new UnauthorizedException(ERR_AUTH.USER_NOT_FOUND);
     }
 
     // Initialize array if it doesn't exist
@@ -371,7 +390,7 @@ export class AuthService {
     try {
       // Validate phone number format
       if (!phoneNumber || phoneNumber.length < 10) {
-        throw new BadRequestException('Invalid phone number');
+        throw new BadRequestException(ERR_OTP.INVALID_PHONE);
       }
 
       // Normalize phone number to E.164 format (international support)
@@ -384,9 +403,7 @@ export class AuthService {
 
       if (!lockAcquired) {
         this.logger.warn(`[OTP] Concurrent request blocked for ${normalizedPhone}`);
-        throw new BadRequestException(
-          'An OTP request is already in progress. Please wait a moment.',
-        );
+        throw new BadRequestException(ERR_OTP.REQUEST_IN_PROGRESS);
       }
 
       try {
@@ -395,13 +412,12 @@ export class AuthService {
         const recentOtp = await this.otpModel.findOne({
           phoneNumber: normalizedPhone,
           type: OtpType.WHATSAPP,
-          createdAt: { $gte: new Date(Date.now() - 60000) }, // Last 1 minute
+          createdAt: { $gte: new Date(Date.now() - this.OTP_RESEND_COOLDOWN_MS) },
         });
 
         if (recentOtp) {
-          throw new BadRequestException(
-            'OTP already sent. Please wait 1 minute before requesting again.',
-          );
+          const cooldownSeconds = Math.ceil(this.OTP_RESEND_COOLDOWN_MS / 1000);
+          throw new BadRequestException(ERR_OTP.RATE_LIMITED(cooldownSeconds));
         }
 
         // Invalidate any existing unverified OTPs for this phone number
@@ -428,7 +444,7 @@ export class AuthService {
           phoneNumber: normalizedPhone,
           code: result.otpCode,
           type: OtpType.WHATSAPP,
-          expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+          expiresAt: new Date(Date.now() + this.OTP_EXPIRY_MS),
           messageId: result.messageId,
         });
 
@@ -439,7 +455,7 @@ export class AuthService {
         return {
           success: true,
           message: 'OTP sent successfully via WhatsApp',
-          expiresIn: 600, // 10 minutes in seconds
+          expiresIn: Math.floor(this.OTP_EXPIRY_MS / 1000), // Convert to seconds
         };
       } finally {
         // ✅ Always release lock, even if operation fails
@@ -467,11 +483,11 @@ export class AuthService {
     try {
       // Validate inputs
       if (!phoneNumber || !code) {
-        throw new BadRequestException('Phone number and OTP code are required');
+        throw new BadRequestException(ERR_OTP.PHONE_AND_CODE_REQUIRED);
       }
 
       if (!/^\d{6}$/.test(code)) {
-        throw new BadRequestException('Invalid OTP format. Must be 6 digits.');
+        throw new BadRequestException(ERR_OTP.INVALID_FORMAT);
       }
 
       // Normalize phone number to E.164 format (international support)
@@ -486,7 +502,7 @@ export class AuthService {
           code: code, // ✅ Verify code atomically
           isVerified: false,
           expiresAt: { $gt: new Date() }, // Not expired
-          attempts: { $lt: 5 }, // ✅ Check attempts limit atomically
+          attempts: { $lt: this.OTP_MAX_ATTEMPTS }, // ✅ Check attempts limit atomically
         },
         {
           $set: {
@@ -523,26 +539,24 @@ export class AuthService {
       }).sort({ createdAt: -1 });
 
       if (!otpRecord) {
-        throw new BadRequestException('OTP not found or expired. Please request a new OTP.');
+        throw new BadRequestException(ERR_OTP.NOT_FOUND);
       }
 
       // Check if max attempts reached
-      if (otpRecord.attempts >= 5) {
+      if (otpRecord.attempts >= this.OTP_MAX_ATTEMPTS) {
         // Expire the OTP
         await this.otpModel.updateOne(
           { _id: otpRecord._id },
           { $set: { expiresAt: new Date() } },
         );
-        throw new BadRequestException(
-          'Maximum verification attempts exceeded. Please request a new OTP.',
-        );
+        throw new BadRequestException(ERR_OTP.MAX_ATTEMPTS);
       }
 
       // Wrong code - increment attempts atomically
       const updatedOtp = await this.otpModel.findOneAndUpdate(
         {
           _id: otpRecord._id,
-          attempts: { $lt: 5 }, // Double-check to prevent race condition
+          attempts: { $lt: this.OTP_MAX_ATTEMPTS }, // Double-check to prevent race condition
         },
         {
           $inc: { attempts: 1 },
@@ -551,15 +565,11 @@ export class AuthService {
       );
 
       if (!updatedOtp) {
-        throw new BadRequestException(
-          'Maximum verification attempts exceeded. Please request a new OTP.',
-        );
+        throw new BadRequestException(ERR_OTP.MAX_ATTEMPTS);
       }
 
-      const remainingAttempts = 5 - updatedOtp.attempts;
-      throw new BadRequestException(
-        `Invalid OTP code. ${remainingAttempts} attempt(s) remaining.`,
-      );
+      const remainingAttempts = this.OTP_MAX_ATTEMPTS - updatedOtp.attempts;
+      throw new BadRequestException(ERR_OTP.REMAINING_ATTEMPTS(remainingAttempts));
 
     } catch (error) {
       this.logger.error(`Failed to verify WhatsApp OTP: ${error.message}`);

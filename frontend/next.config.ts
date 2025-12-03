@@ -1,8 +1,70 @@
 import type { NextConfig } from "next";
 
+// Security Headers Configuration
+const securityHeaders = [
+  // 1. HSTS - Force HTTPS for 1 year, include subdomains
+  {
+    key: 'Strict-Transport-Security',
+    value: 'max-age=31536000; includeSubDomains; preload',
+  },
+  // 2. Prevent clickjacking - Only allow framing from same origin
+  {
+    key: 'X-Frame-Options',
+    value: 'SAMEORIGIN',
+  },
+  // 3. Prevent MIME type sniffing
+  {
+    key: 'X-Content-Type-Options',
+    value: 'nosniff',
+  },
+  // 4. Control referrer information
+  {
+    key: 'Referrer-Policy',
+    value: 'strict-origin-when-cross-origin',
+  },
+  // 5. Permissions Policy - Restrict browser features
+  {
+    key: 'Permissions-Policy',
+    value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+  },
+  // 6. XSS Protection (legacy browsers)
+  {
+    key: 'X-XSS-Protection',
+    value: '1; mode=block',
+  },
+  // 7. Content Security Policy
+  {
+    key: 'Content-Security-Policy',
+    value: [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Required for Next.js
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", // For inline styles & Google Fonts
+      "font-src 'self' https://fonts.gstatic.com data:",
+      "img-src 'self' data: blob: https: http:",
+      "connect-src 'self' https: wss: ws:", // API calls & WebSockets
+      "frame-ancestors 'self'",
+      "form-action 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "upgrade-insecure-requests",
+    ].join('; '),
+  },
+];
+
 const nextConfig: NextConfig = {
   // Enable standalone output for Docker deployment
   output: 'standalone',
+
+  // ✅ Security Headers
+  async headers() {
+    return [
+      {
+        // Apply security headers to all routes
+        source: '/:path*',
+        headers: securityHeaders,
+      },
+    ];
+  },
   
   // ✅ Optimize images for better performance
   images: {
