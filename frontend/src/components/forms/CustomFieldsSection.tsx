@@ -17,7 +17,7 @@ import { UseFormReturn } from 'react-hook-form';
 import { RegistrationFormData, Exhibition, CustomField } from '@/types';
 import { exhibitionsApi } from '@/lib/api/exhibitions';
 import { locationsApi } from '@/lib/api/locations';
-import { Loader2, CheckCircle, Lock, MapPin } from 'lucide-react';
+import { Loader2, CheckCircle, Check, Lock, MapPin } from 'lucide-react';
 import { badgeVariants } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useVisitorAuthStore } from '@/lib/store/visitorAuthStore';
