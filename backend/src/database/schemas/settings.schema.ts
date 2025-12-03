@@ -99,7 +99,7 @@ export class Settings {
 export const SettingsSchema = SchemaFactory.createForClass(Settings);
 
 // Indexes
-SettingsSchema.index({ key: 1 }, { unique: true });
+// Note: key already has unique: true in @Prop, which auto-creates the index
 SettingsSchema.index({ category: 1, group: 1, order: 1 });
 SettingsSchema.index({ category: 1 });
 
