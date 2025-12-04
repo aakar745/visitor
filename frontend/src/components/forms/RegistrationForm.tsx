@@ -1,19 +1,17 @@
 'use client';
 
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PricingSection } from './PricingSection';
 import { CustomFieldsSection } from './CustomFieldsSection';
 import { useCreateRegistration, useVisitorLookup } from '@/lib/hooks/useRegistration';
-import { useFormAutosave, useLoadDraft } from '@/lib/hooks/useFormAutosave';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { createDynamicRegistrationSchema } from '@/lib/validation/registration.schema';
-import { AlertCircle, Save, CheckCircle2, Lock } from 'lucide-react';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import type { Exhibition, Exhibitor, RegistrationFormData } from '@/types';
 import { toast } from 'sonner';
 import { useVisitorAuthStore } from '@/lib/store/visitorAuthStore';
@@ -107,7 +105,6 @@ export function RegistrationForm({ exhibition, exhibitor }: RegistrationFormProp
   // Hooks
   const { mutate: submitRegistration, isPending: isSubmitting } = useCreateRegistration();
   const { lookupVisitor, isLooking, existingVisitor } = useVisitorLookup();
-  const { hasDraft, draft, restoreDraft, discardDraft } = useLoadDraft(exhibitionId);
 
   // Ensure exhibition and exhibitor IDs are set on mount
   // Note: Don't reset registrationCategory here - let CustomFieldsSection handle it
@@ -190,10 +187,6 @@ export function RegistrationForm({ exhibition, exhibitor }: RegistrationFormProp
     }
   }, [phoneNumber, visitorData, exhibition.customFields, form]);
 
-  // Watch form values for auto-save
-  const watchedValues = form.watch();
-  useFormAutosave(watchedValues, exhibitionId, !isSubmitting);
-
   // Watch email/phone for visitor lookup (from custom fields)
   const customFieldData = form.watch('customFieldData') || {};
   
@@ -246,45 +239,6 @@ export function RegistrationForm({ exhibition, exhibitor }: RegistrationFormProp
       });
     }
   }, [existingVisitor, exhibition.customFields, form, visitorData]);
-
-  // Show draft restore prompt (only once)
-  const draftPromptShownRef = useRef(false);
-  
-  useEffect(() => {
-    // Only show the prompt once per page load
-    if (hasDraft && !existingVisitor && !draftPromptShownRef.current) {
-      draftPromptShownRef.current = true;
-      
-      toast.info('Saved draft found!', {
-        description: 'Would you like to restore your previous entries?',
-        action: {
-          label: 'Restore',
-          onClick: () => {
-            const restoredDraft = restoreDraft();
-            if (restoredDraft) {
-              Object.entries(restoredDraft).forEach(([key, value]) => {
-                form.setValue(key as any, value);
-              });
-              toast.success('Draft restored successfully!');
-            }
-          },
-        },
-        cancel: {
-          label: 'Discard',
-          onClick: () => {
-            discardDraft();
-            toast.success('Draft discarded');
-          },
-        },
-        duration: 10000,
-      });
-    }
-    
-    // Reset the flag when visitor data is loaded
-    if (existingVisitor) {
-      draftPromptShownRef.current = false;
-    }
-  }, [hasDraft, existingVisitor]);
 
   // Handle form submission
   const onSubmit = (data: DynamicRegistrationFormData) => {
@@ -393,55 +347,44 @@ export function RegistrationForm({ exhibition, exhibitor }: RegistrationFormProp
       )}
 
       {/* Form Actions */}
-      <Card className="p-6">
-        <div className="flex flex-col gap-4">
-          <Separator />
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Save className="h-4 w-4" />
-              <span>Your progress is automatically saved</span>
-            </div>
+      <div className="flex flex-col items-center gap-3 pt-2">
+        <Button
+          type="submit"
+          disabled={isSubmitting}
+          className="min-w-[220px] h-11 rounded-md px-8"
+          onClick={(e) => {
+            // Manual validation check on click
+            const errors = form.formState.errors;
+            if (Object.keys(errors).length > 0) {
+              console.log('[Button Click] Form has errors:', errors);
+              console.log('[Button Click] Form values:', form.getValues());
+            }
+          }}
+        >
+          {isSubmitting ? (
+            <>
+              <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" />
+              Submitting...
+            </>
+          ) : exhibition.isPaid ? (
+            (() => {
+              const selectedTierId = form.watch('pricingTierId');
+              const selectedTier = exhibition.pricingTiers?.find(t => {
+                const tierId = (t as any).id || (t as any)._id;
+                return tierId === selectedTierId;
+              });
+              const price = selectedTier?.price || 0;
+              return `Register & Pay ₹${price}`;
+            })()
+          ) : (
+            'Complete Registration'
+          )}
+        </Button>
 
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="min-w-[200px] h-10 rounded-md px-8"
-              onClick={(e) => {
-                // Manual validation check on click
-                const errors = form.formState.errors;
-                if (Object.keys(errors).length > 0) {
-                  console.log('[Button Click] Form has errors:', errors);
-                  console.log('[Button Click] Form values:', form.getValues());
-                }
-              }}
-            >
-              {isSubmitting ? (
-                <>
-                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" />
-                  Submitting...
-                </>
-              ) : exhibition.isPaid ? (
-                (() => {
-                  const selectedTierId = form.watch('pricingTierId');
-                  const selectedTier = exhibition.pricingTiers?.find(t => {
-                    const tierId = (t as any).id || (t as any)._id;
-                    return tierId === selectedTierId;
-                  });
-                  const price = selectedTier?.price || 0;
-                  return `Register & Pay ₹${price}`;
-                })()
-              ) : (
-                'Complete Registration'
-              )}
-            </Button>
-          </div>
-
-          <p className="text-xs text-muted-foreground text-center">
-            By registering, you agree to our terms and conditions
-          </p>
-        </div>
-      </Card>
+        <p className="text-xs text-muted-foreground">
+          By registering, you agree to our terms and conditions
+        </p>
+      </div>
     </form>
   );
 }

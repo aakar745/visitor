@@ -12,7 +12,6 @@ import { useRegistrationStore, useUIStore } from '../store/registration.store';
  */
 export function useCreateRegistration() {
   const router = useRouter();
-  const clearDraft = useRegistrationStore((state) => state.clearDraft);
   const setFormSubmitting = useUIStore((state) => state.setFormSubmitting);
 
   return useMutation<RegistrationResponse, Error, RegistrationFormData>({
@@ -26,9 +25,6 @@ export function useCreateRegistration() {
       setFormSubmitting(false);
       
       toast.success('Registration successful! 🎉', { id: 'registration' });
-      
-      // Clear draft after successful submission
-      clearDraft();
 
       // Check if response data exists
       if (!data) {

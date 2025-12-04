@@ -20,7 +20,6 @@ import {
 import { toast } from 'sonner';
 import { registrationsApi } from '@/lib/api/registrations';
 import { useVisitorAuthStore } from '@/lib/store/visitorAuthStore';
-import { useRegistrationStore } from '@/lib/store/registration.store';
 import PhoneInput from './PhoneInput';
 import { OTPModal } from './OTPModal';
 import { isValidPhoneNumber } from 'libphonenumber-js';
@@ -75,19 +74,13 @@ export function OTPLogin({ exhibitionId, exhibitionName, exhibitionLogo, exhibit
   const [nextRetryDelay, setNextRetryDelay] = useState(0);
   
   const { setAuthenticated, setExistingRegistration, clearAuthentication } = useVisitorAuthStore();
-  const { clearDraft } = useRegistrationStore();
   
   // Initialize component: clear old auth data
   useEffect(() => {
-    // CRITICAL: Clear any old persisted visitor data from localStorage
+    // Clear any old persisted visitor data from localStorage
     // This prevents old visitor data from auto-filling when a new user logs in
     clearAuthentication();
     console.log('[OTP] Cleared old authentication data');
-    
-    // CRITICAL: Also clear any old form drafts from previous users
-    // Drafts are keyed by exhibitionId only, so they persist across different users
-    clearDraft();
-    console.log('[OTP] Cleared old form drafts');
 
     // Cleanup reCAPTCHA on component unmount
     return () => {

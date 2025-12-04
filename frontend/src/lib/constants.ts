@@ -37,7 +37,6 @@ export const API_ENDPOINTS = {
 // Local Storage Keys
 export const STORAGE_KEYS = {
   registration: 'visitor_registration',
-  formDraft: 'registration_draft',
 } as const;
 
 // Form Validation

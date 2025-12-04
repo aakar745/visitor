@@ -37,18 +37,22 @@ const securityHeaders = [
     value: '1; mode=block',
   },
   // 7. Content Security Policy (relaxed in development to allow localhost)
+  // Firebase Phone Auth requires Google reCAPTCHA scripts
   {
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Required for Next.js
+      // Script sources: Next.js + Firebase + Google reCAPTCHA
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com https://apis.google.com https://*.firebaseapp.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", // For inline styles & Google Fonts
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data: blob: https: http:",
-      // Allow localhost in dev, only HTTPS in production
+      // Allow localhost in dev, only HTTPS in production + Firebase/Google APIs
       isDev 
         ? "connect-src 'self' http://localhost:* http://127.0.0.1:* https: wss: ws:"
         : "connect-src 'self' https: wss: ws:",
+      // Frame sources: Google reCAPTCHA uses iframes for verification
+      "frame-src 'self' https://www.google.com https://*.firebaseapp.com https://*.googleapis.com",
       "frame-ancestors 'self'",
       "form-action 'self'",
       "base-uri 'self'",

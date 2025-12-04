@@ -175,6 +175,18 @@ export function Footer() {
             <Link href="/refund-policy" className="hover:text-foreground transition-colors">
               Refund Policy
             </Link>
+            {/* reCAPTCHA notice (required by Google ToS when hiding badge) */}
+            <span className="text-xs">
+              Protected by{' '}
+              <a 
+                href="https://www.google.com/recaptcha/about/" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="hover:text-foreground transition-colors"
+              >
+                reCAPTCHA
+              </a>
+            </span>
           </div>
         </div>
       </div>
