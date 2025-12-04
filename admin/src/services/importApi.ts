@@ -34,8 +34,13 @@ export const importApi = {
     const response = await apiClient.get<{
       success: boolean;
       data: ImportProgress;
+      message: string;
+      timestamp: string;
     }>(`/visitor-imports/progress/${importId}`);
 
+    console.log('[importApi.getProgress] Raw response:', response.data);
+    
+    // TransformInterceptor wraps response as { success, data, message, timestamp }
     return response.data;
   },
 

@@ -271,6 +271,57 @@ export class VisitorsService {
   }
 
   /**
+   * Delete ALL visitors (with cascade deletion of registrations)
+   * ⚠️ DANGEROUS: This deletes ALL visitors and their registrations!
+   */
+  async deleteAll(): Promise<{
+    message: string;
+    visitorsDeleted: number;
+    registrationsDeleted: number;
+  }> {
+    this.logger.warn('⚠️ DELETE ALL VISITORS initiated - This is a destructive operation!');
+
+    // Get total counts before deletion
+    const totalVisitors = await this.visitorModel.countDocuments().exec();
+    const totalRegistrations = await this.registrationModel.countDocuments().exec();
+
+    if (totalVisitors === 0) {
+      return {
+        message: 'No visitors to delete',
+        visitorsDeleted: 0,
+        registrationsDeleted: 0,
+      };
+    }
+
+    // Step 1: Delete ALL registrations first (cascade)
+    const registrationResult = await this.registrationModel.deleteMany({}).exec();
+    this.logger.log(`Deleted ${registrationResult.deletedCount} registrations`);
+
+    // Step 2: Delete ALL visitors
+    const visitorResult = await this.visitorModel.deleteMany({}).exec();
+    this.logger.log(`Deleted ${visitorResult.deletedCount} visitors`);
+
+    // Step 3: Clear MeiliSearch index
+    try {
+      await this.meilisearchService.deleteAllVisitors();
+      this.logger.log('✅ Cleared MeiliSearch visitor index');
+    } catch (error) {
+      this.logger.error(`Failed to clear MeiliSearch index: ${error.message}`);
+      // Don't throw - data is deleted, search index cleanup is optional
+    }
+
+    this.logger.warn(
+      `🗑️ DELETE ALL completed: ${visitorResult.deletedCount} visitors and ${registrationResult.deletedCount} registrations deleted`,
+    );
+
+    return {
+      message: `Successfully deleted all visitors and registrations`,
+      visitorsDeleted: visitorResult.deletedCount,
+      registrationsDeleted: registrationResult.deletedCount,
+    };
+  }
+
+  /**
    * Get visitor statistics
    */
   async getStatistics(): Promise<{
@@ -351,6 +402,72 @@ export class VisitorsService {
     limit: number = 20,
   ): Promise<any> {
     return await this.meilisearchService.searchVisitors(query, exhibitionId, limit);
+  }
+
+  /**
+   * Re-sync all visitors to MeiliSearch
+   * Useful when search index settings are updated (e.g., new phone format fields)
+   * Processes in batches to avoid memory issues
+   */
+  async resyncMeilisearch(): Promise<{
+    message: string;
+    totalSynced: number;
+    duration: number;
+  }> {
+    this.logger.log('🔄 Starting MeiliSearch full resync...');
+    const startTime = Date.now();
+    
+    const total = await this.visitorModel.countDocuments().exec();
+    this.logger.log(`📊 Total visitors to sync: ${total.toLocaleString()}`);
+
+    if (total === 0) {
+      return {
+        message: 'No visitors to sync',
+        totalSynced: 0,
+        duration: 0,
+      };
+    }
+
+    // Clear existing index first
+    try {
+      await this.meilisearchService.deleteAllVisitors();
+      this.logger.log('🗑️ Cleared existing MeiliSearch index');
+    } catch (error) {
+      this.logger.warn(`Failed to clear index (may not exist): ${error.message}`);
+    }
+
+    // Process in batches
+    const BATCH_SIZE = 1000;
+    let processedCount = 0;
+
+    const cursor = this.visitorModel.find().lean().cursor();
+    let batch: any[] = [];
+
+    for await (const visitor of cursor) {
+      batch.push(visitor);
+
+      if (batch.length >= BATCH_SIZE) {
+        await this.meilisearchService.indexAllVisitors(batch);
+        processedCount += batch.length;
+        this.logger.log(`📤 Synced ${processedCount.toLocaleString()}/${total.toLocaleString()} visitors (${((processedCount / total) * 100).toFixed(1)}%)`);
+        batch = [];
+      }
+    }
+
+    // Process remaining batch
+    if (batch.length > 0) {
+      await this.meilisearchService.indexAllVisitors(batch);
+      processedCount += batch.length;
+    }
+
+    const duration = Date.now() - startTime;
+    this.logger.log(`✅ MeiliSearch resync completed: ${processedCount.toLocaleString()} visitors in ${(duration / 1000).toFixed(1)}s`);
+
+    return {
+      message: `Successfully synced ${processedCount.toLocaleString()} visitors to MeiliSearch`,
+      totalSynced: processedCount,
+      duration,
+    };
   }
 
   /**

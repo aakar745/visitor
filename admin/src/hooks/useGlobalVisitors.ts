@@ -180,6 +180,24 @@ export const useGlobalVisitorMutations = () => {
     },
   });
 
+  // Delete ALL visitors (Super Admin Only)
+  const deleteAllVisitors = useMutation({
+    mutationFn: globalVisitorService.deleteAllVisitors,
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: globalVisitorQueryKeys.globalVisitors.lists() });
+      queryClient.invalidateQueries({ queryKey: ['all-registrations-with-visitors'] });
+      queryClient.invalidateQueries({ queryKey: globalVisitorQueryKeys.globalVisitors.analytics });
+      queryClient.invalidateQueries({ queryKey: globalVisitorQueryKeys.registrations.all });
+      
+      message.success(
+        `Successfully deleted ${result.visitorsDeleted.toLocaleString()} visitors and ${result.registrationsDeleted.toLocaleString()} registrations`
+      );
+    },
+    onError: (error: any) => {
+      message.error(error?.response?.data?.message || 'Failed to delete all visitors');
+    },
+  });
+
   // Delete registration
   const deleteRegistration = useMutation({
     mutationFn: globalVisitorService.deleteRegistration,
@@ -303,6 +321,7 @@ export const useGlobalVisitorMutations = () => {
     updateGlobalVisitor,
     deleteVisitor,
     bulkDeleteVisitors,
+    deleteAllVisitors,
     deleteRegistration,
     bulkDeleteRegistrations,
     registerForExhibition,

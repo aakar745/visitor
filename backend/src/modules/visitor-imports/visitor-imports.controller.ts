@@ -123,14 +123,11 @@ export class VisitorImportsController {
       duplicateStrategy || DuplicateStrategy.SKIP,
     );
 
+    // ✅ Return data directly - TransformInterceptor will wrap it
     return {
-      success: true,
-      message: 'Import initiated successfully',
-      data: {
-        importId: result.importId,
-        totalRows: result.totalRows,
-        status: 'pending',
-      },
+      importId: result.importId,
+      totalRows: result.totalRows,
+      status: 'pending',
     };
   }
 
@@ -158,15 +155,9 @@ export class VisitorImportsController {
       },
     },
   })
-  async getImportProgress(@Param('importId') importId: string): Promise<{
-    success: boolean;
-    data: ImportProgress;
-  }> {
-    const progress = await this.importService.getImportProgress(importId);
-    return {
-      success: true,
-      data: progress,
-    };
+  async getImportProgress(@Param('importId') importId: string): Promise<ImportProgress> {
+    // ✅ Return progress directly - TransformInterceptor will wrap it
+    return await this.importService.getImportProgress(importId);
   }
 
   @Get('history/me')
@@ -177,14 +168,11 @@ export class VisitorImportsController {
     @CurrentUser() user: any,
     @Query('limit') limit?: number,
   ) {
-    const history = await this.importService.getImportHistory(
+    // ✅ Return data directly - TransformInterceptor will wrap it
+    return await this.importService.getImportHistory(
       user.userId,
       limit || 20,
     );
-    return {
-      success: true,
-      data: history,
-    };
   }
 
   @Get('history/all')
@@ -192,11 +180,8 @@ export class VisitorImportsController {
   @ApiOperation({ summary: 'Get all import history (super admin only)' })
   @ApiResponse({ status: 200, description: 'All import history retrieved' })
   async getAllImportHistory(@Query('limit') limit?: number) {
-    const history = await this.importService.getAllImportHistory(limit || 50);
-    return {
-      success: true,
-      data: history,
-    };
+    // ✅ Return data directly - TransformInterceptor will wrap it
+    return await this.importService.getAllImportHistory(limit || 50);
   }
 
   @Delete('rollback/:importId')
@@ -219,17 +204,12 @@ export class VisitorImportsController {
     @Param('importId') importId: string,
     @CurrentUser() user: any,
   ) {
-    const result = await this.importService.rollbackImport(
+    // ✅ Return data directly - TransformInterceptor will wrap it
+    return await this.importService.rollbackImport(
       importId,
       user.userId,
       user.name || user.email,
     );
-
-    return {
-      success: true,
-      message: 'Import rolled back successfully',
-      data: result,
-    };
   }
 
   @Get('template/download')
@@ -253,11 +233,8 @@ export class VisitorImportsController {
   @ApiOperation({ summary: 'Get visitor import statistics' })
   @ApiResponse({ status: 200, description: 'Statistics retrieved' })
   async getStats() {
-    const stats = await this.visitorImportsService.getImportStats();
-    return {
-      success: true,
-      data: stats,
-    };
+    // ✅ Return data directly - TransformInterceptor will wrap it
+    return await this.visitorImportsService.getImportStats();
   }
 }
 

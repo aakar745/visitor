@@ -14,6 +14,7 @@ import {
   Statistic,
   Tag,
   List,
+  Spin,
 } from 'antd';
 import {
   UploadOutlined,
@@ -22,6 +23,7 @@ import {
   CloseCircleOutlined,
   DownloadOutlined,
   InfoCircleOutlined,
+  LoadingOutlined,
 } from '@ant-design/icons';
 import type { UploadFile } from 'antd/es/upload/interface';
 import { DuplicateStrategy, ImportStatus } from '../../types/import.types';
@@ -52,17 +54,35 @@ const ImportVisitorsModal: React.FC<ImportVisitorsModalProps> = ({
   );
   const [importId, setImportId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  // ✅ Track import started state separately - doesn't rely on React Query timing
+  const [importStarted, setImportStarted] = useState(false);
 
   const uploadMutation = useUploadVisitors();
   const downloadTemplateMutation = useDownloadTemplate();
 
   // Poll for progress while importing
-  const { data: progressData } = useImportProgress(importId, !!importId);
+  const { data: progressData, isLoading: isLoadingProgress, isFetching } = useImportProgress(importId, !!importId);
 
   const progress = progressData?.data;
   const isProcessing =
     progress?.status === ImportStatus.PROCESSING ||
     progress?.status === ImportStatus.PENDING;
+  
+  // ✅ Show loading when import has started but we haven't received progress yet
+  // Use importStarted flag instead of relying on React Query timing
+  const isWaitingForProgress = importStarted && !progress;
+  
+  // Debug logging
+  console.log('[ImportModal] State:', {
+    importId,
+    importStarted,
+    isLoadingProgress,
+    isFetching,
+    hasProgress: !!progress,
+    progressStatus: progress?.status,
+    isWaitingForProgress,
+    isProcessing,
+  });
 
   const handleUpload = async () => {
     if (fileList.length === 0) return;
@@ -76,16 +96,22 @@ const ImportVisitorsModal: React.FC<ImportVisitorsModalProps> = ({
         throw new Error('Invalid file object');
       }
 
-      console.log('Uploading file:', file.name, file.type, file.size);
+      console.log('[ImportModal] Uploading file:', file.name, file.type, file.size);
       
       const result = await uploadMutation.mutateAsync({
         file,
         duplicateStrategy,
       });
 
+      console.log('[ImportModal] Upload response:', result);
+      console.log('[ImportModal] Import ID:', result.data.importId);
+      
+      // ✅ Set importStarted FIRST to show loading state immediately
+      setImportStarted(true);
       setImportId(result.data.importId);
+      setIsUploading(false);
     } catch (error) {
-      console.error('Upload failed:', error);
+      console.error('[ImportModal] Upload failed:', error);
       setIsUploading(false);
     }
   };
@@ -114,6 +140,7 @@ const ImportVisitorsModal: React.FC<ImportVisitorsModalProps> = ({
     setFileList([]);
     setImportId(null);
     setIsUploading(false);
+    setImportStarted(false);
     setDuplicateStrategy(DuplicateStrategy.SKIP);
   };
 
@@ -164,7 +191,7 @@ const ImportVisitorsModal: React.FC<ImportVisitorsModalProps> = ({
       open={visible}
       onCancel={handleClose}
       footer={
-        !importId ? (
+        !importStarted ? (
           <Space>
             <Button onClick={handleClose}>Cancel</Button>
             <Button
@@ -178,15 +205,19 @@ const ImportVisitorsModal: React.FC<ImportVisitorsModalProps> = ({
             </Button>
           </Space>
         ) : (
-          <Button type="primary" onClick={handleClose}>
-            {isProcessing ? 'Close (Processing in Background)' : 'Done'}
+          <Button type="primary" onClick={handleClose} disabled={isWaitingForProgress}>
+            {isWaitingForProgress 
+              ? 'Starting Import...' 
+              : isProcessing 
+                ? 'Close (Processing in Background)' 
+                : 'Done'}
           </Button>
         )
       }
       width={700}
       destroyOnHidden
     >
-      {!importId ? (
+      {!importStarted ? (
         <>
           {/* Instructions */}
           <Alert
@@ -302,6 +333,24 @@ const ImportVisitorsModal: React.FC<ImportVisitorsModalProps> = ({
         </>
       ) : (
         <>
+          {/* Loading State - Waiting for first progress fetch */}
+          {isWaitingForProgress && (
+            <div style={{ textAlign: 'center', padding: '60px 0' }}>
+              <Spin 
+                indicator={<LoadingOutlined style={{ fontSize: 48 }} spin />} 
+                size="large"
+              />
+              <div style={{ marginTop: 24 }}>
+                <Text strong style={{ fontSize: 18, display: 'block', marginBottom: 8 }}>
+                  🚀 Import Started!
+                </Text>
+                <Text type="secondary" style={{ fontSize: 14 }}>
+                  Initializing import process... Please wait.
+                </Text>
+              </div>
+            </div>
+          )}
+
           {/* Import Progress */}
           {progress && (
             <>
@@ -317,7 +366,7 @@ const ImportVisitorsModal: React.FC<ImportVisitorsModalProps> = ({
                 status={
                   progress.status === ImportStatus.FAILED
                     ? 'exception'
-                    : progress.status === ImportStatus.COMPLETED
+                    : progress.status === ImportStatus.COMPLETED || progress.status === ImportStatus.PARTIALLY_COMPLETED
                     ? 'success'
                     : 'active'
                 }
@@ -326,6 +375,78 @@ const ImportVisitorsModal: React.FC<ImportVisitorsModalProps> = ({
                   '100%': '#87d068',
                 }}
               />
+
+              {/* Live Processing Status */}
+              {isProcessing && (
+                <div style={{ textAlign: 'center', marginTop: 12 }}>
+                  <Text type="secondary" style={{ fontSize: 14 }}>
+                    📊 Processing {progress.processedRows.toLocaleString()} of {progress.totalRows.toLocaleString()} records...
+                  </Text>
+                  {progress.successRows > 0 && (
+                    <div style={{ marginTop: 8 }}>
+                      <Text type="success" style={{ marginRight: 16 }}>✓ Imported: {progress.successRows.toLocaleString()}</Text>
+                      {progress.skippedRows > 0 && (
+                        <Text type="warning" style={{ marginRight: 16 }}>⊘ Skipped: {progress.skippedRows.toLocaleString()}</Text>
+                      )}
+                      {progress.updatedRows > 0 && (
+                        <Text style={{ color: '#1890ff', marginRight: 16 }}>↻ Updated: {progress.updatedRows.toLocaleString()}</Text>
+                      )}
+                      {progress.failedRows > 0 && (
+                        <Text type="danger">✗ Failed: {progress.failedRows.toLocaleString()}</Text>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Completion Message */}
+              {!isProcessing && progress.status !== ImportStatus.PENDING && (
+                <Alert
+                  message={
+                    progress.status === ImportStatus.COMPLETED
+                      ? '✅ Import Completed Successfully!'
+                      : progress.status === ImportStatus.PARTIALLY_COMPLETED
+                      ? '⚠️ Import Completed with Some Issues'
+                      : '❌ Import Failed'
+                  }
+                  description={
+                    <div>
+                      {progress.status === ImportStatus.FAILED ? (
+                        <p>The import encountered a critical error. Please check the error messages below.</p>
+                      ) : (
+                        <>
+                          <p style={{ marginBottom: 8 }}>
+                            <strong>Summary:</strong> Processed {progress.processedRows.toLocaleString()} of {progress.totalRows.toLocaleString()} records
+                          </p>
+                          <ul style={{ margin: 0, paddingLeft: 20 }}>
+                            <li style={{ color: '#3f8600' }}>✓ Imported: {progress.successRows.toLocaleString()} new records</li>
+                            {progress.updatedRows > 0 && (
+                              <li style={{ color: '#1890ff' }}>↻ Updated: {progress.updatedRows.toLocaleString()} existing records</li>
+                            )}
+                            {progress.skippedRows > 0 && (
+                              <li style={{ color: '#faad14' }}>
+                                ⊘ Skipped: {progress.skippedRows.toLocaleString()} duplicates (phone numbers already exist)
+                              </li>
+                            )}
+                            {progress.failedRows > 0 && (
+                              <li style={{ color: '#cf1322' }}>✗ Failed: {progress.failedRows.toLocaleString()} records</li>
+                            )}
+                          </ul>
+                        </>
+                      )}
+                    </div>
+                  }
+                  type={
+                    progress.status === ImportStatus.COMPLETED
+                      ? 'success'
+                      : progress.status === ImportStatus.PARTIALLY_COMPLETED
+                      ? 'warning'
+                      : 'error'
+                  }
+                  showIcon
+                  style={{ marginTop: 16, marginBottom: 16 }}
+                />
+              )}
 
               <Divider />
 
@@ -379,6 +500,47 @@ const ImportVisitorsModal: React.FC<ImportVisitorsModalProps> = ({
                   />
                 </Col>
               </Row>
+
+              {/* Skip Reason Explanation */}
+              {progress.skippedRows > 0 && progress.skipReason && (
+                <>
+                  <Divider />
+                  <Alert
+                    message="Skipped Records Explanation"
+                    description={progress.skipReason}
+                    type="warning"
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                  />
+                  
+                  {/* Show sample of skipped records */}
+                  {progress.skipMessages && progress.skipMessages.length > 0 && (
+                    <>
+                      <Text strong style={{ display: 'block', marginBottom: 8 }}>
+                        Sample of Skipped Records ({Math.min(progress.skipMessages.length, 10)} of {progress.skippedRows.toLocaleString()}):
+                      </Text>
+                      <List
+                        size="small"
+                        bordered
+                        dataSource={progress.skipMessages.slice(0, 10)}
+                        renderItem={(skipMsg) => (
+                          <List.Item>
+                            <Text type="warning" style={{ fontSize: 12 }}>
+                              ⊘ {skipMsg}
+                            </Text>
+                          </List.Item>
+                        )}
+                        style={{ maxHeight: 150, overflow: 'auto' }}
+                      />
+                      {progress.skippedRows > 10 && (
+                        <Text type="secondary" style={{ fontSize: 12, marginTop: 8, display: 'block' }}>
+                          ... and {(progress.skippedRows - 10).toLocaleString()} more records skipped (showing first 10 samples)
+                        </Text>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
 
               {/* Error Messages */}
               {progress.errorMessages && progress.errorMessages.length > 0 && (

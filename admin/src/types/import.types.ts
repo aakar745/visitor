@@ -26,7 +26,9 @@ export interface ImportProgress {
   skippedRows: number;
   updatedRows: number;
   errorMessages: string[];
+  skipMessages: string[];
   percentage: number;
+  skipReason: string; // High-level skip reason explanation
 }
 
 export interface ImportHistoryItem {

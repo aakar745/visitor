@@ -29,7 +29,9 @@ export interface VisitorDocument {
   id: string; // MongoDB _id
   name: string; // Visitor name (searchable)
   email: string; // Email (searchable)
-  phone: string; // Phone number (searchable)
+  phone: string; // Phone number with country code (e.g., +919558420000)
+  phoneWithoutPlus: string; // Phone without + sign (e.g., 919558420000)
+  phoneLocal: string; // Phone without country code (e.g., 9558420000)
   company?: string; // Company name (searchable)
   designation?: string; // Designation
   city?: string; // City name
@@ -189,12 +191,15 @@ export class MeilisearchService implements OnModuleInit {
       // Configure visitor index settings for optimal search
       await this.visitorIndex.updateSettings({
         // Searchable attributes (ranked by importance)
+        // ✅ Phone variants allow searching with or without country code
         searchableAttributes: [
-          'name',           // Highest priority - visitor name
-          'phone',          // Phone number
-          'email',          // Email address
-          'company',        // Company name
-          'designation',    // Designation
+          'name',            // Highest priority - visitor name
+          'phoneLocal',      // Phone without country code (9558420000) - most common search
+          'phoneWithoutPlus', // Phone with country code but no + (919558420000)
+          'phone',           // Full phone with + (+919558420000)
+          'email',           // Email address
+          'company',         // Company name
+          'designation',     // Designation
           '_searchableText', // Combined search field
         ],
 
@@ -204,6 +209,8 @@ export class MeilisearchService implements OnModuleInit {
           'name',
           'email',
           'phone',
+          'phoneWithoutPlus',
+          'phoneLocal',
           'company',
           'designation',
           'city',
@@ -533,7 +540,7 @@ export class MeilisearchService implements OnModuleInit {
     try {
       const searchOptions: any = {
         limit,
-        attributesToHighlight: ['name', 'phone', 'email', 'company'],
+        attributesToHighlight: ['name', 'phone', 'phoneLocal', 'email', 'company'],
         highlightPreTag: '<mark>',
         highlightPostTag: '</mark>',
       };
@@ -632,14 +639,59 @@ export class MeilisearchService implements OnModuleInit {
   }
 
   /**
+   * Delete ALL visitors from the search index
+   * ⚠️ DANGEROUS: Clears the entire visitor search index!
+   */
+  async deleteAllVisitors(): Promise<void> {
+    if (!this.visitorIndex) {
+      this.logger.warn('Visitor index not available. Skipping bulk deletion.');
+      return;
+    }
+
+    const startTime = Date.now();
+    try {
+      this.logger.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      this.logger.warn('⚠️ CLEARING ALL VISITORS FROM SEARCH INDEX');
+      this.logger.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      await this.visitorIndex.deleteAllDocuments();
+      
+      const duration = Date.now() - startTime;
+      this.logger.warn(`⚡ Cleared in ${duration}ms`);
+      this.logger.warn('✅ All visitors removed from search index!');
+      this.logger.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      this.logger.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      this.logger.error('❌ Failed to Clear Visitor Index');
+      this.logger.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      this.logger.error(`⏱️  Duration: ${duration}ms`);
+      this.logger.error(`❌ Error: ${error.message}`);
+      this.logger.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      throw error;
+    }
+  }
+
+  /**
    * Transform MongoDB visitor document to Meilisearch document
    */
   private transformVisitorToDocument(visitor: any): VisitorDocument {
-    // Create combined searchable text
+    const phone = visitor.phone || '';
+    
+    // ✅ Generate phone variants for flexible searching
+    // Original: +919558420000
+    // Without plus: 919558420000  
+    // Local (without country code): 9558420000
+    const phoneWithoutPlus = phone.replace(/^\+/, ''); // Remove leading +
+    const phoneLocal = this.extractLocalPhone(phone); // Extract local number without country code
+    
+    // Create combined searchable text with all phone variants
     const searchableText = [
       visitor.name,
       visitor.email,
-      visitor.phone,
+      phone,
+      phoneWithoutPlus,
+      phoneLocal,
       visitor.company,
       visitor.designation,
       visitor.city,
@@ -653,7 +705,9 @@ export class MeilisearchService implements OnModuleInit {
       id: visitor._id.toString(),
       name: visitor.name || '',
       email: visitor.email || '',
-      phone: visitor.phone || '',
+      phone: phone,
+      phoneWithoutPlus: phoneWithoutPlus,
+      phoneLocal: phoneLocal,
       company: visitor.company || undefined,
       designation: visitor.designation || undefined,
       city: visitor.city || undefined,
@@ -665,6 +719,27 @@ export class MeilisearchService implements OnModuleInit {
         : [],
       _searchableText: searchableText,
     };
+  }
+
+  /**
+   * Extract local phone number without country code
+   * Handles various formats: +919558420000, 919558420000, 09558420000, 9558420000
+   * Returns the last 10 digits for Indian numbers
+   */
+  private extractLocalPhone(phone: string): string {
+    if (!phone) return '';
+    
+    // Remove all non-digit characters
+    const digitsOnly = phone.replace(/\D/g, '');
+    
+    // For Indian numbers (starting with 91), extract last 10 digits
+    if (digitsOnly.length >= 10) {
+      // Return last 10 digits (local number without country code)
+      return digitsOnly.slice(-10);
+    }
+    
+    // For shorter numbers, return as-is
+    return digitsOnly;
   }
 }
 

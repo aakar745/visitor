@@ -51,6 +51,9 @@ export class ImportHistory extends Document {
   @Prop({ type: [String], default: [] })
   errorMessages: string[];
 
+  @Prop({ type: [String], default: [] })
+  skipMessages: string[];
+
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   importedBy: Types.ObjectId;
 

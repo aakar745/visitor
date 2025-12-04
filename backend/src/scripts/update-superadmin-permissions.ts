@@ -50,6 +50,7 @@ async function updateSuperAdminPermissions() {
       { id: 'visitors.export', name: 'Export Visitors', description: 'Export visitor data', action: 'export', resource: 'visitors', category: 'Visitor Management' },
       { id: 'visitors.search', name: 'Advanced Search', description: 'Use advanced search', action: 'search', resource: 'visitors', category: 'Visitor Management' },
       { id: 'visitors.bulk', name: 'Bulk Operations', description: 'Perform bulk actions', action: 'bulk', resource: 'visitors', category: 'Visitor Management' },
+      { id: 'visitors.delete_all', name: 'Delete All Visitors', description: '⚠️ DANGER: Delete ALL visitors and registrations', action: 'delete_all', resource: 'visitors', category: 'Visitor Management' },
       
       // Analytics
       { id: 'analytics.view', name: 'View Analytics Dashboard', description: 'Access analytics dashboard with charts', action: 'view', resource: 'analytics', category: 'Analytics' },

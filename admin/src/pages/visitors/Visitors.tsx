@@ -30,6 +30,8 @@ import {
   ExclamationCircleOutlined,
   UploadOutlined,
   EyeOutlined,
+  ClearOutlined,
+  WarningOutlined,
 } from '@ant-design/icons';
 import ImportVisitorsModal from '../../components/visitors/ImportVisitorsModal';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -62,6 +64,7 @@ const Visitors: React.FC = () => {
   const [selectedVisitor, setSelectedVisitor] = useState<any>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'excel'>('csv');
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
   
   // ✅ MeiliSearch Autocomplete State
   const [autocompleteOptions, setAutocompleteOptions] = useState<any[]>([]);
@@ -81,7 +84,8 @@ const Visitors: React.FC = () => {
 
   const { 
     deleteVisitor,
-    bulkDeleteVisitors
+    bulkDeleteVisitors,
+    deleteAllVisitors,
   } = useGlobalVisitorMutations();
   
   const visitors = Array.isArray(globalVisitorsData?.data) ? globalVisitorsData.data : [];
@@ -259,6 +263,78 @@ const Visitors: React.FC = () => {
         } catch (error) {
           // Error is handled by mutation
         }
+      },
+    });
+  };
+
+  // Handle delete ALL visitors
+  const handleDeleteAll = () => {
+    if (total === 0) {
+      message.info('No visitors to delete');
+      return;
+    }
+
+    // First confirmation
+    confirm({
+      title: '⚠️ Delete ALL Visitors',
+      icon: <WarningOutlined style={{ color: '#ff4d4f' }} />,
+      content: (
+        <div>
+          <p style={{ color: '#ff4d4f', fontWeight: 'bold', marginBottom: 16 }}>
+            WARNING: This is a destructive operation!
+          </p>
+          <p>You are about to delete:</p>
+          <ul style={{ marginTop: 8 }}>
+            <li><strong>{total.toLocaleString()}</strong> visitors</li>
+            <li><strong>ALL</strong> their exhibition registrations</li>
+          </ul>
+          <p style={{ color: '#ff4d4f', marginTop: 16 }}>
+            This action CANNOT be undone!
+          </p>
+        </div>
+      ),
+      okText: 'Yes, I understand. Continue...',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      width: 500,
+      onOk: () => {
+        // Second confirmation with text input
+        Modal.confirm({
+          title: '🛑 Final Confirmation Required',
+          icon: <WarningOutlined style={{ color: '#ff4d4f' }} />,
+          content: (
+            <div>
+              <p style={{ marginBottom: 16 }}>
+                To confirm deletion, please type <strong>DELETE ALL</strong> below:
+              </p>
+              <Input 
+                id="delete-confirmation-input"
+                placeholder="Type DELETE ALL to confirm"
+                autoComplete="off"
+              />
+            </div>
+          ),
+          okText: 'Delete All Visitors',
+          okType: 'danger',
+          cancelText: 'Cancel',
+          onOk: async () => {
+            const input = document.getElementById('delete-confirmation-input') as HTMLInputElement;
+            if (input?.value !== 'DELETE ALL') {
+              message.error('Confirmation text does not match. Deletion cancelled.');
+              return Promise.reject();
+            }
+            
+            setIsDeletingAll(true);
+            try {
+              await deleteAllVisitors.mutateAsync();
+              setSelectedRowKeys([]);
+            } catch (error) {
+              // Error is handled by mutation
+            } finally {
+              setIsDeletingAll(false);
+            }
+          },
+        });
       },
     });
   };
@@ -645,6 +721,21 @@ const Visitors: React.FC = () => {
                 >
                   Delete ({selectedRowKeys.length})
                 </Button>
+              )}
+              {hasPermission('visitors.delete_all') && total > 0 && (
+                <Tooltip title="Delete ALL visitors and their registrations">
+                  <Button
+                    danger
+                    type="primary"
+                    icon={<ClearOutlined />}
+                    size="middle"
+                    onClick={handleDeleteAll}
+                    loading={isDeletingAll || deleteAllVisitors.isPending}
+                    style={{ borderRadius: '6px' }}
+                  >
+                    Delete All ({total.toLocaleString()})
+                  </Button>
+                </Tooltip>
               )}
             </Space>
           </Col>

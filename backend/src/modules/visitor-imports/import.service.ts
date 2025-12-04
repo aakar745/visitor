@@ -34,7 +34,9 @@ export interface ImportProgress {
   skippedRows: number;
   updatedRows: number;
   errorMessages: string[];
+  skipMessages: string[];
   percentage: number;
+  skipReason: string; // High-level skip reason explanation
 }
 
 @Injectable()
@@ -204,6 +206,7 @@ export class ImportService {
       let skippedRows = 0;
       let updatedRows = 0;
       const errorMessages: string[] = [];
+      const skipMessages: string[] = [];
       const importedVisitors: any[] = [];
       
       // Track created/updated visitors for Meilisearch batch sync
@@ -232,6 +235,12 @@ export class ImportService {
               // Handle duplicate based on strategy
               if (duplicateStrategy === DuplicateStrategy.SKIP) {
                 skippedRows++;
+                // Track first 100 skip messages for display (avoid memory bloat for large imports)
+                if (skipMessages.length < 100) {
+                  skipMessages.push(
+                    `Row ${i + batch.indexOf(row) + 2}: Phone ${parsedVisitor.phone} already exists (${existingVisitor.name})`,
+                  );
+                }
                 this.logger.debug(
                   `Skipped duplicate phone: ${parsedVisitor.phone}`,
                 );
@@ -294,6 +303,7 @@ export class ImportService {
         importHistory.skippedRows = skippedRows;
         importHistory.updatedRows = updatedRows;
         importHistory.errorMessages = errorMessages.slice(0, 100) as any; // Store max 100 errors
+        (importHistory as any).skipMessages = skipMessages.slice(0, 100); // Store max 100 skip messages
         importHistory.importedVisitors = importedVisitors as any;
         await importHistory.save();
 
@@ -425,6 +435,24 @@ export class ImportService {
           )
         : 0;
 
+    // Generate skip reason explanation based on duplicate strategy
+    let skipReason = '';
+    if (importHistory.skippedRows > 0) {
+      switch (importHistory.duplicateStrategy) {
+        case DuplicateStrategy.SKIP:
+          skipReason = `${importHistory.skippedRows.toLocaleString()} records skipped because phone numbers already exist in database (Duplicate Strategy: Skip)`;
+          break;
+        case DuplicateStrategy.UPDATE:
+          skipReason = 'Records with existing phone numbers were updated';
+          break;
+        case DuplicateStrategy.CREATE_NEW:
+          skipReason = 'All records were imported (duplicates allowed)';
+          break;
+        default:
+          skipReason = 'Some records were skipped';
+      }
+    }
+
     const result: ImportProgress = {
       importId: (importHistory._id as Types.ObjectId).toString(),
       status: importHistory.status,
@@ -435,7 +463,9 @@ export class ImportService {
       skippedRows: importHistory.skippedRows,
       updatedRows: importHistory.updatedRows,
       errorMessages: importHistory.errorMessages as string[],
+      skipMessages: ((importHistory as any).skipMessages || []) as string[],
       percentage,
+      skipReason,
     };
 
     return result;

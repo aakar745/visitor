@@ -205,6 +205,76 @@ export class VisitorsController {
   }
 
   /**
+   * Re-sync all visitors to MeiliSearch
+   * ⚠️ ADMIN ONLY - This rebuilds the entire search index
+   * Useful when index settings are updated (e.g., new phone format fields)
+   */
+  @Post('resync-search')
+  @RequirePermissions('visitors.import')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: 'Re-sync all visitors to MeiliSearch',
+    description: 'Rebuilds the search index with all visitors. Use after updating search settings or if search results are stale.'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Visitors synced successfully',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          message: 'Successfully synced 651000 visitors to MeiliSearch',
+          totalSynced: 651000,
+          duration: 45000,
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 403, description: 'Forbidden - requires visitors.import permission' })
+  async resyncMeilisearch(): Promise<{
+    message: string;
+    totalSynced: number;
+    duration: number;
+  }> {
+    return await this.visitorsService.resyncMeilisearch();
+  }
+
+  /**
+   * Delete ALL visitors (CASCADE: also deletes all registrations)
+   * ⚠️ SUPER ADMIN ONLY - This is a destructive operation!
+   * ⚠️ IMPORTANT: Must be defined BEFORE /:id route to avoid route conflict
+   */
+  @Delete('delete-all')
+  @RequirePermissions('visitors.delete_all')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: '⚠️ Delete ALL visitors with cascade deletion',
+    description: 'DANGER: Deletes ALL visitors and ALL their associated exhibition registrations. This action cannot be undone!'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'All visitors deleted successfully',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          message: 'Successfully deleted all visitors and registrations',
+          visitorsDeleted: 651000,
+          registrationsDeleted: 120000,
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 403, description: 'Forbidden - requires visitors.delete_all permission' })
+  async deleteAll(): Promise<{
+    message: string;
+    visitorsDeleted: number;
+    registrationsDeleted: number;
+  }> {
+    return await this.visitorsService.deleteAll();
+  }
+
+  /**
    * Delete visitor (CASCADE: also deletes all registrations)
    */
   @Delete(':id')

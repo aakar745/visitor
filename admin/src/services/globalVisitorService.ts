@@ -357,6 +357,17 @@ export const globalVisitorService = {
     const response = await api.post('/visitors/bulk-delete', { ids: visitorIds });
     return response.data.data ? response.data.data : response.data;
   },
+
+  // Delete ALL visitors (Super Admin Only)
+  // ⚠️ DANGEROUS: This deletes ALL visitors and their registrations!
+  async deleteAllVisitors(): Promise<{
+    message: string;
+    visitorsDeleted: number;
+    registrationsDeleted: number;
+  }> {
+    const response = await api.delete('/visitors/delete-all');
+    return response.data.data ? response.data.data : response.data;
+  },
 };
 
 // Hook for visitor lookup and form prefilling
