@@ -54,9 +54,9 @@ export class WhatsAppQueueService extends WorkerHost implements OnModuleInit {
    * This is called by RegistrationsService after successful registration
    * 
    * @param data - WhatsApp delivery job data
-   * @returns Job ID
+   * @returns Job ID or null if enqueueing failed
    */
-  async enqueueWhatsAppDelivery(data: WhatsAppDeliveryJobData): Promise<string> {
+  async enqueueWhatsAppDelivery(data: WhatsAppDeliveryJobData): Promise<string | null> {
     try {
       const job = await this.whatsappQueue.add(
         'send-registration-confirmation',
@@ -77,8 +77,9 @@ export class WhatsAppQueueService extends WorkerHost implements OnModuleInit {
         },
       );
 
-      this.logger.log(`📬 WhatsApp job enqueued: ${job.id} for ${data.registrationNumber}`);
-      return job.id;
+      const jobId = job.id ?? 'unknown';
+      this.logger.log(`📬 WhatsApp job enqueued: ${jobId} for ${data.registrationNumber}`);
+      return jobId;
     } catch (error) {
       this.logger.error(`Failed to enqueue WhatsApp job: ${error.message}`);
       // Don't throw - registration should succeed even if queue fails
@@ -130,13 +131,7 @@ export class WhatsAppQueueService extends WorkerHost implements OnModuleInit {
    * 
    * Useful for monitoring and debugging
    */
-  async getQueueStats(): Promise<{
-    active: number;
-    waiting: number;
-    completed: number;
-    failed: number;
-    delayed: number;
-  }> {
+  async getQueueStats() {
     return await this.whatsappQueue.getJobCounts();
   }
 
