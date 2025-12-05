@@ -10,6 +10,7 @@ import { WhatsAppOtpService } from '../../services/whatsapp-otp.service';
 import { RedisLockService } from '../../common/services/redis-lock.service';
 import { normalizePhoneNumberE164 } from '../../common/utils/sanitize.util';
 import { LoginDto } from './dto/login.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { ERR_AUTH, ERR_OTP } from '../../common/constants/error-messages';
 
 @Injectable()
@@ -575,6 +576,78 @@ export class AuthService {
       this.logger.error(`Failed to verify WhatsApp OTP: ${error.message}`);
       throw error;
     }
+  }
+
+  /**
+   * Change user password
+   * 
+   * Security features:
+   * - Validates current password
+   * - Ensures new password is different from current
+   * - Enforces password complexity
+   * - Invalidates all refresh tokens (logout from all devices)
+   * - Updates passwordChangedAt timestamp
+   */
+  async changePassword(userId: string, changePasswordDto: ChangePasswordDto): Promise<void> {
+    const { currentPassword, newPassword, confirmPassword } = changePasswordDto;
+
+    this.logger.log(`[Change Password] Request for user ID: ${userId}`);
+
+    // Validate passwords match
+    if (newPassword !== confirmPassword) {
+      throw new BadRequestException('New password and confirmation do not match');
+    }
+
+    // Get user with password (password field is excluded by default, so we need to explicitly select it)
+    const user = await this.userModel.findById(userId).select('+password').exec();
+    
+    if (!user) {
+      this.logger.error(`[Change Password] User not found for ID: ${userId}`);
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Check if password is properly hashed
+    if (!user.password || !user.password.startsWith('$2')) {
+      this.logger.error(`[Change Password] User ${user.email} has invalid password hash format`);
+      throw new BadRequestException(
+        'Your account password is not properly configured. Please contact an administrator to reset your password.'
+      );
+    }
+
+    // Verify current password
+    let isCurrentPasswordValid = false;
+    try {
+      isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    } catch (error) {
+      this.logger.error(`[Change Password] Bcrypt error for user ${userId}: ${error.message}`);
+      throw new BadRequestException(
+        'Your account password is not properly configured. Please contact an administrator.'
+      );
+    }
+
+    if (!isCurrentPasswordValid) {
+      this.logger.warn(`Failed password change attempt for user ${userId}: Invalid current password`);
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    // Ensure new password is different from current
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      throw new BadRequestException('New password must be different from your current password');
+    }
+
+    // Hash new password
+    const bcryptRounds = parseInt(this.configService.get<string>('BCRYPT_ROUNDS', '10'), 10);
+    const hashedPassword = await bcrypt.hash(newPassword, bcryptRounds);
+
+    // Update password and clear all refresh tokens (logout from all devices)
+    await this.userModel.findByIdAndUpdate(userId, {
+      password: hashedPassword,
+      refreshTokens: [], // Clear all refresh tokens
+      passwordChangedAt: new Date(),
+    });
+
+    this.logger.log(`Password changed successfully for user ${userId}. All sessions invalidated.`);
   }
 }
 

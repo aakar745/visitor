@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, UnauthorizedException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { ConfigService } from '@nestjs/config';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { User, UserDocument } from '../../database/schemas/user.schema';
@@ -16,6 +17,7 @@ export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Role.name) private roleModel: Model<RoleDocument>,
+    private readonly configService: ConfigService,
   ) {}
 
   async getStats() {
@@ -99,7 +101,8 @@ export class UsersService {
     await this.checkEmailUniqueness(createUserDto.email);
 
     // Hash password before saving
-    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    const bcryptRounds = parseInt(this.configService.get<string>('BCRYPT_ROUNDS', '10'), 10);
+    const hashedPassword = await bcrypt.hash(createUserDto.password, bcryptRounds);
     
     const user = new this.userModel({
       ...createUserDto,
@@ -200,7 +203,8 @@ export class UsersService {
     }
 
     // Hash new password
-    const hashedPassword = await bcrypt.hash(changePasswordDto.newPassword, 10);
+    const bcryptRounds = parseInt(this.configService.get<string>('BCRYPT_ROUNDS', '10'), 10);
+    const hashedPassword = await bcrypt.hash(changePasswordDto.newPassword, bcryptRounds);
 
     // SECURITY FIX (BUG-015): Reset login attempts and unlock account on password change
     // Update password and related security fields
@@ -245,7 +249,8 @@ export class UsersService {
     }
 
     // Hash new password
-    const hashedPassword = await bcrypt.hash(resetPasswordDto.newPassword, 10);
+    const bcryptRounds = parseInt(this.configService.get<string>('BCRYPT_ROUNDS', '10'), 10);
+    const hashedPassword = await bcrypt.hash(resetPasswordDto.newPassword, bcryptRounds);
 
     // Update password and related security fields
     await this.userModel.findByIdAndUpdate(id, {

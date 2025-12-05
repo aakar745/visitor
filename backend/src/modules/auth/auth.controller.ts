@@ -9,6 +9,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { generateCsrfToken } from '../../common/utils/crypto.util';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -211,6 +212,27 @@ export class AuthController {
     @Body('code') code: string,
   ) {
     return await this.authService.verifyWhatsAppOTP(phoneNumber, code);
+  }
+
+  @Post('change-password')
+  @ApiBearerAuth()
+  @Throttle({ default: { ttl: 60000, limit: 3 } }) // 3 attempts per minute
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Change user password' })
+  @ApiResponse({ status: 200, description: 'Password changed successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid password or validation failed' })
+  @ApiResponse({ status: 401, description: 'Current password is incorrect' })
+  async changePassword(
+    @CurrentUser() user: any,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
+    // CurrentUser decorator returns user with 'id' property, not 'userId'
+    await this.authService.changePassword(user.id, changePasswordDto);
+    
+    return {
+      success: true,
+      message: 'Password changed successfully. Please login again with your new password.',
+    };
   }
 }
 

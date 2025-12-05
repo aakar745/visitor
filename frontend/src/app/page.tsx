@@ -278,7 +278,7 @@ export default async function HomePage() {
               </div>
             </Card>
           ) : (
-            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 md:gap-8 md:grid-cols-2 lg:grid-cols-3">
               {exhibitions.map((exhibition) => (
                 <ExhibitionCard key={exhibition._id || exhibition.id} exhibition={exhibition} />
               ))}
@@ -320,7 +320,7 @@ export default async function HomePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-6 items-stretch">
               
               {/* Step 1: Register Online */}
-              <div className="relative group flex">
+              <div className="relative group">
                 <div className="bg-white rounded-2xl p-6 shadow-lg border-2 border-transparent hover:border-primary/30 hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 flex flex-col w-full">
                   {/* Step Number - Floating */}
                   <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-10">
@@ -362,7 +362,7 @@ export default async function HomePage() {
               </div>
 
               {/* Step 2: Receive Digital Badge */}
-              <div className="relative group flex">
+              <div className="relative group">
                 <div className="bg-white rounded-2xl p-6 shadow-lg border-2 border-transparent hover:border-purple-500/30 hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 flex flex-col w-full">
                   <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-10">
                     <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-700 text-white rounded-xl flex items-center justify-center font-bold shadow-lg shadow-purple-500/30 group-hover:scale-110 transition-transform">
@@ -403,7 +403,7 @@ export default async function HomePage() {
               </div>
 
               {/* Step 3: Visit Kiosk/Volunteer */}
-              <div className="relative group flex">
+              <div className="relative group">
                 <div className="bg-white rounded-2xl p-6 shadow-lg border-2 border-transparent hover:border-pink-500/30 hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 flex flex-col w-full">
                   <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-10">
                     <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-rose-600 text-white rounded-xl flex items-center justify-center font-bold shadow-lg shadow-pink-500/30 group-hover:scale-110 transition-transform">
@@ -442,7 +442,7 @@ export default async function HomePage() {
               </div>
 
               {/* Step 4: Get Badge Printed */}
-              <div className="relative group flex">
+              <div className="relative group">
                 <div className="bg-white rounded-2xl p-6 shadow-lg border-2 border-transparent hover:border-green-500/30 hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 flex flex-col w-full">
                   <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-10">
                     <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-xl flex items-center justify-center font-bold shadow-lg shadow-green-500/30 group-hover:scale-110 transition-transform">
@@ -572,7 +572,7 @@ function ExhibitionCard({ exhibition }: { exhibition: Exhibition }) {
   // Backend uses exhibitionLogo/bannerImage, but toJSON transforms to logoUrl/bannerImageUrl
   const bannerUrl = getImageUrl(exhibition.bannerImageUrl || (exhibition as any).bannerImage);
   const logoUrl = getImageUrl(exhibition.logoUrl || (exhibition as any).exhibitionLogo);
-  const displayImage = bannerUrl || logoUrl;
+  const displayImage = logoUrl || bannerUrl; // Prioritize logo over banner
   
   // Debug logging
   console.log('[ExhibitionCard] Exhibition:', exhibition.name, {
@@ -587,108 +587,111 @@ function ExhibitionCard({ exhibition }: { exhibition: Exhibition }) {
 
   return (
     <Card className="group overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 border-2 hover:border-primary/20">
-      {/* Exhibition Image */}
-      <div className="relative h-56 w-full overflow-hidden bg-gradient-to-br from-primary/10 via-purple-50/50 to-pink-50/30">
-        {displayImage ? (
-          <Image
-            src={displayImage}
-            alt={exhibition.name}
-            fill
-            className="object-contain transition-transform duration-500 group-hover:scale-105"
-            unoptimized // Bypass Next.js image optimization for dynamic external URLs
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center bg-gradient-to-br from-primary/20 via-purple-100/50 to-pink-100/30">
-            <span className="text-6xl font-bold text-primary opacity-20">
-              {exhibition.name.charAt(0)}
-            </span>
-          </div>
-        )}
-
-        {/* Status Badge */}
-        <div className="absolute right-3 top-3">
-          {isRegistrationOpen ? (
-            <div className="flex items-center gap-1.5 rounded-full bg-green-500 px-3 py-1.5 text-xs font-semibold text-white shadow-lg backdrop-blur">
-              <div className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-              Open
-            </div>
+      {/* Mobile: Horizontal Layout | Desktop: Vertical Layout */}
+      <div className="flex flex-row md:flex-col">
+        {/* Exhibition Image - Smaller on mobile, larger on desktop */}
+        <div className="relative w-32 h-32 md:w-full md:h-56 flex-shrink-0 overflow-hidden bg-gradient-to-br from-primary/10 via-purple-50/50 to-pink-50/30">
+          {displayImage ? (
+            <Image
+              src={displayImage}
+              alt={exhibition.name}
+              fill
+              className="object-contain transition-transform duration-500 group-hover:scale-105"
+              unoptimized // Bypass Next.js image optimization for dynamic external URLs
+            />
           ) : (
-            <div className="rounded-full bg-muted/90 px-3 py-1.5 text-xs font-semibold text-foreground shadow-lg backdrop-blur">
-              Closed
+            <div className="flex h-full items-center justify-center bg-gradient-to-br from-primary/20 via-purple-100/50 to-pink-100/30">
+              <span className="text-3xl md:text-6xl font-bold text-primary opacity-20">
+                {exhibition.name.charAt(0)}
+              </span>
             </div>
           )}
-        </div>
 
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-      </div>
-
-      {/* Content */}
-      <div className="p-6 space-y-4">
-        <div className="space-y-2">
-          <h3 className="text-xl font-bold line-clamp-2 group-hover:text-primary transition-colors">
-            {exhibition.name}
-          </h3>
-
-          {exhibition.tagline && (
-            <p className="text-sm text-muted-foreground line-clamp-2">
-              {exhibition.tagline}
-            </p>
-          )}
-        </div>
-
-        {/* Details */}
-        <div className="space-y-3 text-sm">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-              <MapPin className="h-4 w-4 text-primary" />
-            </div>
-            <span className="line-clamp-1 flex-1">{exhibition.venue}</span>
+          {/* Status Badge */}
+          <div className="absolute right-2 top-2 md:right-3 md:top-3">
+            {isRegistrationOpen ? (
+              <div className="flex items-center gap-1 md:gap-1.5 rounded-full bg-green-500 px-2 py-1 md:px-3 md:py-1.5 text-[10px] md:text-xs font-semibold text-white shadow-lg backdrop-blur">
+                <div className="h-1 w-1 md:h-1.5 md:w-1.5 rounded-full bg-white animate-pulse" />
+                Open
+              </div>
+            ) : (
+              <div className="rounded-full bg-muted/90 px-2 py-1 md:px-3 md:py-1.5 text-[10px] md:text-xs font-semibold text-foreground shadow-lg backdrop-blur">
+                Closed
+              </div>
+            )}
           </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/10">
-              <Calendar className="h-4 w-4 text-purple-600" />
-            </div>
-            <span>
-              {format(new Date(exhibition.onsiteStartDate), 'MMM dd')} -{' '}
-              {format(new Date(exhibition.onsiteEndDate), 'MMM dd, yyyy')}
-            </span>
-          </div>
-          
-          {exhibition.isPaid && (
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="text-xs">
-                Paid Event
-              </Badge>
-              {exhibition.pricingTiers && exhibition.pricingTiers.length > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  From ₹{Math.min(...exhibition.pricingTiers.map(t => t.price))}
-                </span>
-              )}
-            </div>
-          )}
+
+          {/* Gradient Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
         </div>
 
-        {/* CTA */}
-        <div className="pt-2">
-          {isRegistrationOpen ? (
-            <Link href={`/${exhibition.slug}`} className={buttonVariants({ 
-              className: "w-full group/btn bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white shadow-md hover:shadow-lg transition-all" 
-            })}>
-              Register Now
-              <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
-            </Link>
-          ) : (
-            <button 
-              disabled 
-              className={buttonVariants({ 
-                variant: 'outline', 
-                className: "w-full cursor-not-allowed opacity-60" 
-              })}
-            >
-              Registration Closed
-            </button>
-          )}
+        {/* Content - Compact on mobile */}
+        <div className="flex-1 p-3 md:p-6 space-y-2 md:space-y-4 flex flex-col">
+          <div className="space-y-1 md:space-y-2">
+            <h3 className="text-base md:text-xl font-bold line-clamp-1 md:line-clamp-2 group-hover:text-primary transition-colors">
+              {exhibition.name}
+            </h3>
+
+            {exhibition.tagline && (
+              <p className="text-xs md:text-sm text-muted-foreground line-clamp-1 md:line-clamp-2">
+                {exhibition.tagline}
+              </p>
+            )}
+          </div>
+
+          {/* Details - More compact on mobile */}
+          <div className="space-y-1.5 md:space-y-3 text-xs md:text-sm">
+            <div className="flex items-center gap-1.5 md:gap-2 text-muted-foreground">
+              <div className="flex h-6 w-6 md:h-8 md:w-8 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
+                <MapPin className="h-3 w-3 md:h-4 md:w-4 text-primary" />
+              </div>
+              <span className="line-clamp-1 flex-1">{exhibition.venue}</span>
+            </div>
+            <div className="flex items-center gap-1.5 md:gap-2 text-muted-foreground">
+              <div className="flex h-6 w-6 md:h-8 md:w-8 items-center justify-center rounded-lg bg-purple-500/10 flex-shrink-0">
+                <Calendar className="h-3 w-3 md:h-4 md:w-4 text-purple-600" />
+              </div>
+              <span className="text-[11px] md:text-sm">
+                {format(new Date(exhibition.onsiteStartDate), 'MMM dd')} -{' '}
+                {format(new Date(exhibition.onsiteEndDate), 'MMM dd, yyyy')}
+              </span>
+            </div>
+            
+            {exhibition.isPaid && (
+              <div className="flex items-center gap-1.5 md:gap-2">
+                <Badge variant="secondary" className="text-[10px] md:text-xs">
+                  Paid Event
+                </Badge>
+                {exhibition.pricingTiers && exhibition.pricingTiers.length > 0 && (
+                  <span className="text-[10px] md:text-xs text-muted-foreground">
+                    From ₹{Math.min(...exhibition.pricingTiers.map(t => t.price))}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* CTA - Compact button on mobile */}
+          <div className="pt-1 md:pt-2 mt-auto">
+            {isRegistrationOpen ? (
+              <Link href={`/${exhibition.slug}`} className={buttonVariants({ 
+                className: "w-full group/btn bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white shadow-md hover:shadow-lg transition-all text-xs md:text-sm h-8 md:h-10" 
+              })}>
+                Register Now
+                <ArrowRight className="ml-1 md:ml-2 h-3 w-3 md:h-4 md:w-4 transition-transform group-hover/btn:translate-x-1" />
+              </Link>
+            ) : (
+              <button 
+                disabled 
+                className={buttonVariants({ 
+                  variant: 'outline', 
+                  className: "w-full cursor-not-allowed opacity-60 text-xs md:text-sm h-8 md:h-10" 
+                })}
+              >
+                Registration Closed
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </Card>
