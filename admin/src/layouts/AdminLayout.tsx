@@ -60,7 +60,8 @@ const AdminLayout: React.FC = () => {
       key: '/exhibitions',
       icon: <CalendarOutlined />,
       label: 'Exhibitions',
-      permissions: ['exhibitions.view', 'exhibitions.create', 'exhibitions.update'],
+      // Include child permissions so parent shows if user has ANY of these
+      permissions: ['exhibitions.view', 'exhibitions.create', 'exhibitions.update', 'exhibitors.view'],
       children: [
         {
           key: '/exhibitions/list',
@@ -84,7 +85,8 @@ const AdminLayout: React.FC = () => {
       key: '/visitors',
       icon: <TeamOutlined />,
       label: 'Visitors',
-      permissions: ['visitors.view', 'visitors.create'],
+      // Include child permissions so parent shows if user has ANY of these
+      permissions: ['visitors.view', 'visitors.create', 'analytics.view', 'reports.view'],
       children: [
         {
           key: '/visitors/all',
@@ -130,28 +132,33 @@ const AdminLayout: React.FC = () => {
   ];
 
   // Filter menu items based on user permissions
-  const menuItems = allMenuItems.filter((item) => {
-    // Super Admin sees everything
-    if (isSuperAdmin) return true;
+  const menuItems = allMenuItems
+    .map((item) => {
+      // Super Admin sees everything - return item as-is
+      if (isSuperAdmin) return item;
 
-    // Check if user has any of the required permissions
-    if (item.permissions && !hasAnyPermission(item.permissions)) {
-      return false;
-    }
+      // Check if user has any of the required permissions for parent
+      if (item.permissions && !hasAnyPermission(item.permissions)) {
+        return null; // User doesn't have permission for parent
+      }
 
-    // Filter children if they exist
-    if (item.children) {
-      item.children = item.children.filter((child: any) => {
-        if (!child.permissions) return true;
-        return hasAnyPermission(child.permissions);
-      });
+      // Filter children if they exist (create new array to avoid mutation)
+      if (item.children) {
+        const visibleChildren = item.children.filter((child: any) => {
+          if (!child.permissions) return true;
+          return hasAnyPermission(child.permissions);
+        });
 
-      // Hide parent if no children are visible
-      if (item.children.length === 0) return false;
-    }
+        // Hide parent if no children are visible
+        if (visibleChildren.length === 0) return null;
 
-    return true;
-  });
+        // Return item with filtered children (avoid mutating original)
+        return { ...item, children: visibleChildren };
+      }
+
+      return item;
+    })
+    .filter(Boolean); // Remove nulls
 
   React.useEffect(() => {
     const handleResize = () => {
