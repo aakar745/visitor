@@ -11,6 +11,7 @@ import {
   Query,
   BadRequestException,
   Res,
+  Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -37,6 +38,8 @@ import { DuplicateStrategy } from '../../database/schemas/import-history.schema'
 @Controller('visitor-imports')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class VisitorImportsController {
+  private readonly logger = new Logger(VisitorImportsController.name);
+
   constructor(
     private readonly visitorImportsService: VisitorImportsService,
     private readonly importService: ImportService,
@@ -92,16 +95,10 @@ export class VisitorImportsController {
   async importVisitors(
     @UploadedFile() file: Express.Multer.File,
     @Body('duplicateStrategy') duplicateStrategy: DuplicateStrategy,
-    @Body() body: any, // Debug: capture full body
+    @Body() body: any,
     @CurrentUser() user: any,
   ) {
-    // Debug logging
-    console.log('=== FILE UPLOAD DEBUG ===');
-    console.log('File received:', file ? 'YES' : 'NO');
-    console.log('File details:', file);
-    console.log('Body:', body);
-    console.log('Duplicate strategy:', duplicateStrategy);
-    console.log('========================');
+    this.logger.log(`File upload received: ${file ? file.originalname : 'NO FILE'}, Strategy: ${duplicateStrategy || 'skip'}`);
 
     if (!file) {
       throw new BadRequestException('File is required');

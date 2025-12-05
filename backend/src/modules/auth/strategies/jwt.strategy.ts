@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
@@ -9,6 +9,8 @@ import { User, UserDocument } from '../../../database/schemas/user.schema';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
+  private readonly logger = new Logger(JwtStrategy.name);
+
   constructor(
     private configService: ConfigService,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
@@ -19,11 +21,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         (request: Request) => {
           // Try to get token from httpOnly cookie first (more secure)
           const token = request?.cookies?.accessToken || null;
-          if (token) {
-            console.log(`[JWT EXTRACT] Token found in cookie, length: ${token.length}`);
-          } else {
-            console.log(`[JWT EXTRACT] No token in cookie, checking Authorization header`);
-          }
+          // Note: Debug logging removed for production - use debug level if needed
           return token;
         },
         ExtractJwt.fromAuthHeaderAsBearerToken(), // Fallback to Authorization header
@@ -35,22 +33,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    console.log(`[JWT VALIDATE] Payload received:`, JSON.stringify(payload));
-    console.log(`[JWT VALIDATE] Looking up user ID: ${payload.sub}`);
+    this.logger.debug(`Validating JWT for user ID: ${payload.sub}`);
     
     const user = await this.userModel.findById(payload.sub).populate('role');
     
     if (!user) {
-      console.error(`[JWT VALIDATE FAILED] User not found for ID: ${payload.sub}`);
+      this.logger.warn(`User not found for ID: ${payload.sub}`);
       throw new UnauthorizedException('User not found');
     }
 
-    console.log(`[JWT VALIDATE] User found: ${user.email}, IsActive: ${user.isActive}, Status: ${user.status}`);
-    console.log(`[JWT VALIDATE] Role data:`, JSON.stringify(user.role));
+    this.logger.debug(`User found: ${user.email}, IsActive: ${user.isActive}, Status: ${user.status}`);
 
     // Check if user account is active
     if (!user.isActive || user.status === 'inactive') {
-      console.warn(`[JWT VALIDATE FAILED] Account deactivated: ${user.email}, IsActive: ${user.isActive}, Status: ${user.status}`);
+      this.logger.warn(`Account deactivated: ${user.email}`);
       throw new UnauthorizedException('Your account has been deactivated. Please contact the administrator for assistance.');
     }
 
@@ -63,7 +59,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       status: user.status,
     };
     
-    console.log(`[JWT VALIDATE SUCCESS] Returning user:`, JSON.stringify(validatedUser));
+    this.logger.debug(`User validated: ${user.email}`);
     return validatedUser;
   }
 }

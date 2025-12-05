@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, HttpCode, HttpStatus, Res, Req, UnauthorizedException } from '@nestjs/common';
+import { Controller, Post, Body, Get, HttpCode, HttpStatus, Res, Req, UnauthorizedException, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
@@ -13,6 +13,8 @@ import { LoginDto } from './dto/login.dto';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
@@ -29,17 +31,15 @@ export class AuthController {
     @Body() loginDto: LoginDto,
     @Res({ passthrough: true }) response: Response,
   ) {
-    console.log(`[LOGIN CONTROLLER] Login request for: ${loginDto.email}`);
+    this.logger.log(`Login request for: ${loginDto.email}`);
     
     const result = await this.authService.login(loginDto);
     
-    console.log(`[LOGIN CONTROLLER] Login service completed, user role:`, JSON.stringify(result.user.role));
+    this.logger.debug(`Login successful for: ${loginDto.email}`);
     
     // Set httpOnly cookies for production security
     const isProduction = this.configService.get('NODE_ENV') === 'production';
     const cookieDomain = this.configService.get('COOKIE_DOMAIN'); // e.g., '.aakarvisitors.in' for subdomain sharing
-    
-    console.log(`[LOGIN CONTROLLER] Cookie settings - isProduction: ${isProduction}, domain: ${cookieDomain || 'undefined'}`);
     
     const cookieOptions = {
       httpOnly: true,
@@ -54,11 +54,9 @@ export class AuthController {
       ...cookieOptions,
       maxAge: 15 * 60 * 1000, // 15 minutes
     });
-    console.log(`[LOGIN CONTROLLER] AccessToken cookie set (15min expiry)`);
 
     // Set refresh token cookie (longer expiry)
     response.cookie('refreshToken', result.refreshToken, cookieOptions);
-    console.log(`[LOGIN CONTROLLER] RefreshToken cookie set (7day expiry)`);
 
     // Set fresh CSRF token on login (consistent with token refresh)
     const csrfToken = generateCsrfToken();
@@ -69,9 +67,8 @@ export class AuthController {
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       domain: cookieDomain || undefined, // Share across subdomains if configured
     });
-    console.log(`[LOGIN CONTROLLER] CSRF token cookie set`);
 
-    console.log(`[LOGIN CONTROLLER] All cookies set, returning response`);
+    this.logger.log(`Login completed for: ${loginDto.email}`);
     
     // Also return tokens in response body for development/localStorage fallback
     return result;
@@ -97,7 +94,7 @@ export class AuthController {
         await this.authService.revokeRefreshToken(userId, refreshToken);
       } catch (error) {
         // Log error but don't fail logout
-        console.error('Error revoking refresh token:', error);
+        this.logger.error(`Error revoking refresh token: ${error.message}`);
       }
     }
     

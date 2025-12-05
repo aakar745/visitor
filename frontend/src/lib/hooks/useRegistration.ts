@@ -6,16 +6,43 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import type { RegistrationFormData, RegistrationResponse } from '@/types';
 import { useRegistrationStore, useUIStore } from '../store/registration.store';
+import { 
+  requestTracker, 
+  generateRegistrationKey 
+} from '../utils/requestDeduplication';
 
 /**
  * Hook to submit registration
+ * 
+ * ✅ REQUEST DEDUPLICATION: Prevents double submissions
+ * - Tracks in-flight requests by exhibition ID + phone
+ * - Returns early if duplicate submission detected
+ * - Auto-cleanup on completion or timeout
  */
 export function useCreateRegistration() {
   const router = useRouter();
   const setFormSubmitting = useUIStore((state) => state.setFormSubmitting);
 
   return useMutation<RegistrationResponse, Error, RegistrationFormData>({
-    mutationFn: (data) => registrationsApi.createRegistration(data),
+    mutationFn: async (data) => {
+      // ✅ DEDUPLICATION: Generate unique key for this registration attempt
+      const dedupeKey = generateRegistrationKey(
+        data.exhibitionId, 
+        data.customFieldData?.phone || data.customFieldData?.mobile
+      );
+      
+      // Check if this registration is already in progress
+      if (!requestTracker.start(dedupeKey)) {
+        // Return a rejected promise with a specific error
+        throw new Error('DUPLICATE_SUBMISSION');
+      }
+      
+      try {
+        return await registrationsApi.createRegistration(data);
+      } finally {
+        requestTracker.complete(dedupeKey);
+      }
+    },
     onMutate: () => {
       setFormSubmitting(true);
       toast.loading('Submitting your registration...', { id: 'registration' });
@@ -49,6 +76,15 @@ export function useCreateRegistration() {
       
       setFormSubmitting(false);
       const errorMessage = error.message || 'Failed to submit registration. Please try again.';
+      
+      // ✅ DEDUPLICATION: Handle duplicate submission silently
+      if (errorMessage === 'DUPLICATE_SUBMISSION') {
+        toast.info('Please wait, your registration is being processed...', {
+          id: 'registration',
+          duration: 3000,
+        });
+        return;
+      }
       
       // Special handling for "already registered" error (409)
       if (error.statusCode === 409) {

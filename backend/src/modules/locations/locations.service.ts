@@ -1491,6 +1491,8 @@ export class LocationsService {
 
   /**
    * Bulk delete cities
+   * 
+   * SECURITY: Limited to 100 cities per request to prevent DoS
    */
   async bulkDeleteCities(ids: string[]): Promise<{
     deleted: number;
@@ -1498,6 +1500,15 @@ export class LocationsService {
     failed: number;
     errors: string[];
   }> {
+    // ✅ SECURITY FIX: Limit bulk operations to prevent DoS
+    const MAX_BULK_DELETE = 100;
+    if (ids.length > MAX_BULK_DELETE) {
+      throw new BadRequestException(
+        `Cannot delete more than ${MAX_BULK_DELETE} cities at once. ` +
+        `Received: ${ids.length}. Please split into smaller batches.`
+      );
+    }
+
     const results = {
       deleted: 0,
       softDeleted: 0,
@@ -1529,6 +1540,8 @@ export class LocationsService {
 
   /**
    * Bulk delete pincodes
+   * 
+   * SECURITY: Limited to 100 pincodes per request to prevent DoS
    */
   async bulkDeletePincodes(ids: string[]): Promise<{
     deleted: number;
@@ -1536,6 +1549,15 @@ export class LocationsService {
     failed: number;
     errors: string[];
   }> {
+    // ✅ SECURITY FIX: Limit bulk operations to prevent DoS
+    const MAX_BULK_DELETE = 100;
+    if (ids.length > MAX_BULK_DELETE) {
+      throw new BadRequestException(
+        `Cannot delete more than ${MAX_BULK_DELETE} pincodes at once. ` +
+        `Received: ${ids.length}. Please split into smaller batches.`
+      );
+    }
+
     const results = {
       deleted: 0,
       softDeleted: 0,

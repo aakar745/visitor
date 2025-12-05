@@ -373,8 +373,19 @@ export class ExhibitorsService {
 
   /**
    * Bulk toggle status
+   * 
+   * SECURITY: Limited to 100 exhibitors per request to prevent DoS
    */
   async bulkToggleStatus(exhibitorIds: string[], isActive: boolean, userId?: string): Promise<void> {
+    // ✅ SECURITY FIX: Limit bulk operations to prevent DoS
+    const MAX_BULK_UPDATE = 100;
+    if (exhibitorIds.length > MAX_BULK_UPDATE) {
+      throw new BadRequestException(
+        `Cannot update more than ${MAX_BULK_UPDATE} exhibitors at once. ` +
+        `Received: ${exhibitorIds.length}. Please split into smaller batches.`
+      );
+    }
+
     const objectIds = exhibitorIds
       .filter(id => Types.ObjectId.isValid(id))
       .map(id => new Types.ObjectId(id));
@@ -396,8 +407,19 @@ export class ExhibitorsService {
 
   /**
    * Bulk delete
+   * 
+   * SECURITY: Limited to 100 exhibitors per request to prevent DoS
    */
   async bulkDelete(exhibitorIds: string[]): Promise<void> {
+    // ✅ SECURITY FIX: Limit bulk operations to prevent DoS
+    const MAX_BULK_DELETE = 100;
+    if (exhibitorIds.length > MAX_BULK_DELETE) {
+      throw new BadRequestException(
+        `Cannot delete more than ${MAX_BULK_DELETE} exhibitors at once. ` +
+        `Received: ${exhibitorIds.length}. Please split into smaller batches.`
+      );
+    }
+
     const objectIds = exhibitorIds
       .filter(id => Types.ObjectId.isValid(id))
       .map(id => new Types.ObjectId(id));

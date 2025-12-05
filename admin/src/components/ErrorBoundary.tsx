@@ -237,5 +237,99 @@ export const ErrorBoundaryWithRouter: React.FC<Omit<Props, 'location'>> = (props
   return <ErrorBoundary {...props} location={location} key={location} />;
 };
 
+/**
+ * Compact Error Boundary for component-level errors
+ * 
+ * Use this for wrapping individual components/widgets that can fail independently
+ * without taking down the entire page.
+ * 
+ * Features:
+ * - Minimal footprint (inline error message)
+ * - Retry button
+ * - Doesn't break page layout
+ * - Optional custom fallback
+ * 
+ * Usage:
+ *   <ComponentErrorBoundary name="Dashboard Stats">
+ *     <StatsWidget />
+ *   </ComponentErrorBoundary>
+ */
+interface ComponentErrorProps {
+  children: ReactNode;
+  name?: string;
+  fallback?: ReactNode;
+  onRetry?: () => void;
+}
+
+interface ComponentErrorState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+export class ComponentErrorBoundary extends Component<ComponentErrorProps, ComponentErrorState> {
+  constructor(props: ComponentErrorProps) {
+    super(props);
+    this.state = {
+      hasError: false,
+      error: null,
+    };
+  }
+
+  static getDerivedStateFromError(error: Error): ComponentErrorState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error(`[${this.props.name || 'Component'}] Error:`, error, errorInfo);
+  }
+
+  handleRetry = () => {
+    this.setState({ hasError: false, error: null });
+    this.props.onRetry?.();
+  };
+
+  render() {
+    if (this.state.hasError) {
+      if (this.props.fallback) {
+        return this.props.fallback;
+      }
+
+      // Compact inline error UI
+      return (
+        <Card 
+          size="small"
+          style={{ 
+            borderColor: '#ffccc7',
+            background: '#fff2f0',
+          }}
+        >
+          <Space direction="vertical" size="small" style={{ width: '100%' }}>
+            <Space>
+              <WarningOutlined style={{ color: '#ff4d4f' }} />
+              <Text type="danger">
+                {this.props.name ? `${this.props.name} failed to load` : 'Component error'}
+              </Text>
+            </Space>
+            {import.meta.env.DEV && this.state.error && (
+              <Text code style={{ fontSize: '11px', display: 'block' }}>
+                {this.state.error.message}
+              </Text>
+            )}
+            <Button 
+              size="small" 
+              icon={<ReloadOutlined />} 
+              onClick={this.handleRetry}
+            >
+              Retry
+            </Button>
+          </Space>
+        </Card>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 export default ErrorBoundary;
 

@@ -12,6 +12,19 @@ import { toast } from 'sonner';
 import QRCode from 'qrcode';
 import { getKioskId } from '@/lib/utils/kioskId';
 
+// ✅ Development-only logging (no console.log in production)
+const devLog = (...args: any[]) => {
+  if (process.env.NODE_ENV === 'development') {
+    devLog('', ...args);
+  }
+};
+
+const devError = (...args: any[]) => {
+  if (process.env.NODE_ENV === 'development') {
+    devError('', ...args);
+  }
+};
+
 export default function AutoPrintPage() {
   // State
   const [config, setConfig] = useState<KioskConfig | null>(null);
@@ -42,7 +55,7 @@ export default function AutoPrintPage() {
       // Enter key - process the scanned code
       if (e.key === 'Enter') {
         if (scanBufferRef.current.length > 0) {
-          console.log('[Hardware Scanner] Detected scan:', scanBufferRef.current);
+          devLog('[Hardware Scanner] Detected scan:', scanBufferRef.current);
           handleQRScan(scanBufferRef.current);
           scanBufferRef.current = '';
         }
@@ -80,7 +93,7 @@ export default function AutoPrintPage() {
       setConfig(data);
       configRef.current = data; // Update ref immediately
       
-      console.log('[Auto-Print] Config loaded:', {
+      devLog('Config loaded:', {
         allowRepeatPrinting: data.allowRepeatPrinting,
         autoPrintEnabled: data.autoPrintEnabled,
         enabled: data.enabled
@@ -103,7 +116,7 @@ export default function AutoPrintPage() {
         });
       }
     } catch (error: any) {
-      console.error('Failed to load config:', error);
+      devError('Failed to load config:', error);
       toast.error('Failed to load configuration');
     } finally {
       setLoading(false);
@@ -113,13 +126,13 @@ export default function AutoPrintPage() {
   const handleQRScan = async (scannedData: string) => {
     // Prevent duplicate processing
     if (processingRef.current) {
-      console.log('[Auto-Print] Already processing, ignoring scan');
+      devLog(' Already processing, ignoring scan');
       return;
     }
 
     // Prevent scanning before config is loaded
     if (!configRef.current) {
-      console.log('[Auto-Print] Config not loaded yet, ignoring scan');
+      devLog(' Config not loaded yet, ignoring scan');
       toast.warning('System initializing, please wait...');
       return;
     }
@@ -132,13 +145,13 @@ export default function AutoPrintPage() {
       const parsed = JSON.parse(scannedData);
       if (parsed.registrationNumber) {
         registrationNumber = parsed.registrationNumber;
-        console.log('[Auto-Print] Extracted registration number from JSON:', registrationNumber);
+        devLog(' Extracted registration number from JSON:', registrationNumber);
       }
     } catch (e) {
       // Not JSON, check if it's a URL
       if (scannedData.includes('success?id=')) {
         registrationNumber = scannedData.split('success?id=')[1].split('&')[0];
-        console.log('[Auto-Print] Extracted registration number from URL:', registrationNumber);
+        devLog(' Extracted registration number from URL:', registrationNumber);
       } else {
         // Plain text registration number
         registrationNumber = scannedData.trim();
@@ -153,7 +166,7 @@ export default function AutoPrintPage() {
     if (lastScanned && lastScanned.regNumber === registrationNumber) {
       const timeSinceLastScan = now - lastScanned.timestamp;
       if (timeSinceLastScan < 5000) { // 5 seconds
-        console.log(`[Auto-Print] 🛑 DUPLICATE SCAN BLOCKED - Same registration scanned ${timeSinceLastScan}ms ago`);
+        devLog(`🛑 DUPLICATE SCAN BLOCKED - Same registration scanned ${timeSinceLastScan}ms ago`);
         toast.warning('Please wait before scanning again', {
           description: `Last scan was ${Math.round(timeSinceLastScan / 1000)}s ago`,
           duration: 2000,
@@ -183,16 +196,16 @@ export default function AutoPrintPage() {
       // Get config from ref (always up-to-date)
       const currentConfig = configRef.current;
       if (!currentConfig) {
-        console.error('[Auto-Print] ERROR: Config is null in processAndPrint!');
+        devError(' ERROR: Config is null in processAndPrint!');
         toast.error('Configuration error, please refresh the page');
         setPrinting(false);
         return;
       }
       
       // Step 1: Validate QR code
-      console.log('[Auto-Print] Validating:', registrationNumber);
+      devLog(' Validating:', registrationNumber);
       const data = await kioskApi.validateQR(registrationNumber);
-      console.log('[Auto-Print] Validation result:', {
+      devLog(' Validation result:', {
         alreadyCheckedIn: data.alreadyCheckedIn,
         checkInTime: data.checkInTime,
         allowRepeatPrinting: currentConfig.allowRepeatPrinting,
@@ -201,7 +214,7 @@ export default function AutoPrintPage() {
       });
       
       if (data.alreadyCheckedIn && !currentConfig.allowRepeatPrinting) {
-        console.log('[Auto-Print] ⛔ Already checked in - Repeated printing is DISABLED');
+        devLog(' ⛔ Already checked in - Repeated printing is DISABLED');
         toast.warning(`${data.visitor.name} is already checked in`, {
           description: `Checked in at ${new Date(data.checkInTime!).toLocaleTimeString()}. Repeated printing is disabled.`,
         });
@@ -211,7 +224,7 @@ export default function AutoPrintPage() {
       }
       
       if (data.alreadyCheckedIn && currentConfig.allowRepeatPrinting) {
-        console.log('[Auto-Print] ✅ Already checked in - Repeated printing is ENABLED - Reprinting badge');
+        devLog(' ✅ Already checked in - Repeated printing is ENABLED - Reprinting badge');
         toast.info(`${data.visitor.name} - Reprinting badge`, {
           description: 'This visitor is already checked in',
         });
@@ -219,18 +232,18 @@ export default function AutoPrintPage() {
       
       // Step 2: Check-in visitor (skip if already checked in)
       if (!data.alreadyCheckedIn) {
-        console.log('[Auto-Print] Checking in...');
+        devLog(' Checking in...');
         await kioskApi.checkIn(registrationNumber);
       } else {
-        console.log('[Auto-Print] Skipping check-in (already checked in)');
+        devLog(' Skipping check-in (already checked in)');
       }
       
       // Step 3: Queue print job (NEW - uses Redis queue for better reliability)
-      console.log('[Auto-Print] Queuing print job...');
+      devLog(' Queuing print job...');
       
       if (currentConfig.printTestMode) {
         // Test mode - simulate printing
-        console.log('[Auto-Print] TEST MODE - Would queue print job');
+        devLog(' TEST MODE - Would queue print job');
         await new Promise(resolve => setTimeout(resolve, 500)); // Simulate delay
         toast.success(`✅ TEST MODE: ${data.visitor.name}`, {
           description: 'Print job would be queued in production mode',
@@ -238,7 +251,7 @@ export default function AutoPrintPage() {
       } else {
         // Real printing - queue the job
         const kioskId = getKioskId(); // Get unique kiosk ID from localStorage
-        console.log('[Auto-Print] Using kiosk ID:', kioskId);
+        devLog(' Using kiosk ID:', kioskId);
         
         const queueResult = await kioskApi.queuePrintJob(
           registrationNumber,
@@ -246,8 +259,8 @@ export default function AutoPrintPage() {
           kioskId
         );
         
-        console.log('[Auto-Print] ✅ Print job queued:', queueResult);
-        console.log(`[Auto-Print] Job ID: ${queueResult.jobId}, Queue position: ${queueResult.queuePosition}`);
+        devLog('✅ Print job queued:', queueResult);
+        devLog(`Job ID: ${queueResult.jobId}, Queue position: ${queueResult.queuePosition}`);
         
         toast.success(`✅ ${data.visitor.name}`, {
           description: `Badge queued for printing (Position: ${queueResult.queuePosition})`,
@@ -260,7 +273,7 @@ export default function AutoPrintPage() {
       setLastPrinted({ name: data.visitor.name, time: new Date() });
       
     } catch (error: any) {
-      console.error('[Auto-Print] Error:', error);
+      devError(' Error:', error);
       setStats(prev => ({ ...prev, failed: prev.failed + 1 }));
       
       if (error.message?.includes('print service')) {

@@ -13,6 +13,7 @@ import { State, StateSchema } from '../../database/schemas/state.schema';
 import { City, CitySchema } from '../../database/schemas/city.schema';
 import { BadgesModule } from '../badges/badges.module';
 import { PrintQueueModule } from '../print-queue/print-queue.module';
+import { WhatsAppQueueModule } from '../whatsapp-queue/whatsapp-queue.module';
 import { MeilisearchModule } from '../meilisearch/meilisearch.module';
 
 @Module({
@@ -30,6 +31,7 @@ import { MeilisearchModule } from '../meilisearch/meilisearch.module';
     ]),
     BadgesModule, // Import for badge generation
     PrintQueueModule, // Import for print job queue
+    WhatsAppQueueModule, // Import for WhatsApp message delivery
     MeilisearchModule, // Import for auto-indexing visitors
   ],
   controllers: [RegistrationsController],

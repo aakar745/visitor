@@ -25,6 +25,7 @@ import { City, CityDocument } from '../../database/schemas/city.schema';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { BadgesService } from '../badges/badges.service';
 import { PrintQueueService } from '../print-queue/print-queue.service';
+import { WhatsAppQueueService } from '../whatsapp-queue/whatsapp-queue.service';
 import { MeilisearchService } from '../meilisearch/meilisearch.service';
 import * as QRCode from 'qrcode';
 import * as fs from 'fs/promises';
@@ -57,6 +58,7 @@ export class RegistrationsService {
     private cityModel: Model<CityDocument>,
     private badgesService: BadgesService,
     private printQueueService: PrintQueueService,
+    private whatsappQueueService: WhatsAppQueueService,
     private configService: ConfigService,
     private meilisearchService: MeilisearchService,
   ) {}
@@ -664,6 +666,46 @@ export class RegistrationsService {
       `Registration created successfully: ${registration._id} for ${visitor.email}`,
     );
 
+    // 15. 📱 Enqueue WhatsApp registration confirmation (Enterprise-Level: Non-Blocking)
+    // This runs asynchronously and doesn't block the registration response
+    // Even if WhatsApp fails, registration is successful
+    if (badgeUrl && visitor.phone) {
+      try {
+        // Convert phone to E.164 format for WhatsApp
+        const e164Phone = normalizePhoneNumberE164(visitor.phone);
+        
+        if (e164Phone) {
+          // Enqueue WhatsApp delivery job (non-blocking)
+          this.whatsappQueueService.enqueueWhatsAppDelivery({
+            phoneNumber: e164Phone,
+            visitorName: visitor.name || 'Visitor',
+            badgeUrl: badgeUrl,
+            registrationNumber: registration.registrationNumber,
+            registrationId: registration._id.toString(),
+            timestamp: new Date().toISOString(),
+          }).catch(error => {
+            // Log but don't fail registration
+            this.logger.warn(`Failed to enqueue WhatsApp message for ${registration.registrationNumber}: ${error.message}`);
+          });
+          
+          this.logger.debug(`📬 WhatsApp confirmation enqueued for ${registration.registrationNumber}`);
+        } else {
+          this.logger.warn(`Invalid phone number format for WhatsApp: ${visitor.phone}`);
+        }
+      } catch (error) {
+        // Catch any synchronous errors (e.g., normalization failures)
+        this.logger.error(`Error enqueueing WhatsApp for ${registration.registrationNumber}: ${error.message}`);
+        // Don't throw - registration should succeed regardless
+      }
+    } else {
+      if (!badgeUrl) {
+        this.logger.debug(`Skipping WhatsApp for ${registration.registrationNumber}: No badge URL`);
+      }
+      if (!visitor.phone) {
+        this.logger.debug(`Skipping WhatsApp for ${registration.registrationNumber}: No phone number`);
+      }
+    }
+
     // Return registration details (ensure all IDs are strings)
     return {
       registration: {
@@ -1146,6 +1188,11 @@ export class RegistrationsService {
 
   /**
    * Bulk delete registrations (Admin)
+   * 
+   * SECURITY: Limited to 100 registrations per request to prevent:
+   * - DoS attacks via large bulk operations
+   * - Memory exhaustion from processing too many records
+   * - Long-running requests that could timeout
    */
   async bulkDeleteRegistrations(ids: string[]): Promise<{
     message: string;
@@ -1154,6 +1201,15 @@ export class RegistrationsService {
   }> {
     if (!ids || ids.length === 0) {
       throw new BadRequestException('No registration IDs provided');
+    }
+
+    // ✅ SECURITY FIX: Limit bulk operations to prevent DoS
+    const MAX_BULK_DELETE = 100;
+    if (ids.length > MAX_BULK_DELETE) {
+      throw new BadRequestException(
+        `Cannot delete more than ${MAX_BULK_DELETE} registrations at once. ` +
+        `Received: ${ids.length}. Please split into smaller batches.`
+      );
     }
 
     const deleted: string[] = [];
@@ -1511,19 +1567,26 @@ export class RegistrationsService {
    * Records entry time and validates registration status
    * Exhibition is automatically detected from the registration
    * 
-   * RACE CONDITION SAFE: Uses atomic findOneAndUpdate
+   * RACE CONDITION SAFE: Uses distributed Redis lock + atomic findOneAndUpdate
+   * 
+   * ✅ OPTIMIZED FOR 40+ CONCURRENT STAFF:
+   * - Reduced lock TTL from 10s to 5s for faster recovery
+   * - Lock prevents same QR being processed by multiple devices
+   * - Atomic MongoDB update as defense-in-depth
    */
   async checkInVisitor(registrationNumber: string) {
     this.logger.log(`[Check-in] Processing check-in for: ${registrationNumber}`);
 
     // ✅ STEP 1: ACQUIRE DISTRIBUTED LOCK
-    // Prevents race condition when 20 kiosks scan the same QR simultaneously
-    const lockAcquired = await this.printQueueService.acquireLock(registrationNumber, 10000);
+    // Prevents race condition when 40+ staff scan the same QR simultaneously
+    // TTL reduced to 5s for faster recovery during high-concurrency scenarios
+    const LOCK_TTL_MS = 5000;
+    const lockAcquired = await this.printQueueService.acquireLock(registrationNumber, LOCK_TTL_MS);
     
     if (!lockAcquired) {
       this.logger.warn(`[Check-in] ⛔ Lock acquisition failed: ${registrationNumber}`);
       throw new BadRequestException(
-        'Another kiosk is currently processing this registration. Please try again in a few seconds.',
+        'Another staff member is currently processing this visitor. Please wait a moment.',
       );
     }
 

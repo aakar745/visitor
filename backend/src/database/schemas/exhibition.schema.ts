@@ -317,3 +317,7 @@ ExhibitionSchema.index({ isPaid: 1 }); // Index for paid/free filtering
 ExhibitionSchema.index({ createdAt: -1 }); // Index for sorting by creation date
 ExhibitionSchema.index({ name: 'text', description: 'text' }); // Text search index
 
+// ✅ Compound indexes for common query patterns (optimizes admin dashboard queries)
+ExhibitionSchema.index({ status: 1, createdAt: -1 }); // For status-filtered lists sorted by date
+ExhibitionSchema.index({ status: 1, onsiteStartDate: 1 }); // For CRON job status updates
+

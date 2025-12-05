@@ -236,6 +236,11 @@ export class VisitorsService {
 
   /**
    * Bulk delete visitors
+   * 
+   * SECURITY: Limited to 100 visitors per request to prevent:
+   * - DoS attacks via large bulk operations
+   * - Memory exhaustion from processing too many records
+   * - Long-running requests that could timeout
    */
   async bulkDelete(ids: string[]): Promise<{
     message: string;
@@ -244,6 +249,15 @@ export class VisitorsService {
   }> {
     if (!ids || ids.length === 0) {
       throw new BadRequestException('No visitor IDs provided');
+    }
+
+    // ✅ SECURITY FIX: Limit bulk operations to prevent DoS
+    const MAX_BULK_DELETE = 100;
+    if (ids.length > MAX_BULK_DELETE) {
+      throw new BadRequestException(
+        `Cannot delete more than ${MAX_BULK_DELETE} visitors at once. ` +
+        `Received: ${ids.length}. Please split into smaller batches.`
+      );
     }
 
     const deleted: string[] = [];

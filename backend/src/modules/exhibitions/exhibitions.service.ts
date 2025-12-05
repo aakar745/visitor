@@ -30,6 +30,13 @@ export class ExhibitionsService {
   private readonly uploadDir: string;
   private readonly badgeDir: string;
 
+  /**
+   * Threshold for switching to cursor-based streaming for exports
+   * Above this count, exports use memory-efficient cursor streaming
+   * Below this count, exports use batch fetch (faster for small datasets)
+   */
+  private readonly STREAMING_THRESHOLD = 50000;
+
   constructor(
     @InjectModel(Exhibition.name) private exhibitionModel: Model<ExhibitionDocument>,
     @InjectModel(ExhibitionRegistration.name) private registrationModel: Model<ExhibitionRegistrationDocument>,
@@ -1280,10 +1287,22 @@ export class ExhibitionsService {
     const fieldsToExport = this.mergeFields(configuredFields, allFieldsInData);
     this.logger.log(`[Export] Exporting ${fieldsToExport.length} total fields (${configuredFields.length} configured + ${fieldsToExport.length - configuredFields.length} orphaned)`);
 
+    // ✅ PERFORMANCE FIX: Use cursor streaming for large datasets (50k+ records)
+    // This prevents memory issues when exporting 100k+ registrations
+    const useStreaming = total > this.STREAMING_THRESHOLD;
+    
+    if (useStreaming) {
+      this.logger.log(`[Export] Using cursor streaming (${total.toLocaleString()} records > ${this.STREAMING_THRESHOLD.toLocaleString()} threshold)`);
+    }
+
     if (options.format === 'csv') {
-      return this.exportAsCSV(filter, exhibition.name, fieldsToExport);
+      return useStreaming 
+        ? this.exportAsCSVStreaming(filter, exhibition.name, fieldsToExport, exhibition)
+        : this.exportAsCSV(filter, exhibition.name, fieldsToExport);
     } else {
-      return this.exportAsExcel(filter, exhibition.name, fieldsToExport);
+      return useStreaming
+        ? this.exportAsExcelStreaming(filter, exhibition.name, fieldsToExport, exhibition)
+        : this.exportAsExcel(filter, exhibition.name, fieldsToExport);
     }
   }
 
@@ -1863,6 +1882,316 @@ export class ExhibitionsService {
     stream.end(buffer);
 
     return new StreamableFile(stream);
+  }
+
+  /**
+   * Export as CSV using cursor streaming (memory efficient for 50k+ records)
+   * 
+   * PERFORMANCE: Uses MongoDB cursor to process records one at a time
+   * Memory usage stays constant regardless of dataset size
+   * 
+   * Suitable for: 50,000 - 1,000,000+ records
+   */
+  private async exportAsCSVStreaming(
+    filter: any, 
+    exhibitionName: string, 
+    customFieldDefinitions: any[],
+    exhibition: ExhibitionDocument,
+  ): Promise<StreamableFile> {
+    this.logger.log(`[CSV Streaming Export] Starting cursor-based export...`);
+    
+    const outputStream = new PassThrough();
+    
+    // Build CSV headers
+    const headers: string[] = ['Registration Number'];
+    
+    customFieldDefinitions.forEach(field => {
+      headers.push(field.label || field.name);
+    });
+    
+    if (exhibition?.interestOptions && exhibition.interestOptions.length > 0) {
+      headers.push('Interests');
+    }
+    
+    headers.push('Category');
+    headers.push('Registration Date');
+    headers.push('Time');
+    headers.push('Check-in Date');
+    headers.push('Check-in Time');
+    
+    if (exhibition?.isPaid) {
+      headers.push('Amount Paid');
+      headers.push('Payment Status');
+    }
+    
+    headers.push('Check-In Status');
+
+    // Write header row
+    outputStream.write(headers.join(',') + '\n');
+
+    // Helper function for field mapping
+    const getStandardFieldName = (fieldName: string): string | null => {
+      const normalized = fieldName.toLowerCase().replace(/[\s-_]/g, '');
+      const mappings: Record<string, string> = {
+        'pincode': 'pincode', 'pin': 'pincode', 'postal': 'pincode', 'zip': 'pincode',
+        'phone': 'phone', 'mobile': 'phone', 'contact': 'phone',
+        'name': 'name', 'fullname': 'name',
+        'email': 'email', 'company': 'company', 'organization': 'company',
+        'designation': 'designation', 'position': 'designation', 'title': 'designation',
+        'city': 'city', 'state': 'state', 'country': 'country', 'address': 'address',
+      };
+      return mappings[normalized] || null;
+    };
+
+    // Process using cursor
+    let processedCount = 0;
+    const cursor = this.registrationModel
+      .find(filter)
+      .populate('visitorId')
+      .sort({ registrationDate: -1 })
+      .lean()
+      .cursor();
+
+    for await (const reg of cursor) {
+      const visitor = (reg as any).visitorId;
+      
+      if (!visitor || !visitor._id) {
+        continue; // Skip invalid records
+      }
+
+      const values: string[] = [];
+      
+      // Registration Number
+      values.push(`"${((reg as any).registrationNumber || '').replace(/"/g, '""')}"`);
+      
+      // Custom fields
+      customFieldDefinitions.forEach(field => {
+        let value = visitor[field.name] ?? (reg as any).customFieldData?.[field.name];
+        
+        if (value === undefined || value === null) {
+          const standardField = getStandardFieldName(field.name);
+          if (standardField && visitor[standardField]) {
+            value = visitor[standardField];
+          }
+        }
+        
+        if (Array.isArray(value)) {
+          values.push(`"${value.join(', ')}"`);
+        } else if (value !== undefined && value !== null) {
+          values.push(`"${String(value).replace(/"/g, '""')}"`);
+        } else {
+          values.push('');
+        }
+      });
+      
+      // Interests
+      if (exhibition?.interestOptions && exhibition.interestOptions.length > 0) {
+        values.push(`"${((reg as any).selectedInterests || []).join(', ')}"`);
+      }
+      
+      // Category
+      values.push(`"${(reg as any).registrationCategory || ''}"`);
+      
+      // Registration Date & Time
+      if ((reg as any).registrationDate) {
+        const date = new Date((reg as any).registrationDate);
+        values.push(`${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`);
+        values.push(`${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`);
+      } else {
+        values.push('', '');
+      }
+      
+      // Check-in Date & Time
+      if ((reg as any).checkInTime) {
+        const date = new Date((reg as any).checkInTime);
+        values.push(`${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`);
+        values.push(`${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`);
+      } else {
+        values.push('', '');
+      }
+      
+      // Payment
+      if (exhibition?.isPaid) {
+        values.push(String((reg as any).amountPaid ?? 0));
+        values.push(`"${(reg as any).paymentStatus || 'pending'}"`);
+      }
+      
+      // Check-In Status
+      values.push((reg as any).checkInTime ? 'Checked In' : 'Not Checked In');
+      
+      outputStream.write(values.join(',') + '\n');
+      processedCount++;
+      
+      // Log progress every 10,000 records
+      if (processedCount % 10000 === 0) {
+        this.logger.log(`[CSV Streaming Export] Processed ${processedCount.toLocaleString()} records...`);
+      }
+    }
+
+    outputStream.end();
+    this.logger.log(`[CSV Streaming Export] Complete: ${processedCount.toLocaleString()} records exported`);
+
+    return new StreamableFile(outputStream);
+  }
+
+  /**
+   * Export as Excel using cursor streaming (memory efficient for 50k+ records)
+   * 
+   * PERFORMANCE: Uses MongoDB cursor + ExcelJS streaming workbook
+   * Memory usage stays manageable for large datasets
+   * 
+   * Suitable for: 50,000 - 1,000,000+ records
+   */
+  private async exportAsExcelStreaming(
+    filter: any, 
+    exhibitionName: string, 
+    customFieldDefinitions: any[],
+    exhibition: ExhibitionDocument,
+  ): Promise<StreamableFile> {
+    this.logger.log(`[Excel Streaming Export] Starting cursor-based export...`);
+    
+    const outputStream = new PassThrough();
+
+    // Create streaming workbook
+    const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
+      stream: outputStream,
+      useStyles: true,
+    });
+    
+    const worksheet = workbook.addWorksheet('Registrations');
+
+    // Build columns
+    const allColumns: any[] = [
+      { header: 'Registration Number', key: 'regNumber', width: 20 },
+    ];
+
+    customFieldDefinitions.forEach(field => {
+      allColumns.push({
+        header: field.label || field.name,
+        key: `custom_${field.name}`,
+        width: 20
+      });
+    });
+
+    if (exhibition?.interestOptions && exhibition.interestOptions.length > 0) {
+      allColumns.push({ header: 'Interests', key: 'interests', width: 30 });
+    }
+
+    allColumns.push({ header: 'Category', key: 'category', width: 15 });
+    allColumns.push({ header: 'Registration Date', key: 'regDate', width: 15 });
+    allColumns.push({ header: 'Time', key: 'regTime', width: 12 });
+    allColumns.push({ header: 'Check-in Date', key: 'checkInDate', width: 15 });
+    allColumns.push({ header: 'Check-in Time', key: 'checkInTime', width: 12 });
+
+    if (exhibition?.isPaid) {
+      allColumns.push({ header: 'Amount Paid', key: 'amount', width: 12 });
+      allColumns.push({ header: 'Payment Status', key: 'paymentStatus', width: 15 });
+    }
+
+    allColumns.push({ header: 'Check-In Status', key: 'checkInStatus', width: 15 });
+
+    worksheet.columns = allColumns;
+
+    // Helper for field mapping
+    const getStandardFieldName = (fieldName: string): string | null => {
+      const normalized = fieldName.toLowerCase().replace(/[\s-_]/g, '');
+      const mappings: Record<string, string> = {
+        'pincode': 'pincode', 'pin': 'pincode', 'postal': 'pincode', 'zip': 'pincode',
+        'phone': 'phone', 'mobile': 'phone', 'contact': 'phone',
+        'name': 'name', 'fullname': 'name',
+        'email': 'email', 'company': 'company', 'organization': 'company',
+        'designation': 'designation', 'position': 'designation', 'title': 'designation',
+        'city': 'city', 'state': 'state', 'country': 'country', 'address': 'address',
+      };
+      return mappings[normalized] || null;
+    };
+
+    // Process using cursor
+    let processedCount = 0;
+    const cursor = this.registrationModel
+      .find(filter)
+      .populate('visitorId')
+      .sort({ registrationDate: -1 })
+      .lean()
+      .cursor();
+
+    for await (const reg of cursor) {
+      const visitor = (reg as any).visitorId;
+      
+      if (!visitor || !visitor._id) {
+        continue;
+      }
+
+      const rowData: any = {
+        regNumber: (reg as any).registrationNumber || '',
+      };
+
+      // Custom fields
+      customFieldDefinitions.forEach(field => {
+        let value = visitor[field.name] ?? (reg as any).customFieldData?.[field.name];
+        
+        if (value === undefined || value === null) {
+          const standardField = getStandardFieldName(field.name);
+          if (standardField && visitor[standardField]) {
+            value = visitor[standardField];
+          }
+        }
+        
+        rowData[`custom_${field.name}`] = Array.isArray(value) ? value.join(', ') : (value ?? '');
+      });
+
+      // Interests
+      if (exhibition?.interestOptions && exhibition.interestOptions.length > 0) {
+        rowData.interests = ((reg as any).selectedInterests || []).join(', ');
+      }
+
+      // Category
+      rowData.category = (reg as any).registrationCategory || '';
+
+      // Registration Date & Time
+      if ((reg as any).registrationDate) {
+        const date = new Date((reg as any).registrationDate);
+        rowData.regDate = `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
+        rowData.regTime = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
+      } else {
+        rowData.regDate = '';
+        rowData.regTime = '';
+      }
+
+      // Check-in Date & Time
+      if ((reg as any).checkInTime) {
+        const date = new Date((reg as any).checkInTime);
+        rowData.checkInDate = `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
+        rowData.checkInTime = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
+      } else {
+        rowData.checkInDate = '';
+        rowData.checkInTime = '';
+      }
+
+      // Payment
+      if (exhibition?.isPaid) {
+        rowData.amount = (reg as any).amountPaid ?? 0;
+        rowData.paymentStatus = (reg as any).paymentStatus || 'pending';
+      }
+
+      // Check-In Status
+      rowData.checkInStatus = (reg as any).checkInTime ? 'Checked In' : 'Not Checked In';
+
+      worksheet.addRow(rowData).commit();
+      processedCount++;
+
+      // Log progress every 10,000 records
+      if (processedCount % 10000 === 0) {
+        this.logger.log(`[Excel Streaming Export] Processed ${processedCount.toLocaleString()} records...`);
+      }
+    }
+
+    await worksheet.commit();
+    await workbook.commit();
+    
+    this.logger.log(`[Excel Streaming Export] Complete: ${processedCount.toLocaleString()} records exported`);
+
+    return new StreamableFile(outputStream);
   }
 
   /**

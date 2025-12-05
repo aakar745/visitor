@@ -30,6 +30,7 @@ import { VisitorImportsModule } from './modules/visitor-imports/visitor-imports.
 import { KioskModule } from './modules/kiosk/kiosk.module';
 import { PrintQueueModule } from './modules/print-queue/print-queue.module';
 import { OtpQueueModule } from './modules/otp-queue/otp-queue.module';
+import { WhatsAppQueueModule } from './modules/whatsapp-queue/whatsapp-queue.module';
 import { MeilisearchModule } from './modules/meilisearch/meilisearch.module';
 
 // Guards
@@ -104,6 +105,7 @@ import { PermissionsGuard } from './common/guards/permissions.guard';
     KioskModule,
     PrintQueueModule,
     OtpQueueModule,
+    WhatsAppQueueModule,
   ],
   providers: [
     // Global guards - order matters!

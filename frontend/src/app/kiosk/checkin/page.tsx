@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { QRScanner } from '@/components/kiosk/QRScanner';
 import { kioskApi, type KioskConfig, type ValidateQRResponse, type RecentCheckIn } from '@/lib/api/kiosk';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Badge } from '@/components/ui/badge';
 import { Loader2, CheckCircle, AlertCircle, Search, RefreshCw, User, Building, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
+
+// ✅ DEDUPLICATION: Minimum time between processing same QR code (prevents double-tap)
+const SCAN_COOLDOWN_MS = 3000;
 
 export default function KioskCheckinPage() {
   // State
@@ -33,6 +36,10 @@ export default function KioskCheckinPage() {
   
   const barcodeBufferRef = useRef('');
   const barcodeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // ✅ DEDUPLICATION: Track last processed QR to prevent double-tap
+  const lastProcessedRef = useRef<{ regNumber: string; timestamp: number } | null>(null);
+  const processingRef = useRef<Set<string>>(new Set()); // Track in-flight requests
 
   // Load config and check PIN
   useEffect(() => {
@@ -100,7 +107,9 @@ export default function KioskCheckinPage() {
         setAuthenticated(true);
       }
     } catch (error: any) {
-      console.error('Failed to load kiosk config:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Failed to load kiosk config:', error);
+      }
       toast.error('Failed to load kiosk configuration');
     } finally {
       setLoading(false);
@@ -135,7 +144,10 @@ export default function KioskCheckinPage() {
       const data = await kioskApi.getRecentCheckIns('all', config?.recentCheckInsLimit || 20);
       setRecentCheckIns(data);
     } catch (error) {
-      console.error('Failed to load recent check-ins:', error);
+      // Silently fail - recent check-ins list is not critical
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Failed to load recent check-ins:', error);
+      }
     } finally {
       setLoadingRecent(false);
     }
@@ -163,9 +175,34 @@ export default function KioskCheckinPage() {
     setProcessingManual(false);
   };
 
-  const validateAndProcess = async (registrationNumber: string) => {
+  const validateAndProcess = useCallback(async (registrationNumber: string) => {
+    const normalizedRegNumber = registrationNumber.trim().toUpperCase();
+    
+    // ✅ DEDUPLICATION: Check if this QR was recently processed
+    const now = Date.now();
+    const lastProcessed = lastProcessedRef.current;
+    if (lastProcessed && 
+        lastProcessed.regNumber === normalizedRegNumber && 
+        (now - lastProcessed.timestamp) < SCAN_COOLDOWN_MS) {
+      // Same QR scanned within cooldown period - ignore
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[Check-in] Ignoring duplicate scan: ${normalizedRegNumber}`);
+      }
+      return;
+    }
+    
+    // ✅ DEDUPLICATION: Check if request is already in-flight
+    if (processingRef.current.has(normalizedRegNumber)) {
+      toast.info('Processing in progress...', { duration: 1500 });
+      return;
+    }
+    
+    // Mark as processing
+    processingRef.current.add(normalizedRegNumber);
+    lastProcessedRef.current = { regNumber: normalizedRegNumber, timestamp: now };
+    
     try {
-      const data = await kioskApi.validateQR(registrationNumber);
+      const data = await kioskApi.validateQR(normalizedRegNumber);
       
       if (data.alreadyCheckedIn) {
         // Already checked in - show info toast
@@ -179,7 +216,7 @@ export default function KioskCheckinPage() {
       // Valid registration - check if auto-check-in is enabled
       if (config?.autoCheckIn) {
         // Auto check-in without confirmation
-        await performCheckIn(registrationNumber, data);
+        await performCheckIn(normalizedRegNumber, data);
       } else {
         // Show confirmation modal
         setValidatedData(data);
@@ -188,10 +225,17 @@ export default function KioskCheckinPage() {
       
       setManualInput('');
     } catch (error: any) {
-      console.error('Validation error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Validation error:', error);
+      }
       toast.error(error.response?.data?.message || 'Invalid QR code or registration not found');
+    } finally {
+      // Clear processing flag after short delay (allows UI to update)
+      setTimeout(() => {
+        processingRef.current.delete(normalizedRegNumber);
+      }, 500);
     }
-  };
+  }, [config]);
 
   const performCheckIn = async (registrationNumber: string, data?: ValidateQRResponse) => {
     const visitorData = data || validatedData;
@@ -220,8 +264,20 @@ export default function KioskCheckinPage() {
         loadRecentCheckIns();
       }
     } catch (error: any) {
-      console.error('Check-in error:', error);
-      toast.error(error.response?.data?.message || 'Check-in failed');
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Check-in error:', error);
+      }
+      
+      // ✅ IMPROVED ERROR HANDLING: Show specific message for concurrent scan
+      const errorMessage = error.response?.data?.message || 'Check-in failed';
+      if (errorMessage.includes('Another kiosk')) {
+        toast.error('Processing on another device', {
+          description: 'This visitor is being processed by another staff member. Please wait.',
+          duration: 5000,
+        });
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setCheckingIn(false);
     }
