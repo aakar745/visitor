@@ -960,69 +960,98 @@ export function CustomFieldsSection({
         })}
       </div>
 
-        {/* Interests Section - Multi-Select Badges */}
-        {interestOptions.length > 0 && (
-          <div className="space-y-3">
-            <div>
-              <Label className={cn(
-                "text-sm font-medium",
-                hasRequiredInterest && "required"
-              )}>
-                What are you looking for?
-              </Label>
-              <p className="text-sm text-muted-foreground mt-1">
-                {hasRequiredInterest 
-                  ? 'Select all areas you\'re interested in exploring at this exhibition'
-                  : 'Select all areas you\'re interested in exploring at this exhibition (optional)'
-                }
-              </p>
-            </div>
-            
-            <div className="flex flex-wrap gap-2">
-              {interestOptions.map((option) => {
-                if (!option.name) {
-                  console.warn('[Interests] Invalid interest option:', option);
-                  return null;
-                }
-                
-                const isSelected = selectedInterests.includes(option.name);
-                
-                return (
-                  <div
-                    key={`interest-${option.id}`}
-                    className={cn(
-                      badgeVariants({ variant: isSelected ? 'default' : 'outline' }),
-                      "cursor-pointer px-4 py-2 text-sm transition-all hover:scale-105 flex items-center gap-1.5"
-                    )}
-                    onClick={() => {
-                      // Toggle selection - Multi-select using NAMES
-                      const newInterests = isSelected
-                        ? selectedInterests.filter((name: string) => name !== option.name)
-                        : [...selectedInterests, option.name];
-                      form.setValue('selectedInterests', newInterests, { shouldValidate: true });
-                    }}
-                  >
-                    {isSelected && <Check className="h-3 w-3" />}
-                    <span>{option.name}</span>
-                  </div>
-                );
-              })}
-            </div>
-            
-            {selectedInterests.length > 0 && (
-              <p className="text-xs text-muted-foreground">
-                {selectedInterests.length} interest{selectedInterests.length !== 1 ? 's' : ''} selected
-              </p>
-            )}
-
-            {/* ✅ Show validation error if interests are required but not selected */}
-            {errors.selectedInterests && (
-              <p className="text-sm text-red-500">
-                {errors.selectedInterests.message}
-              </p>
-            )}
+      {/* Interests Section - Multi-Select Badges */}
+      {interestOptions.length > 0 && (
+        <div className="space-y-4">
+          <div>
+            <Label className={cn(
+              "text-lg font-semibold flex items-center gap-2",
+              hasRequiredInterest && "required"
+            )}>
+              What are you looking for?
+              {hasRequiredInterest && (
+                <span className="text-xs font-normal text-muted-foreground">
+                  (At least one selection required)
+                </span>
+              )}
+            </Label>
+            <p className="text-sm text-muted-foreground mt-1">
+              Select the areas you're interested in exploring at this exhibition
+            </p>
           </div>
-        )}
+          
+          {/* Show required interests notice */}
+          {hasRequiredInterest && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 p-3">
+              <div className="flex items-start gap-2">
+                <CheckCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  Please select at least one interest to continue with your registration.
+                </p>
+              </div>
+            </div>
+          )}
+          
+          <div className="flex flex-wrap gap-3">
+            {interestOptions.map((option) => {
+              if (!option.name) {
+                console.warn('[Interests] Invalid interest option:', option);
+                return null;
+              }
+              
+              const isSelected = selectedInterests.includes(option.name);
+              const isRequired = option.required === true;
+              
+              return (
+                <div
+                  key={`interest-${option.id}`}
+                  className={cn(
+                    badgeVariants({ variant: isSelected ? 'default' : 'outline' }),
+                    "cursor-pointer px-4 py-2 text-sm transition-all hover:scale-105 flex items-center gap-1.5 relative",
+                    isRequired && !isSelected && "border-amber-300 dark:border-amber-700"
+                  )}
+                  onClick={() => {
+                    // Toggle selection - Multi-select using NAMES
+                    const newInterests = isSelected
+                      ? selectedInterests.filter((name: string) => name !== option.name)
+                      : [...selectedInterests, option.name];
+                    form.setValue('selectedInterests', newInterests, { shouldValidate: true });
+                  }}
+                  title={isRequired ? 'Recommended interest' : option.description || option.name}
+                >
+                  {isSelected && <Check className="h-3 w-3" />}
+                  {isRequired && !isSelected && (
+                    <svg className="h-3 w-3 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  )}
+                  <span>{option.name}</span>
+                </div>
+              );
+            })}
+          </div>
+          
+          {selectedInterests.length > 0 && (
+            <p className="text-sm text-muted-foreground">
+              {selectedInterests.length} interest{selectedInterests.length !== 1 ? 's' : ''} selected
+            </p>
+          )}
+
+          {/* ✅ Show validation error if interests are required but not selected */}
+          {errors.selectedInterests && (
+            <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-950/20 p-3">
+              <div className="flex items-start gap-2">
+                <svg className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                <p className="text-sm text-red-600">
+                  {errors.selectedInterests.message}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

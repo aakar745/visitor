@@ -70,6 +70,8 @@ class DataProcessor {
       'Andaman and Nicobar Islands': 'AN',
       'Chandigarh': 'CH',
       'Dadra and Nagar Haveli and Daman and Diu': 'DH',
+      'Dadra and Nagar Haveli': 'DN',  // Legacy code
+      'Daman and Diu': 'DD',            // Legacy code
       'Delhi': 'DL',
       'Jammu and Kashmir': 'JK',
       'Ladakh': 'LA',

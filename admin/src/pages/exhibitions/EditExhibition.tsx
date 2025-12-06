@@ -19,7 +19,6 @@ import { useMessage } from '../../hooks/useMessage';
 import { useFormCleanup } from '../../hooks/useFormCleanup';
 import {
   SaveOutlined,
-  EyeOutlined,
   ArrowLeftOutlined,
   CalendarOutlined,
   SettingOutlined,
@@ -52,7 +51,6 @@ const EditExhibition: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
-  const [previewMode, setPreviewMode] = useState(false);
   const [canSubmit, setCanSubmit] = useState(false);
 
   // Prevent auto-submission when reaching last step
@@ -661,28 +659,18 @@ const EditExhibition: React.FC = () => {
             Update exhibition details, pricing, and visitor management settings
           </Text>
         </div>
-        <Space>
-          <Button 
-            icon={<EyeOutlined />} 
-            onClick={() => setPreviewMode(!previewMode)}
-            disabled={previewMode}
-            size="middle"
-          >
-            Preview
-          </Button>
-          <Button 
-            type="primary" 
-            icon={<SaveOutlined />}
-            onClick={() => {
-              setCanSubmit(true);
-              form.submit();
-            }}
-            loading={loading}
-            size="middle"
-          >
-            Save Changes
-          </Button>
-        </Space>
+        <Button 
+          type="primary" 
+          icon={<SaveOutlined />}
+          onClick={() => {
+            setCanSubmit(true);
+            form.submit();
+          }}
+          loading={loading}
+          size="middle"
+        >
+          Save Changes
+        </Button>
       </div>
 
       {/* Progress Steps */}
